@@ -9,6 +9,7 @@
 </head>
 <body>
   <div class="os-shell">
+    <!-- EXPANDABLE LEFT SIDEBAR WITH CRISP SYMBOLS -->
     <aside class="left-dock" id="left-dock">
       <div class="dock-top">
         <div class="brand-logo">Z</div>
@@ -17,32 +18,37 @@
       </div>
 
       <div class="dock-section">CORE</div>
-      <button class="dock-btn active" data-tab="home-view"><span class="ico">⌂</span><span class="lbl">Dashboard</span></button>
-      <button class="dock-btn" data-tab="game-view"><span class="ico">🎮</span><span class="lbl">Arcade</span></button>
-      <button class="dock-btn" data-tab="store-view"><span class="ico">🛒</span><span class="lbl">Zynk Store</span></button>
+      <button class="dock-btn active" data-tab="home-view"><span class="sym">⌂</span><span class="lbl">Dashboard</span></button>
+      <button class="dock-btn" data-tab="chat-view"><span class="sym">◈</span><span class="lbl">Zynk Chat</span></button>
+      <button class="dock-btn" data-tab="game-view"><span class="sym">❖</span><span class="lbl">Arcade</span></button>
+      <button class="dock-btn" data-tab="ranks-view"><span class="sym">▲</span><span class="lbl">Ranks</span></button>
+      <button class="dock-btn" data-tab="store-view"><span class="sym">⊞</span><span class="lbl">Zynk Store</span></button>
 
-      <div class="dock-section">APPS</div>
-      <button class="dock-btn" data-tab="achieve-view"><span class="ico">🏆</span><span class="lbl">Achievements</span></button>
-      <button class="dock-btn" data-tab="leader-view"><span class="ico">📊</span><span class="lbl">Leaderboards</span></button>
-      <button class="dock-btn" data-tab="tools-view"><span class="ico">🧰</span><span class="lbl">Utility Tools</span></button>
+      <div class="dock-section">NETWORK</div>
+      <button class="dock-btn" data-tab="profile-view"><span class="sym">◉</span><span class="lbl">Profile & Friends</span></button>
+      <button class="dock-btn" data-tab="achieve-view"><span class="sym">★</span><span class="lbl">Achievements</span></button>
+      <button class="dock-btn" data-tab="leader-view"><span class="sym">≡</span><span class="lbl">Leaderboards</span></button>
+      <button class="dock-btn" data-tab="tools-view"><span class="sym">⌘</span><span class="lbl">Utility Tools</span></button>
 
       <div class="dock-section">SYSTEM</div>
-      <button class="dock-btn" data-tab="settings-view"><span class="ico">⚙️</span><span class="lbl">Settings</span></button>
+      <button class="dock-btn" data-tab="settings-view"><span class="sym">⚙</span><span class="lbl">Settings</span></button>
 
       <div class="dock-footer" onclick="openTab('settings-view')">
-        <div class="dock-clock"><span id="dock-hr">03</span>:<span id="dock-min">30</span></div>
+        <div class="dock-clock"><span id="dock-hr">04</span>:<span id="dock-min">00</span></div>
         <span class="lbl clock-sub">Local Time</span>
       </div>
     </aside>
 
+    <!-- CENTER WORKSPACE -->
     <main class="center-stage">
+      <!-- 1. DASHBOARD -->
       <section id="home-view" class="tab-view active">
         <div class="hero-stage">
           <canvas id="wireframe-bg"></canvas>
           <div class="hero-clock-overlay">
             <div class="hero-day" id="hero-day">SATURDAY</div>
             <div class="hero-time-row">
-              <span class="hero-time" id="hero-time">3:30</span>
+              <span class="hero-time" id="hero-time">4:06</span>
               <span class="hero-ampm" id="hero-ampm">PM</span>
             </div>
             <div class="hero-date" id="hero-date">11.21.26</div>
@@ -64,17 +70,16 @@
                 <div class="user-block">
                   <div class="avatar-box" id="profile-avatar">Z</div>
                   <div>
-                    <div class="hello-tag">OPERATOR // VERIFIED</div>
-                    <h2 class="username">KingstenVibes</h2>
+                    <div class="hello-tag" id="hud-role-tag">[FOUNDER] • [CIRCUIT]</div>
+                    <h2 class="username" id="hud-username">KingstenVibes</h2>
                     <div class="badges-row">
-                      <span class="pill">Founder</span>
                       <span class="pill" id="hud-credits">500 Z-Credits</span>
+                      <span class="pill" id="hud-rank-pill">Rank: Circuit</span>
                     </div>
                   </div>
                 </div>
-                <button class="btn-outline" onclick="openTab('settings-view')">⚙️ Timezone</button>
+                <button class="btn-outline" onclick="openTab('settings-view')">⚙ Settings</button>
               </div>
-
               <div class="level-box">
                 <div class="level-header">
                   <span>NEURAL SYNC LEVEL</span>
@@ -83,129 +88,123 @@
                 <div class="level-num" id="hud-lvl">◈ LEVEL 1</div>
                 <div class="xp-track"><div class="xp-fill" id="hud-xp-bar" style="width: 35%;"></div></div>
               </div>
-
-              <div class="rewards-row">
-                <div class="reward-chip earned"><span>UNLOCKED</span><strong>Emerald Core</strong></div>
-                <div class="reward-chip next"><span>UP NEXT</span><strong>Cyber Pulse</strong></div>
-                <div class="reward-chip"><span>LOCKED</span><strong>Quantum Halo</strong></div>
-              </div>
             </div>
 
             <div class="glass-card">
               <h3>ZynkOS Feed</h3>
               <div class="sub-label">SYSTEM BROADCASTS</div>
               <div class="announce-item featured">
-                <strong>ZYNKOS NETWORK LAUNCHED ⚡</strong>
-                <p>Welcome to ZynkOS! Chat live on the right, earn Z-Credits in the Arcade, and unlock custom themes in the Store.</p>
+                <strong>ZYNKBOT & RANKS ONLINE ⚡</strong>
+                <p>Open <strong>Zynk Chat</strong> to use <code>/help</code>, <code>/pay</code>, and <code>/daily</code>, or visit <strong>Ranks</strong> to claim monthly Z-Credits!</p>
               </div>
               <div class="announce-item">
-                <strong>Custom Arcade Ready</strong>
-                <p>Click <strong>Arcade</strong> in the left dock to launch our custom FriendJam build.</p>
+                <strong>Stealth Cloak Ready</strong>
+                <p>Launch ZynkOS inside an invisible <code>about:blank</code> tab from <strong>Settings</strong>.</p>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="game-view" class="tab-view">
-        <div class="view-topbar">
-          <div>
-            <h2>ZynkOS // Arcade</h2>
-            <p class="sub-text">Play our custom FriendJam build directly inside ZynkOS.</p>
+      <!-- 2. NATIVE ZYNK CHAT + BUILT-IN BOT + MEMBER LIST -->
+      <section id="chat-view" class="tab-view">
+        <div class="native-chat-layout">
+          <div class="native-chat-main">
+            <div class="view-topbar">
+              <div>
+                <h2># zynk-global</h2>
+                <p class="sub-text">Native ZynkOS Chat • Type <code>/help</code> for ZynkBot commands</p>
+              </div>
+              <span class="credit-pill" id="chat-credits">500 Z-Credits</span>
+            </div>
+            <div class="native-messages" id="native-messages"></div>
+            <form class="native-input-row" id="native-chat-form">
+              <input id="native-msg-input" placeholder="Message #zynk-global or type /pay @user 50..." autocomplete="off" />
+              <button type="submit" class="btn-neon">Send</button>
+            </form>
           </div>
-          <button class="btn-neon" onclick="openTab('home-view')">← Dashboard</button>
-        </div>
-        <div class="game-frame-box" id="custom-game-container">
-          <div class="game-placeholder">
-            <h3>Ready for Your Game Code</h3>
-            <p>Send over your FriendJam link or code next and it will load right inside this arena.</p>
-          </div>
+          <aside class="member-sidebar" id="member-sidebar"></aside>
         </div>
       </section>
 
+      <!-- 3. ARCADE -->
+      <section id="game-view" class="tab-view">
+        <div class="view-topbar">
+          <div><h2>ZynkOS // Arcade</h2><p class="sub-text">Custom FriendJam build arena.</p></div>
+          <button class="btn-neon" onclick="openTab('home-view')">← Dashboard</button>
+        </div>
+        <div class="game-frame-box" id="custom-game-container">
+          <div class="game-placeholder"><h3>Ready for Your Game Code</h3><p>Paste your FriendJam link or code next to launch here.</p></div>
+        </div>
+      </section>
+
+      <!-- 4. RANKS -->
+      <section id="ranks-view" class="tab-view padded-view">
+        <div class="view-topbar">
+          <div><h2>ZynkOS Ranks & Stipends</h2><p class="sub-text">Higher ranks inherit all lower rank perks + bigger monthly Z-Credit drops.</p></div>
+          <button class="btn-neon" id="claim-monthly-btn">Claim Monthly Stipend</button>
+        </div>
+        <div class="cards-grid" id="ranks-grid"></div>
+      </section>
+
+      <!-- 5. STORE -->
       <section id="store-view" class="tab-view padded-view">
         <div class="view-topbar">
-          <div>
-            <h2>Zynk Store</h2>
-            <p class="sub-text">Spend your Z-Credits on avatar cores, glowing borders, and profile badges.</p>
-          </div>
-          <div class="credit-pill" id="store-credits">500 Z-Credits</div>
+          <div><h2>Zynk Store</h2><p class="sub-text">Unlock working avatar cores, chat badges, and profile frames.</p></div>
+          <span class="credit-pill" id="store-credits">500 Z-Credits</span>
         </div>
         <div class="cards-grid" id="store-grid"></div>
       </section>
 
+      <!-- 6. PROFILE, ROLES & FRIENDS -->
+      <section id="profile-view" class="tab-view padded-view">
+        <div id="social-container"></div>
+      </section>
+
+      <!-- 7. ACHIEVEMENTS -->
       <section id="achieve-view" class="tab-view padded-view">
-        <div class="view-topbar">
-          <div>
-            <h2>Achievements</h2>
-            <p class="sub-text">Complete milestones across ZynkOS to claim bonus Z-Credits and XP.</p>
-          </div>
-        </div>
+        <div class="view-topbar"><div><h2>Achievements</h2><p class="sub-text">Complete milestones for XP & Z-Credits.</p></div></div>
         <div class="cards-grid" id="achieve-grid"></div>
       </section>
 
+      <!-- 8. LEADERBOARDS -->
       <section id="leader-view" class="tab-view padded-view">
-        <div class="view-topbar">
-          <div>
-            <h2>Global Leaderboards</h2>
-            <p class="sub-text">Top operators ranked by Neural Sync Level and Z-Credits.</p>
-          </div>
-        </div>
+        <div class="view-topbar"><div><h2>Global Leaderboards</h2><p class="sub-text">Ranked by Z-Credits & Rank Tier.</p></div></div>
         <div class="glass-card" id="leaderboard-list"></div>
       </section>
 
+      <!-- 9. UTILITY TOOLS -->
       <section id="tools-view" class="tab-view padded-view">
-        <div class="view-topbar">
-          <div>
-            <h2>ZynkOS Utility Tools</h2>
-            <p class="sub-text">Built-in browser tools for creators and operators.</p>
-          </div>
-        </div>
-        <div class="cards-grid">
-          <div class="glass-card tool-card">
-            <h4>Password Generator</h4>
-            <p class="sub-text">Generate a strong 16-character secure password.</p>
-            <input id="gen-pass-out" readonly value="Click Generate..." class="tool-input" />
-            <button class="btn-neon" id="gen-pass-btn">Generate</button>
-          </div>
-          <div class="glass-card tool-card">
-            <h4>Color Hex Inspector</h4>
-            <p class="sub-text">Pick any color and copy its hex code for themes.</p>
-            <div style="display:flex; gap:10px; align-items:center; margin-top:8px;">
-              <input type="color" id="color-picker" value="#10b981" style="height:38px; width:50px; border:none; background:none;" />
-              <input id="color-hex-out" readonly value="#10b981" class="tool-input" style="margin:0;" />
-            </div>
-          </div>
-        </div>
+        <div class="view-topbar"><div><h2>ZynkOS Utility Tools</h2><p class="sub-text">Creator & developer suite.</p></div></div>
+        <div class="cards-grid" id="tools-grid"></div>
       </section>
 
+      <!-- 10. SETTINGS -->
       <section id="settings-view" class="tab-view padded-view">
         <div class="glass-card settings-card">
           <h2>System Settings</h2>
-          <p class="sub-text">Personalize your clock, timezone, and browser tab appearance.</p>
           <div id="settings-controls"></div>
           <div class="settings-actions">
             <button id="save-settings-btn" class="btn-neon">Save Preferences</button>
+            <button id="about-blank-btn" class="btn-outline">↗ Open in about:blank</button>
             <span id="save-msg" class="save-msg"></span>
           </div>
-          <div class="dns-footer">
-            <a href="https://dynu.com" target="_blank">Free Dynamic DNS by Dynu</a>
-          </div>
+          <div class="dns-footer"><a href="https://dynu.com" target="_blank">Free Dynamic DNS by Dynu</a></div>
         </div>
       </section>
     </main>
 
+    <!-- PINNED RIGHT VORTEX GUILD CHAT -->
     <aside class="right-chat-dock">
-      <iframe
-        src="https://vortexos.net"
-        title="ZynkOS Live Guild Chat"
-        allow="clipboard-write"
-      ></iframe>
+      <iframe src="https://vortexos.net" title="Vortex Guild Chat" allow="clipboard-write"></iframe>
     </aside>
   </div>
 
   <script src="js/nav.js"></script>
-  <script src="js/features.js"></script>
+  <script src="js/ranks-store.js"></script>
+  <script src="js/chat.js"></script>
+  <script src="js/social.js"></script>
+  <script src="js/tools.js"></script>
   <script src="js/wireframe.js"></script>
 </body>
 </html>
