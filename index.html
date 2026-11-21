@@ -6,10 +6,32 @@
   <title>ZynkOS — Neural OS & Arcade</title>
   <link id="favicon" rel="icon" href="data:image/svg+xml,<svg xmlns='http://w3.org' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💠</text></svg>" />
   <link rel="stylesheet" href="css/style.css" />
+  <script src="https://jsdelivr.net"></script>
 </head>
 <body>
+  <!-- SIGN IN / CREATE ACCOUNT MODAL -->
+  <div id="auth-modal" class="modal-backdrop hidden">
+    <div class="glass-card modal-box">
+      <h2 id="auth-title">Sign In to ZynkOS</h2>
+      <p class="sub-text">Access your real profile, Z-Credits, ranks, and live multiplayer chat.</p>
+      <input id="auth-user" class="tool-input hidden" placeholder="Choose a Username (e.g. KingstenVibes)" />
+      <input id="auth-email" class="tool-input" type="email" placeholder="Email Address" />
+      <input id="auth-pass" class="tool-input" type="password" placeholder="Password (6+ characters)" />
+      <div class="settings-actions">
+        <button id="auth-submit-btn" class="btn-neon" style="flex:1">Sign In</button>
+        <button id="auth-toggle-btn" class="btn-outline">Create Account</button>
+      </div>
+      <button id="auth-close-btn" class="btn-ghost">Continue as Guest</button>
+    </div>
+  </div>
+
+  <!-- CLICKABLE USER PROFILE POPUP MODAL -->
+  <div id="user-modal" class="modal-backdrop hidden">
+    <div class="glass-card profile-modal" id="user-modal-content"></div>
+  </div>
+
   <div class="os-shell">
-    <!-- EXPANDABLE LEFT SIDEBAR WITH CRISP SYMBOLS -->
+    <!-- EXPANDABLE LEFT SIDEBAR -->
     <aside class="left-dock" id="left-dock">
       <div class="dock-top">
         <div class="brand-logo">Z</div>
@@ -24,8 +46,8 @@
       <button class="dock-btn" data-tab="ranks-view"><span class="sym">▲</span><span class="lbl">Ranks</span></button>
       <button class="dock-btn" data-tab="store-view"><span class="sym">⊞</span><span class="lbl">Zynk Store</span></button>
 
-      <div class="dock-section">NETWORK</div>
-      <button class="dock-btn" data-tab="profile-view"><span class="sym">◉</span><span class="lbl">Profile & Friends</span></button>
+      <div class="dock-section">SOCIAL</div>
+      <button class="dock-btn" data-tab="profile-view"><span class="sym">◉</span><span class="lbl">My Profile</span></button>
       <button class="dock-btn" data-tab="achieve-view"><span class="sym">★</span><span class="lbl">Achievements</span></button>
       <button class="dock-btn" data-tab="leader-view"><span class="sym">≡</span><span class="lbl">Leaderboards</span></button>
       <button class="dock-btn" data-tab="tools-view"><span class="sym">⌘</span><span class="lbl">Utility Tools</span></button>
@@ -34,12 +56,11 @@
       <button class="dock-btn" data-tab="settings-view"><span class="sym">⚙</span><span class="lbl">Settings</span></button>
 
       <div class="dock-footer" onclick="openTab('settings-view')">
-        <div class="dock-clock"><span id="dock-hr">04</span>:<span id="dock-min">00</span></div>
+        <div class="dock-clock"><span id="dock-hr">05</span>:<span id="dock-min">43</span></div>
         <span class="lbl clock-sub">Local Time</span>
       </div>
     </aside>
-
-    <!-- CENTER WORKSPACE -->
+    <!-- FULL-WIDTH WORKSPACE (NO SPINNING VORTEX WALL) -->
     <main class="center-stage">
       <!-- 1. DASHBOARD -->
       <section id="home-view" class="tab-view active">
@@ -48,7 +69,7 @@
           <div class="hero-clock-overlay">
             <div class="hero-day" id="hero-day">SATURDAY</div>
             <div class="hero-time-row">
-              <span class="hero-time" id="hero-time">4:06</span>
+              <span class="hero-time" id="hero-time">5:43</span>
               <span class="hero-ampm" id="hero-ampm">PM</span>
             </div>
             <div class="hero-date" id="hero-date">11.21.26</div>
@@ -60,33 +81,36 @@
 
         <div class="bento-wrapper">
           <div class="status-bar">
-            <span><i class="dot-emerald"></i> ZynkOS Grid Online</span>
-            <span class="mono-dim" id="status-tz">TZ: Auto-Detected</span>
+            <span><i class="dot-emerald"></i> ZynkOS Network Live</span>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <span class="mono-dim" id="status-tz">TZ: Auto</span>
+              <button class="btn-neon" id="top-auth-btn">Sign In / Create Account</button>
+            </div>
           </div>
 
           <div class="bento-grid">
             <div class="glass-card">
               <div class="profile-top">
                 <div class="user-block">
-                  <div class="avatar-box" id="profile-avatar">Z</div>
+                  <img id="hud-avatar-img" class="avatar-img" src="https://dicebear.com" alt="Avatar" />
                   <div>
-                    <div class="hello-tag" id="hud-role-tag">[FOUNDER] • [CIRCUIT]</div>
-                    <h2 class="username" id="hud-username">KingstenVibes</h2>
+                    <div class="hello-tag" id="hud-role-tag">[GUEST] • [CIRCUIT]</div>
+                    <h2 class="username" id="hud-username">Guest Operator</h2>
                     <div class="badges-row">
-                      <span class="pill" id="hud-credits">500 Z-Credits</span>
+                      <span class="pill" id="hud-credits">0 Z-Credits</span>
                       <span class="pill" id="hud-rank-pill">Rank: Circuit</span>
                     </div>
                   </div>
                 </div>
-                <button class="btn-outline" onclick="openTab('settings-view')">⚙ Settings</button>
+                <button class="btn-outline" onclick="openTab('profile-view')">Edit Profile</button>
               </div>
               <div class="level-box">
                 <div class="level-header">
                   <span>NEURAL SYNC LEVEL</span>
-                  <span class="mono-dim" id="hud-xp-text">350 / 1,000 XP</span>
+                  <span class="mono-dim" id="hud-xp-text">0 / 1,000 XP</span>
                 </div>
                 <div class="level-num" id="hud-lvl">◈ LEVEL 1</div>
-                <div class="xp-track"><div class="xp-fill" id="hud-xp-bar" style="width: 35%;"></div></div>
+                <div class="xp-track"><div class="xp-fill" id="hud-xp-bar" style="width: 0%;"></div></div>
               </div>
             </div>
 
@@ -94,28 +118,25 @@
               <h3>ZynkOS Feed</h3>
               <div class="sub-label">SYSTEM BROADCASTS</div>
               <div class="announce-item featured">
-                <strong>ZYNKBOT & RANKS ONLINE ⚡</strong>
-                <p>Open <strong>Zynk Chat</strong> to use <code>/help</code>, <code>/pay</code>, and <code>/daily</code>, or visit <strong>Ranks</strong> to claim monthly Z-Credits!</p>
+                <strong>REAL ACCOUNTS & LIVE CHAT ⚡</strong>
+                <p>Click <strong>Sign In / Create Account</strong> above to claim your username, upload your avatar & banner, and chat live.</p>
               </div>
               <div class="announce-item">
-                <strong>Stealth Cloak Ready</strong>
-                <p>Launch ZynkOS inside an invisible <code>about:blank</code> tab from <strong>Settings</strong>.</p>
+                <strong>ZynkBot Commands</strong>
+                <p>Type <code>/help</code>, <code>/pay @username amount</code>, <code>/daily</code>, or <code>/roll</code> in Zynk Chat.</p>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- 2. NATIVE ZYNK CHAT + BUILT-IN BOT + MEMBER LIST -->
+      <!-- 2. LIVE MULTIPLAYER ZYNK CHAT -->
       <section id="chat-view" class="tab-view">
         <div class="native-chat-layout">
           <div class="native-chat-main">
             <div class="view-topbar">
-              <div>
-                <h2># zynk-global</h2>
-                <p class="sub-text">Native ZynkOS Chat • Type <code>/help</code> for ZynkBot commands</p>
-              </div>
-              <span class="credit-pill" id="chat-credits">500 Z-Credits</span>
+              <div><h2># zynk-global</h2><p class="sub-text">Click any avatar or username to open their profile • Type <code>/help</code> for ZynkBot</p></div>
+              <span class="credit-pill" id="chat-credits">0 Z-Credits</span>
             </div>
             <div class="native-messages" id="native-messages"></div>
             <form class="native-input-row" id="native-chat-form">
@@ -141,7 +162,7 @@
       <!-- 4. RANKS -->
       <section id="ranks-view" class="tab-view padded-view">
         <div class="view-topbar">
-          <div><h2>ZynkOS Ranks & Stipends</h2><p class="sub-text">Higher ranks inherit all lower rank perks + bigger monthly Z-Credit drops.</p></div>
+          <div><h2>ZynkOS Ranks</h2><p class="sub-text">Higher ranks inherit all lower perks + bigger monthly Z-Credit stipends.</p></div>
           <button class="btn-neon" id="claim-monthly-btn">Claim Monthly Stipend</button>
         </div>
         <div class="cards-grid" id="ranks-grid"></div>
@@ -150,15 +171,15 @@
       <!-- 5. STORE -->
       <section id="store-view" class="tab-view padded-view">
         <div class="view-topbar">
-          <div><h2>Zynk Store</h2><p class="sub-text">Unlock working avatar cores, chat badges, and profile frames.</p></div>
-          <span class="credit-pill" id="store-credits">500 Z-Credits</span>
+          <div><h2>Zynk Store</h2><p class="sub-text">Unlock avatar borders, banners, and badges.</p></div>
+          <span class="credit-pill" id="store-credits">0 Z-Credits</span>
         </div>
         <div class="cards-grid" id="store-grid"></div>
       </section>
 
-      <!-- 6. PROFILE, ROLES & FRIENDS -->
+      <!-- 6. MY PROFILE -->
       <section id="profile-view" class="tab-view padded-view">
-        <div id="social-container"></div>
+        <div id="my-profile-container"></div>
       </section>
 
       <!-- 7. ACHIEVEMENTS -->
@@ -169,7 +190,7 @@
 
       <!-- 8. LEADERBOARDS -->
       <section id="leader-view" class="tab-view padded-view">
-        <div class="view-topbar"><div><h2>Global Leaderboards</h2><p class="sub-text">Ranked by Z-Credits & Rank Tier.</p></div></div>
+        <div class="view-topbar"><div><h2>Live Global Leaderboards</h2><p class="sub-text">Real registered operators ranked by Z-Credits.</p></div></div>
         <div class="glass-card" id="leaderboard-list"></div>
       </section>
 
@@ -193,17 +214,13 @@
         </div>
       </section>
     </main>
-
-    <!-- PINNED RIGHT VORTEX GUILD CHAT -->
-    <aside class="right-chat-dock">
-      <iframe src="https://vortexos.net" title="Vortex Guild Chat" allow="clipboard-write"></iframe>
-    </aside>
   </div>
 
+  <script src="js/supabase.js"></script>
   <script src="js/nav.js"></script>
   <script src="js/ranks-store.js"></script>
   <script src="js/chat.js"></script>
-  <script src="js/social.js"></script>
+  <script src="js/profile-ui.js"></script>
   <script src="js/tools.js"></script>
   <script src="js/wireframe.js"></script>
 </body>
