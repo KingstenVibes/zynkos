@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZynkOS — Chat • Levels • Arcade</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <nav>
+    <div class="logo">ZynkOS</div>
+    <div class="nav-links">
+      <button class="nav-btn active" data-view="chat-view">Community Chat</button>
+      <button class="nav-btn" data-view="arcade-view">HELLFIRE Arcade</button>
+      <button class="nav-btn" data-view="about-view">System Info</button>
+    </div>
+    <div class="user-hud">
+      <span id="hud-stats">High Score: 0</span>
+    </div>
+  </nav>
+
+  <!-- VORTEX LIVE GUILD CHAT VIEW -->
+  <main id="chat-view" class="view active">
+    <div class="embed-wrapper">
+      <!-- REPLACE THIS DIV WITH YOUR VORTEX EMBED CODE ONCE APPROVED -->
+      <div class="placeholder-box">
+        <h3>ZynkOS // Comms Link Pending</h3>
+        <p>Live guild chat & Vortex sign-in will appear right here as soon as the ZynkOS Partner App is activated.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- ARCADE VIEW -->
+  <main id="arcade-view" class="view">
+    <div class="arcade-container">
+      <h2>ZynkOS // HELLFIRE</h2>
+      <p>Use <strong>WASD</strong> or <strong>Arrow Keys</strong> to dodge projectiles.</p>
+      <div class="arcade-controls">
+        <button id="start-game-btn" class="btn-primary">Launch Run</button>
+        <span id="arcade-score">Score: 0</span>
+      </div>
+      <canvas id="arcade-canvas" width="600" height="360"></canvas>
+    </div>
+  </main>
+
+  <!-- SYSTEM INFO VIEW -->
+  <main id="about-view" class="view">
+    <div class="info-card">
+      <h2>Welcome to ZynkOS</h2>
+      <p>Next-gen browser messaging, custom roles, and arcade hub powered by Vortex Guild Integration.</p>
+    </div>
+  </main>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
