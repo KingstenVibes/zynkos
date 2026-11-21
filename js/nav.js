@@ -11,19 +11,17 @@ document.querySelectorAll('.dock-btn').forEach(btn => {
   btn.addEventListener('click', () => openTab(btn.dataset.tab));
 });
 
-// Build Settings Dropdowns Dynamically
-const controlsBox = document.getElementById('settings-controls');
-controlsBox.innerHTML = `
+// Build Settings Controls Dynamically
+document.getElementById('settings-controls').innerHTML = `
   <div class="setting-group">
     <label for="tz-select">Timezone</label>
     <select id="tz-select">
       <option value="auto">Auto-Detect (Visitor's Local Time)</option>
-      <option value="America/New_York">Eastern Time (US & Canada)</option>
-      <option value="America/Chicago">Central Time (US & Canada)</option>
-      <option value="America/Denver">Mountain Time (US & Canada)</option>
-      <option value="America/Los_Angeles">Pacific Time (US & Canada)</option>
-      <option value="Europe/London">London (GMT / BST)</option>
-      <option value="Europe/Paris">Central Europe (CET)</option>
+      <option value="America/New_York">Eastern Time (ET)</option>
+      <option value="America/Chicago">Central Time (CT)</option>
+      <option value="America/Denver">Mountain Time (MT)</option>
+      <option value="America/Los_Angeles">Pacific Time (PT)</option>
+      <option value="Europe/London">London (GMT/BST)</option>
       <option value="Asia/Tokyo">Tokyo (JST)</option>
       <option value="UTC">UTC</option>
     </select>
@@ -78,45 +76,47 @@ document.getElementById('save-settings-btn').addEventListener('click', () => {
   localStorage.setItem('zynkos_tz', savedTz);
   localStorage.setItem('zynkos_format', savedFormat);
   localStorage.setItem('zynkos_cloak', savedCloak);
-
   applyCloak(savedCloak);
   updateClocks();
-
   const msg = document.getElementById('save-msg');
-  msg.textContent = '✓ Preferences Saved';
-  setTimeout(() => (msg.textContent = ''), 2500);
+  msg.textContent = '✓ Saved';
+  setTimeout(() => (msg.textContent = ''), 2000);
+});
+
+// Open ZynkOS inside a cloaked about:blank tab
+document.getElementById('about-blank-btn').addEventListener('click', () => {
+  const win = window.open('about:blank', '_blank');
+  if (!win) return alert('Allow pop-ups for ZynkOS to open an about:blank window.');
+  win.document.title = document.title;
+  const iframe = win.document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:none;';
+  iframe.src = window.location.href;
+  win.document.body.style.margin = '0';
+  win.document.body.appendChild(iframe);
 });
 
 function updateClocks() {
   const now = new Date();
   const activeTz = savedTz === 'auto' ? Intl.DateTimeFormat().resolvedOptions().timeZone : savedTz;
   const is24 = savedFormat === '24';
-
   const dayStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: activeTz }).format(now).toUpperCase();
-  const dateParts = new Intl.DateTimeFormat('en-US', {
-    month: '2-digit', day: '2-digit', year: '2-digit', timeZone: activeTz
-  }).format(now).replace(/\//g, '.');
+  const dateParts = new Intl.DateTimeFormat('en-US', { month: '2-digit', day: '2-digit', year: '2-digit', timeZone: activeTz }).format(now).replace(/\//g, '.');
+  const parts = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: !is24, timeZone: activeTz }).formatToParts(now);
 
-  const timeParts = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric', minute: '2-digit', hour12: !is24, timeZone: activeTz
-  }).formatToParts(now);
-
-  const hourVal = timeParts.find(p => p.type === 'hour')?.value || '12';
-  const minVal = timeParts.find(p => p.type === 'minute')?.value || '00';
-  const dayPeriod = timeParts.find(p => p.type === 'dayPeriod')?.value || '';
+  const hr = parts.find(p => p.type === 'hour')?.value || '12';
+  const min = parts.find(p => p.type === 'minute')?.value || '00';
+  const ampm = parts.find(p => p.type === 'dayPeriod')?.value || '';
 
   document.getElementById('hero-day').textContent = dayStr;
-  document.getElementById('hero-time').textContent = `${hourVal}:${minVal}`;
-  document.getElementById('hero-ampm').textContent = is24 ? '24H' : dayPeriod;
+  document.getElementById('hero-time').textContent = `${hr}:${min}`;
+  document.getElementById('hero-ampm').textContent = is24 ? '24H' : ampm;
   document.getElementById('hero-date').textContent = dateParts;
-
-  document.getElementById('dock-hr').textContent = hourVal.padStart(2, '0');
-  document.getElementById('dock-min').textContent = minVal;
+  document.getElementById('dock-hr').textContent = hr.padStart(2, '0');
+  document.getElementById('dock-min').textContent = min;
 
   const shortTz = activeTz.split('/').pop().replace(/_/g, ' ');
   document.getElementById('current-tz-label').textContent = savedTz === 'auto' ? `Local Time (${shortTz})` : shortTz;
   document.getElementById('status-tz').textContent = `TZ: ${activeTz}`;
 }
-
 setInterval(updateClocks, 1000);
 updateClocks();
