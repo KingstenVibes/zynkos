@@ -90,7 +90,7 @@ document.getElementById('t-ab-btn').onclick = () => {
 
 // 2. Image -> Data URL Generator
 document.getElementById('t-data-file').onchange = (e) => {
-  const file = e.target.files?.[0];
+const file = e.target.files;
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => (document.getElementById('t-data-out').value = reader.result);
