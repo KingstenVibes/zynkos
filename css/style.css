@@ -137,3 +137,7 @@ body { background: var(--bg-void); color: var(--text-main); height: 100vh; overf
 .zynk-toast-box { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 10000; pointer-events: none; }
 .zynk-toast { background: #0b121c; border-left: 4px solid var(--neon-emerald); color: #fff; padding: 12px 16px; border-radius: 8px; font-size: 0.84rem; box-shadow: 0 10px 30px rgba(0,0,0,0.7); max-width: 320px; animation: fadeIn 0.2s ease; }
 .zynk-toast.err { border-left-color: #ef4444; background: #1a0b0e; }
+.left-dock { overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: #10b981 #04070b; }
+.left-dock::-webkit-scrollbar { width: 5px; }
+.left-dock::-webkit-scrollbar-thumb { background: #10b981; border-radius: 4px; }
+.theme-cyber { --neon-emerald: #06b6d4; } .theme-crimson { --neon-emerald: #f43f5e; } .theme-gold { --neon-emerald: #f59e0b; } .theme-violet { --neon-emerald: #a855f7; }
