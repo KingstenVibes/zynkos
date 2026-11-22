@@ -13,10 +13,9 @@ window.notify = function(msg, isError = false) {
   t.className = `zynk-toast ${isError ? 'err' : ''}`;
   t.textContent = msg;
   box.appendChild(t);
-  setTimeout(() => t.remove(), 4000);
+  setTimeout(() => t.remove(), 4500);
 };
 
-// Direct REST helper (Zero CDN scripts required!)
 window.sbRest = async function(path, method = 'GET', body = null, token = null) {
   const headers = { 'apikey': SB_KEY, 'Authorization': `Bearer ${token || SB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
   const res = await fetch(`${SB_URL}/rest/v1/${path}`, { method, headers, body: body ? JSON.stringify(body) : null });
@@ -70,10 +69,10 @@ document.getElementById('top-auth-btn').onclick = async () => {
 async function bootUser(user, token, preferredName) {
   window.currentUser = user;
   window.authToken = token;
-  let rows = await window.sbRest(`users?id=eq.${user.id}`, 'GET', null, token);
-  let prof = rows?.;
+  const rows = await window.sbRest(`users?id=eq.${user.id}`, 'GET', null, token);
+  let prof = Array.isArray(rows) ? rows.at(0) : null;
   if (!prof) {
-    const uname = preferredName || user.email.split('@');
+    const uname = preferredName || user.email.split('@').at(0);
     const isFounder = uname.toLowerCase() === 'kingstenvibes';
     const created = await window.sbRest('users', 'POST', {
       id: user.id,
@@ -83,7 +82,7 @@ async function bootUser(user, token, preferredName) {
       is_beta: isFounder,
       online: true
     }, token);
-    prof = created?.;
+    prof = Array.isArray(created) ? created.at(0) : null;
   } else {
     await window.sbRest(`users?id=eq.${user.id}`, 'PATCH', { online: true }, token);
   }
@@ -101,8 +100,9 @@ async function bootUser(user, token, preferredName) {
 window.refreshMyProfile = async function() {
   if (!window.currentUser) return;
   const rows = await window.sbRest(`users?id=eq.${window.currentUser.id}`, 'GET', null, window.authToken);
-  if (rows?.) {
-    window.userProfile = rows;
+  const prof = Array.isArray(rows) ? rows.at(0) : null;
+  if (prof) {
+    window.userProfile = prof;
     window.dispatchEvent(new Event('zynk-profile-updated'));
   }
 };
@@ -138,7 +138,6 @@ submitBtn.onclick = async () => {
   }
 };
 
-// Auto-Restore Session if "Remember Me" was checked
 const savedSession = JSON.parse(localStorage.getItem('zynk_session') || sessionStorage.getItem('zynk_session') || 'null');
 if (savedSession?.user && savedSession?.token) {
   bootUser(savedSession.user, savedSession.token).catch(() => lockScreen(true));
