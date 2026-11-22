@@ -11,7 +11,7 @@ const authModal = mk('div', 'startup-gate', `
     <div class="brand-logo" style="margin:0 auto 8px;width:46px;height:46px;font-size:1.4rem;">Z</div>
     <h2 id="auth-title" style="text-align:center;">ZynkOS // System Access</h2>
     <p class="sub-text" style="text-align:center;">Sign in or create an account to boot.</p>
-    <input id="auth-user" class="tool-input hidden" placeholder="Username (e.g. KingstenVibes)" />
+    <input id="auth-user" class="tool-input hidden" placeholder="Username (e.g. UserName)" />
     <input id="auth-email" class="tool-input" type="email" placeholder="Email Address" />
     <input id="auth-pass" class="tool-input" type="password" placeholder="Password (6+ chars)" />
     <label class="remember-row"><input type="checkbox" id="remember-me" checked /><span>Remember me</span></label>
