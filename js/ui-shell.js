@@ -27,7 +27,7 @@ userModal.id = 'user-modal';
 const shell = mk('div', 'os-shell');
 const dock = mk('aside', 'left-dock', `
   <div class="dock-top">
-    <div class="brand-logo" id="zynk-logo-box">Z</div>
+    <img src="logo.png" alt="ZynkOS" style="width:36px;height:36px;border-radius:8px;object-fit:cover;" />
     <span class="brand-title">ZynkOS</span>
     <button class="collapse-btn" id="toggle-dock">☰</button>
   </div>
