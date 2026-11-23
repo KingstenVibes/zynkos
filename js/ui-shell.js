@@ -1,3 +1,9 @@
+window.openTab = function(tabId) {
+  if (!tabId) return;
+  document.querySelectorAll('.dock-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+  document.querySelectorAll('.tab-view').forEach(v => v.classList.toggle('active', v.id === tabId));
+};
+
 const root = document.getElementById('zynk-root');
 const ic = window.ZYNK_ICONS || {};
 function mk(tag, cls, html) {
@@ -33,23 +39,23 @@ const dock = mk('aside', 'left-dock', `
     <button type="button" class="collapse-btn" id="toggle-dock" onclick="document.getElementById('left-dock').classList.toggle('expanded')" title="Expand / Collapse Sidebar">${ic.arrow || '▶'}</button>
   </div>
   <div class="dock-section">
-    <button class="dock-btn active" data-tab="dash-view"><span class="sym">${ic.home || '⌂'}</span><span class="lbl">Dashboard</span></button>
-    <button class="dock-btn" data-tab="chat-view"><span class="sym">${ic.chat || '💬'}</span><span class="lbl">Zynk Chat</span></button>
-    <button class="dock-btn" data-tab="vortex-view"><span class="sym">${ic.vortex || '❖'}</span><span class="lbl">Vortex Guild</span></button>
-    <button class="dock-btn" data-tab="arcade-view"><span class="sym">${ic.arcade || '🎮'}</span><span class="lbl">UGS Arcade</span></button>
-    <button class="dock-btn" data-tab="ranks-view"><span class="sym">${ic.ranks || '★'}</span><span class="lbl">Ranks</span></button>
-    <button class="dock-btn" data-tab="store-view"><span class="sym">${ic.store || '🛒'}</span><span class="lbl">Zynk Store</span></button>
+    <button type="button" class="dock-btn active" data-tab="dash-view" onclick="openTab('dash-view')"><span class="sym">${ic.home || '⌂'}</span><span class="lbl">Dashboard</span></button>
+    <button type="button" class="dock-btn" data-tab="chat-view" onclick="openTab('chat-view')"><span class="sym">${ic.chat || '💬'}</span><span class="lbl">Zynk Chat</span></button>
+    <button type="button" class="dock-btn" data-tab="vortex-view" onclick="openTab('vortex-view')"><span class="sym">${ic.vortex || '❖'}</span><span class="lbl">Vortex Guild</span></button>
+    <button type="button" class="dock-btn" data-tab="arcade-view" onclick="openTab('arcade-view')"><span class="sym">${ic.arcade || '🎮'}</span><span class="lbl">UGS Arcade</span></button>
+    <button type="button" class="dock-btn" data-tab="ranks-view" onclick="openTab('ranks-view')"><span class="sym">${ic.ranks || '★'}</span><span class="lbl">Ranks</span></button>
+    <button type="button" class="dock-btn" data-tab="store-view" onclick="openTab('store-view')"><span class="sym">${ic.store || '🛒'}</span><span class="lbl">Zynk Store</span></button>
   </div>
   <div class="dock-section">
-    <button class="dock-btn" data-tab="profile-view"><span class="sym">${ic.profile || '👤'}</span><span class="lbl">My Profile</span></button>
-    <button class="dock-btn" data-tab="achieve-view"><span class="sym">${ic.quests || '🏆'}</span><span class="lbl">Quests</span></button>
-    <button class="dock-btn" data-tab="leader-view"><span class="sym">${ic.leader || '📊'}</span><span class="lbl">Leaderboards</span></button>
-    <button class="dock-btn" data-tab="tools-view"><span class="sym">${ic.tools || '⌘'}</span><span class="lbl">Utility Tools</span></button>
-    <button class="dock-btn" data-tab="browser-view"><span class="sym">${ic.browser || '🌐'}</span><span class="lbl">Zynk Browser</span></button>
-    <button class="dock-btn" data-tab="support-view"><span class="sym">${ic.support || '🛟'}</span><span class="lbl">Support & Ideas</span></button>
-    <button class="dock-btn hidden" id="nav-beta-btn" data-tab="beta-view"><span class="sym">${ic.beta || '⚛'}</span><span class="lbl">Beta Lab</span></button>
-    <button class="dock-btn hidden" id="nav-admin-btn" data-tab="admin-view"><span class="sym">${ic.admin || '⚡'}</span><span class="lbl">Founder Panel</span></button>
-    <button class="dock-btn" data-tab="settings-view"><span class="sym">${ic.settings || '⚙'}</span><span class="lbl">Settings</span></button>
+    <button type="button" class="dock-btn" data-tab="profile-view" onclick="openTab('profile-view')"><span class="sym">${ic.profile || '👤'}</span><span class="lbl">My Profile</span></button>
+    <button type="button" class="dock-btn" data-tab="achieve-view" onclick="openTab('achieve-view')"><span class="sym">${ic.quests || '🏆'}</span><span class="lbl">Quests</span></button>
+    <button type="button" class="dock-btn" data-tab="leader-view" onclick="openTab('leader-view')"><span class="sym">${ic.leader || '📊'}</span><span class="lbl">Leaderboards</span></button>
+    <button type="button" class="dock-btn" data-tab="tools-view" onclick="openTab('tools-view')"><span class="sym">${ic.tools || '⌘'}</span><span class="lbl">Utility Tools</span></button>
+    <button type="button" class="dock-btn" data-tab="browser-view" onclick="openTab('browser-view')"><span class="sym">${ic.browser || '🌐'}</span><span class="lbl">Zynk Browser</span></button>
+    <button type="button" class="dock-btn" data-tab="support-view" onclick="openTab('support-view')"><span class="sym">${ic.support || '🛟'}</span><span class="lbl">Support & Ideas</span></button>
+    <button type="button" class="dock-btn hidden" id="nav-beta-btn" data-tab="beta-view" onclick="openTab('beta-view')"><span class="sym">${ic.beta || '⚛'}</span><span class="lbl">Beta Lab</span></button>
+    <button type="button" class="dock-btn hidden" id="nav-admin-btn" data-tab="admin-view" onclick="openTab('admin-view')"><span class="sym">${ic.admin || '⚡'}</span><span class="lbl">Founder Panel</span></button>
+    <button type="button" class="dock-btn" data-tab="settings-view" onclick="openTab('settings-view')"><span class="sym">${ic.settings || '⚙'}</span><span class="lbl">Settings</span></button>
   </div>
   <div class="dock-clock"><span id="dock-hr">12</span><span class="dock-sep">:</span><span id="dock-min">00</span></div>
 `);
