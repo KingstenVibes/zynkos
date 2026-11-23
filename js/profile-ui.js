@@ -7,13 +7,13 @@ window.openUserModal = async function(uid) {
   const box = document.getElementById('user-modal-content');
   if (!modal || !box || !window.sbRest) return;
   const rows = await window.sbRest(`users?id=eq.${uid}`);
-  const u = Array.isArray(rows) ? rows : null;
+  const u = Array.isArray(rows) ? rows.at(0) : null;
   if (!u) return;
-  const rank = window.RANKS?.[u.rank_index || 0] || { name: 'Circuit' };
+  const rank = window.RANKS?.at(u.rank_index || 0) || { name: 'Circuit' };
   const frameGlow = u.avatar_frame && u.avatar_frame !== 'none' ? `box-shadow:0 0 0 3px ${u.avatar_frame},0 0 18px ${u.avatar_frame};` : '';
   const extras = (u.extra_roles || []).map(r => `<span class="pill">${r}</span>`).join('');
   box.innerHTML = `
-    <div class="banner-hero" style="background:${u.banner && u.banner.startsWith('http') || String(u.banner).startsWith('data:') ? `url('${u.banner}') center/cover` : (u.banner || 'linear-gradient(135deg,#064e3b,#0f172a)')}">
+    <div class="banner-hero" style="background:${u.banner && (u.banner.startsWith('http') || String(u.banner).startsWith('data:')) ? `url('${u.banner}') center/cover` : (u.banner || 'linear-gradient(135deg,#064e3b,#0f172a)')}">
       <img class="banner-avatar" style="border-color:${u.equipped_color};${frameGlow}" src="${safeAvatar(u.avatar)}" />
     </div>
     <div class="profile-body">
@@ -98,7 +98,7 @@ async function renderLeaderboardQuestsAndAnnouncements() {
 
   const lb = document.getElementById('leaderboard-list');
   if (lb) {
-    const users = await window.sbRest('users?order=credits.desc,xp.desc&limit=30').catch(() => []);
+    const users = await window.sbRest('users?role=neq.FOUNDER&order=credits.desc,xp.desc&limit=30').catch(() => []);
     lb.innerHTML = (users || []).length ? users.map((u, idx) => `
       <div onclick="openUserModal('${u.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;">
         <div style="display:flex;align-items:center;gap:12px;">
@@ -113,30 +113,32 @@ async function renderLeaderboardQuestsAndAnnouncements() {
   const aGrid = document.getElementById('achieve-grid');
   if (!aGrid) return;
 
+  const myLvl = Math.floor((p?.xp || 0) / 1000) + 1;
   const builtInQuests = [
     { id: 'q_daily', title: '🎁 Daily Member Stipend', desc: 'Claim +150 Z-Credits every 24 hours.', cred: 150, xp: 100, isDaily: true, ready: () => Date.now() - (p?.last_daily || 0) >= 86400000 },
-    { id: 'q_msg1', title: '💬 First Transmission', desc: 'Send your first message in Zynk Chat.', cred: 100, xp: 150, ready: () => (p?.msg_count || 0) >= 1 },
-    { id: 'q_msg5', title: '🗨️ Getting Social', desc: 'Send 5 messages in Zynk Chat.', cred: 175, xp: 200, ready: () => (p?.msg_count || 0) >= 5 },
-    { id: 'q_msg15', title: '📡 Chat Regular', desc: 'Send 15 messages in Zynk Chat.', cred: 300, xp: 350, ready: () => (p?.msg_count || 0) >= 15 },
-    { id: 'q_msg50', title: '🔥 Network Broadcaster', desc: 'Send 50 messages in Zynk Chat.', cred: 650, xp: 800, ready: () => (p?.msg_count || 0) >= 50 },
-    { id: 'q_bio', title: '🪪 Identity Configured', desc: 'Customize your bio on My Profile.', cred: 100, xp: 150, ready: () => p?.bio && !p.bio.startsWith('New ZynkOS') },
-    { id: 'q_frame', title: '💠 Framed Up', desc: 'Equip any Avatar Frame color.', cred: 120, xp: 150, ready: () => p?.avatar_frame && p.avatar_frame !== 'none' },
-    { id: 'q_shop1', title: '🛒 First Store Gear', desc: 'Own at least 1 item from Zynk Store.', cred: 150, xp: 200, ready: () => (p?.owned_items || []).length >= 1 },
-    { id: 'q_shop3', title: '🎒 Gear Collector', desc: 'Own 3 or more items from Zynk Store.', cred: 350, xp: 400, ready: () => (p?.owned_items || []).length >= 3 },
-    { id: 'q_shop8', title: '💎 Vault Tycoon', desc: 'Own 8 or more items from Zynk Store.', cred: 800, xp: 900, ready: () => (p?.owned_items || []).length >= 8 },
+    { id: 'q_msg1', title: '💬 First Transmission', desc: 'Send your first message in Zynk Chat.', cred: 75, xp: 100, ready: () => (p?.msg_count || 0) >= 1 },
+    { id: 'q_msg15', title: '🗨️ Active Chatter', desc: 'Send 15 messages in Zynk Chat.', cred: 200, xp: 250, ready: () => (p?.msg_count || 0) >= 15 },
+    { id: 'q_msg50', title: '📡 Signal Regular', desc: 'Send 50 messages in Zynk Chat.', cred: 500, xp: 600, ready: () => (p?.msg_count || 0) >= 50 },
+    { id: 'q_msg150', title: '🔥 Network Veteran', desc: 'Send 150 messages in Zynk Chat.', cred: 1200, xp: 1500, ready: () => (p?.msg_count || 0) >= 150 },
+    { id: 'q_msg500', title: '👑 Chat Legend', desc: 'Send 500 messages in Zynk Chat.', cred: 3500, xp: 4000, ready: () => (p?.msg_count || 0) >= 500 },
+    { id: 'q_bio', title: '🪪 Identity Configured', desc: 'Customize your bio on My Profile.', cred: 100, xp: 150, ready: () => Boolean(p?.bio && !p.bio.startsWith('New ZynkOS')) },
+    { id: 'q_stk1', title: '🏷 Sticker Creator', desc: 'Upload your first custom chat sticker.', cred: 150, xp: 200, ready: () => Array.isArray(p?.stickers) && p.stickers.length >= 1 },
+    { id: 'q_shop2', title: '🛒 Gear Buyer', desc: 'Own at least 2 items from Zynk Store.', cred: 250, xp: 300, ready: () => (p?.owned_items || []).length >= 2 },
+    { id: 'q_shop6', title: '🎒 Vault Collector', desc: 'Own 6 or more items from Zynk Store.', cred: 750, xp: 900, ready: () => (p?.owned_items || []).length >= 6 },
+    { id: 'q_shop15', title: '💎 Royal Armory', desc: 'Own 15 or more items from Zynk Store.', cred: 2000, xp: 2500, ready: () => (p?.owned_items || []).length >= 15 },
     { id: 'q_pulse', title: '⚡ Pulse Member', desc: 'Unlock Pulse Rank or higher.', cred: 200, xp: 300, ready: () => (p?.rank_index || 0) >= 1 },
-    { id: 'q_lvl2', title: '🧬 Neural Level 2', desc: 'Reach Level 2 (1,000+ XP).', cred: 200, xp: 250, ready: () => (p?.xp || 0) >= 1000 },
-    { id: 'q_lvl5', title: '🚀 Neural Level 5', desc: 'Reach Level 5 (4,000+ XP).', cred: 600, xp: 750, ready: () => (p?.xp || 0) >= 4000 },
-    { id: 'q_rich1', title: '💰 Credit Saver', desc: 'Hold 1,000+ Z-Credits at once.', cred: 250, xp: 300, ready: () => (p?.credits || 0) >= 1000 },
-    { id: 'q_rich2', title: '🏦 Zynk Whale', desc: 'Hold 5,000+ Z-Credits at once.', cred: 1000, xp: 1200, ready: () => (p?.credits || 0) >= 5000 },
-    { id: 'sec_night', isSecret: true, title: '🌙 Night Owl Protocol', desc: '??? [Secret Quest — Condition Hidden]', cred: 500, xp: 500, ready: () => new Date().getHours() >= 22 || new Date().getHours() <= 4 },
-    { id: 'sec_cyber', isSecret: true, title: '💠 Cyan Overclock', desc: '??? [Secret Quest — Condition Hidden]', cred: 400, xp: 450, ready: () => localStorage.getItem('zynk_theme') === 'theme-cyber' },
-    { id: 'sec_24h', isSecret: true, title: '⏱ Military Precision', desc: '??? [Secret Quest — Condition Hidden]', cred: 350, xp: 400, ready: () => localStorage.getItem('zynk_format') === '24' },
-    { id: 'sec_cloak', isSecret: true, title: '🕵️ Ghost Protocol', desc: '??? [Secret Quest — Condition Hidden]', cred: 450, xp: 500, ready: () => (localStorage.getItem('zynk_cloak') || 'none') !== 'none' },
-    { id: 'sec_crimson', isSecret: true, title: '🩸 Crimson Shadow', desc: '??? [Secret Quest — Condition Hidden]', cred: 450, xp: 500, ready: () => localStorage.getItem('zynk_theme') === 'theme-crimson' },
-    { id: 'sec_zoom', isSecret: true, title: '🔬 Micro Vision', desc: '??? [Secret Quest — Condition Hidden]', cred: 300, xp: 350, ready: () => localStorage.getItem('zynk_zoom') === '0.9' }
+    { id: 'q_lvl5', title: '🧬 Neural Level 5', desc: 'Reach Level 5 (4,000+ XP).', cred: 600, xp: 750, ready: () => myLvl >= 5 },
+    { id: 'q_lvl10', title: '🚀 Neural Level 10', desc: 'Reach Level 10 (9,000+ XP).', cred: 1500, xp: 2000, ready: () => myLvl >= 10 },
+    { id: 'q_lvl20', title: '🌌 Ascended Level 20', desc: 'Reach Level 20 (19,000+ XP).', cred: 4000, xp: 5000, ready: () => myLvl >= 20 },
+    { id: 'q_rich5k', title: '💰 Credit Hoarder', desc: 'Hold 5,000+ Z-Credits at once.', cred: 600, xp: 750, ready: () => (p?.credits || 0) >= 5000 },
+    { id: 'q_rich25k', title: '🏦 Zynk Tycoon', desc: 'Hold 25,000+ Z-Credits at once.', cred: 2500, xp: 3000, ready: () => (p?.credits || 0) >= 25000 },
+    { id: 'sec_night', isSecret: true, title: '🌙 Midnight Operator', desc: '??? [Secret Quest — Condition Hidden]', cred: 650, xp: 750, ready: () => new Date().getHours() >= 0 && new Date().getHours() <= 3 },
+    { id: 'sec_cyber', isSecret: true, title: '💠 Cyan Overclock', desc: '??? [Secret Quest — Condition Hidden]', cred: 450, xp: 500, ready: () => document.body.classList.contains('theme-cyber') },
+    { id: 'sec_24h', isSecret: true, title: '⏱ Military Precision', desc: '??? [Secret Quest — Condition Hidden]', cred: 400, xp: 450, ready: () => localStorage.getItem('zynk_format') === '24' },
+    { id: 'sec_cloak', isSecret: true, title: '🕵️ Ghost Protocol', desc: '??? [Secret Quest — Condition Hidden]', cred: 500, xp: 600, ready: () => ['clever', 'classroom', 'drive', 'docs'].includes(localStorage.getItem('zynk_cloak')) },
+    { id: 'sec_violet', isSecret: true, title: '🔮 Void Resonance', desc: '??? [Secret Quest — Condition Hidden]', cred: 500, xp: 600, ready: () => document.body.classList.contains('theme-violet') },
+    { id: 'sec_zoom', isSecret: true, title: '🔬 Micro Vision', desc: '??? [Secret Quest — Condition Hidden]', cred: 350, xp: 400, ready: () => localStorage.getItem('zynk_zoom') === '0.9' }
   ];
-
   const customQuests = await window.sbRest('achievements_list?order=id.asc').catch(() => []);
   const allQuests = [
     ...builtInQuests,
@@ -159,7 +161,7 @@ async function renderLeaderboardQuestsAndAnnouncements() {
   const renderCard = (q, targetId, isDone) => {
     const box = document.getElementById(targetId);
     if (!box) return;
-    const canClaim = p && q.ready() && !isDone;
+    const canClaim = Boolean(p) && q.ready() && !isDone;
     const card = document.createElement('div');
     card.className = 'glass-card';
     card.innerHTML = `<span class="rarity-tag" style="color:${q.isSecret ? '#a855f7' : '#10b981'}">+${q.cred} Z-Credits • +${q.xp} XP</span><h3>${q.title}</h3><p class="sub-text" style="margin:6px 0 12px;">${q.desc}</p><button class="${canClaim ? 'btn-neon' : 'btn-outline'}" ${q.isDaily ? 'id="daily-quest-btn"' : ''} ${canClaim ? '' : 'disabled'}>${isDone ? '✓ Completed' : canClaim ? 'Claim Reward' : q.isSecret ? '🔒 Discover Secret' : 'In Progress'}</button>`;
