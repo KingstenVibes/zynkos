@@ -85,7 +85,6 @@ async function renderAdminAndBeta() {
       window.dispatchEvent(new Event('zynk-profile-updated'));
     }));
   }
-
   if (activeFounderTab === 'SHOP') {
     const storeItems = await window.sbRest('store_items?order=id.asc').catch(() => []);
     const reqs = await window.sbRest('shop_requests?order=id.desc').catch(() => []);
@@ -137,7 +136,6 @@ async function renderAdminAndBeta() {
       window.dispatchEvent(new Event('zynk-profile-updated'));
     }));
   }
-
   if (activeFounderTab === 'ROLES') {
     sub.innerHTML = `
       <div class="glass-card" style="max-width:520px;">
@@ -164,3 +162,40 @@ async function renderAdminAndBeta() {
     };
   }
 
+  if (activeFounderTab === 'SECRETS') {
+    const customSecrets = await window.sbRest('achievements_list?is_secret=eq.true&order=id.asc').catch(() => []);
+    sub.innerHTML = `
+      <div class="bento-grid" style="padding:0;">
+        <div class="glass-card">
+          <h3>🔒 Founder-Only Secret Quest Solution Key</h3>
+          <p class="sub-text" style="margin-bottom:12px;">Only you (FOUNDER) can see how these secret quests are unlocked:</p>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="padding:10px;background:#04070b;border-radius:8px;"><strong>🌙 Night Owl Protocol (+500 Z-Credits):</strong> Open Quests between 10:00 PM and 4:59 AM local time.</div>
+            <div style="padding:10px;background:#04070b;border-radius:8px;"><strong>💠 Cyan Overclock (+400 Z-Credits):</strong> Equip the <code>Cyber Cyan</code> steady page theme in Settings or My Profile.</div>
+            <div style="padding:10px;background:#04070b;border-radius:8px;"><strong>⏱ Military Precision (+350 Z-Credits):</strong> Switch Clock Format to <code>24-Hour (Military)</code> in Settings.</div>
+            <div style="padding:10px;background:#04070b;border-radius:8px;"><strong>🕵️ Ghost Protocol (+450 Z-Credits):</strong> Enable any Tab Disguise (Clever, Classroom, Drive, or Docs) in Settings.</div>
+            ${(customSecrets || []).map(s => `<div style="padding:10px;background:#04070b;border-radius:8px;"><strong>${s.title} (+${s.reward_credits}):</strong> ${s.secret_hint || s.description}</div>`).join('')}
+          </div>
+        </div>
+        <div class="glass-card">
+          <h3>➕ Create New Normal or Secret Quest</h3>
+          <input id="adm-ach-title" class="tool-input" placeholder="Quest Title" />
+          <input id="adm-ach-desc" class="tool-input" placeholder="Public Description" />
+          <input id="adm-ach-hint" class="tool-input" placeholder="Founder-Only Secret Solution / How to Complete" />
+          <div style="display:flex;gap:8px;"><input id="adm-ach-cred" type="number" class="tool-input" value="250" /><input id="adm-ach-xp" type="number" class="tool-input" value="300" /></div>
+          <label class="remember-row"><input type="checkbox" id="adm-ach-sec" /><span>🔒 Hide conditions as a Secret Quest</span></label>
+          <button class="btn-neon" id="adm-add-ach-btn" style="width:100%">Publish Quest</button>
+        </div>
+      </div>`;
+    document.getElementById('adm-add-ach-btn').onclick = async () => {
+      const title = document.getElementById('adm-ach-title').value.trim();
+      if (!title) return window.notify('Enter quest title.', true);
+      await window.sbRest('achievements_list', 'POST', { title, description: document.getElementById('adm-ach-desc').value.trim(), secret_hint: document.getElementById('adm-ach-hint').value.trim(), reward_credits: parseInt(document.getElementById('adm-ach-cred').value, 10) || 100, reward_xp: parseInt(document.getElementById('adm-ach-xp').value, 10) || 250, is_secret: document.getElementById('adm-ach-sec').checked }, window.authToken);
+      window.notify('Quest published!');
+      renderAdminAndBeta();
+    };
+  }
+}
+
+window.addEventListener('zynk-profile-updated', renderAdminAndBeta);
+window.addEventListener('DOMContentLoaded', renderAdminAndBeta);
