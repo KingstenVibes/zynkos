@@ -7,13 +7,13 @@ window.openUserModal = async function(uid) {
   const box = document.getElementById('user-modal-content');
   if (!modal || !box || !window.sbRest) return;
   const rows = await window.sbRest(`users?id=eq.${uid}`);
-  const u = Array.isArray(rows) ? rows.at(0) : null;
+  const u = Array.isArray(rows) ? rows : null;
   if (!u) return;
-  const rank = window.RANKS?.at(u.rank_index || 0) || { name: 'Circuit' };
+  const rank = window.RANKS?.[u.rank_index || 0] || { name: 'Circuit' };
   const frameGlow = u.avatar_frame && u.avatar_frame !== 'none' ? `box-shadow:0 0 0 3px ${u.avatar_frame},0 0 18px ${u.avatar_frame};` : '';
   const extras = (u.extra_roles || []).map(r => `<span class="pill">${r}</span>`).join('');
   box.innerHTML = `
-    <div class="banner-hero" style="background:${u.banner || 'linear-gradient(135deg,#064e3b,#0f172a)'}">
+    <div class="banner-hero" style="background:${u.banner && u.banner.startsWith('http') || String(u.banner).startsWith('data:') ? `url('${u.banner}') center/cover` : (u.banner || 'linear-gradient(135deg,#064e3b,#0f172a)')}">
       <img class="banner-avatar" style="border-color:${u.equipped_color};${frameGlow}" src="${safeAvatar(u.avatar)}" />
     </div>
     <div class="profile-body">
@@ -28,34 +28,55 @@ window.openUserModal = async function(uid) {
   document.getElementById('close-user-modal').onclick = () => modal.classList.add('hidden');
 };
 
-function renderMyProfileTab() {
+async function renderMyProfileTab() {
   const box = document.getElementById('my-profile-container');
   const p = window.userProfile;
   if (!box) return;
   if (!p) { box.innerHTML = `<div class="glass-card"><h2>Sign in to customize your profile</h2></div>`; return; }
 
+  const allItems = await window.sbRest('store_items?order=id.asc').catch(() => []);
+  const ownedList = (allItems || []).filter(it => (p.owned_items || []).includes(it.id));
+  const ownedAvatars = ownedList.filter(it => it.item_type === 'avatar');
+  const ownedBanners = ownedList.filter(it => it.item_type === 'banner');
+  const ownedFrames = ownedList.filter(it => it.item_type === 'frame');
+
   const frameGlow = p.avatar_frame && p.avatar_frame !== 'none' ? `box-shadow:0 0 0 3px ${p.avatar_frame},0 0 18px ${p.avatar_frame};` : '';
+  const bannerBg = p.banner && (p.banner.startsWith('http') || p.banner.startsWith('data:')) ? `url('${p.banner}') center/cover` : (p.banner || 'linear-gradient(135deg,#064e3b,#0f172a)');
+
   box.innerHTML = `
-    <div class="glass-card" style="padding:0;overflow:hidden;max-width:680px;margin:auto;">
-      <div class="banner-hero" style="background:${p.banner || 'linear-gradient(135deg,#064e3b,#0f172a)'}">
+    <div class="glass-card" style="padding:0;overflow:hidden;max-width:720px;margin:auto;">
+      <div class="banner-hero" style="background:${bannerBg}">
         <img class="banner-avatar" style="border-color:${p.equipped_color};${frameGlow}" src="${safeAvatar(p.avatar)}" />
       </div>
       <div class="profile-body">
         <h2 style="color:${p.equipped_color}">${p.username}</h2>
-        <div class="setting-group"><label>Avatar Frame Color</label><select id="edit-frame" class="tool-input"><option value="none">None</option><option value="#10b981">Emerald Pulse</option><option value="#06b6d4">Cyber Cyan</option><option value="#f59e0b">Solar Gold</option><option value="#a855f7">Violet Neon</option></select></div>
+        <div class="setting-group"><label>Equipped Avatar</label><select id="edit-avatar" class="tool-input"><option value="logo.png">ZynkOS Default Logo</option>${ownedAvatars.map(a => `<option value="${a.image_url || a.item_value}">${a.name}</option>`).join('')}</select></div>
+        <div class="setting-group"><label>Equipped Banner</label><select id="edit-banner" class="tool-input"><option value="linear-gradient(135deg,#064e3b,#0f172a)">Default Emerald Gradient</option>${ownedBanners.map(b => `<option value="${b.image_url || b.item_value}">${b.name}</option>`).join('')}</select></div>
+        <div class="setting-group"><label>Avatar Frame Color</label><select id="edit-frame" class="tool-input"><option value="none">None</option><option value="#10b981">Emerald Pulse</option><option value="#06b6d4">Cyber Cyan</option><option value="#f59e0b">Solar Gold</option><option value="#a855f7">Violet Neon</option>${ownedFrames.map(f => `<option value="${f.item_value}">${f.name}</option>`).join('')}</select></div>
         <div class="setting-group"><label>Steady Page Theme</label><select id="edit-theme" class="tool-input"><option value="default">Default Emerald</option><option value="theme-cyber">Cyber Cyan</option><option value="theme-crimson">Crimson Ops</option><option value="theme-gold">Solar Gold</option><option value="theme-violet">Violet Pulse</option></select></div>
         <div class="setting-group"><label>Bio</label><input id="edit-bio" class="tool-input" value="${p.bio || ''}" /></div>
-        <button id="save-my-profile" class="btn-neon">Save Profile & Theme</button>
+        <button id="save-my-profile" class="btn-neon">Save Profile, Avatar & Theme</button>
       </div>
     </div>`;
+
+  document.getElementById('edit-avatar').value = safeAvatar(p.avatar);
+  document.getElementById('edit-banner').value = p.banner || 'linear-gradient(135deg,#064e3b,#0f172a)';
   document.getElementById('edit-frame').value = p.avatar_frame || 'none';
-  document.getElementById('edit-theme').value = p.profile_theme || 'default';
+  document.getElementById('edit-theme').value = localStorage.getItem('zynk_theme') || p.profile_theme || 'default';
+
   document.getElementById('save-my-profile').onclick = async () => {
     const th = document.getElementById('edit-theme').value;
+    localStorage.setItem('zynk_theme', th);
     document.body.className = th === 'default' ? '' : th;
-    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { avatar_frame: document.getElementById('edit-frame').value, profile_theme: th, bio: document.getElementById('edit-bio').value.trim() }, window.authToken);
+    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', {
+      avatar: document.getElementById('edit-avatar').value,
+      banner: document.getElementById('edit-banner').value,
+      avatar_frame: document.getElementById('edit-frame').value,
+      profile_theme: th,
+      bio: document.getElementById('edit-bio').value.trim()
+    }, window.authToken);
     await window.refreshMyProfile();
-    window.notify('Profile & page theme saved!');
+    window.notify('Profile, avatar & theme saved!');
   };
 }
 async function renderLeaderboardQuestsAndAnnouncements() {
@@ -109,10 +130,10 @@ async function renderLeaderboardQuestsAndAnnouncements() {
     { id: 'q_rich1', title: '💰 Credit Saver', desc: 'Hold 1,000+ Z-Credits at once.', cred: 250, xp: 300, ready: () => (p?.credits || 0) >= 1000 },
     { id: 'q_rich2', title: '🏦 Zynk Whale', desc: 'Hold 5,000+ Z-Credits at once.', cred: 1000, xp: 1200, ready: () => (p?.credits || 0) >= 5000 },
     { id: 'sec_night', isSecret: true, title: '🌙 Night Owl Protocol', desc: '??? [Secret Quest — Condition Hidden]', cred: 500, xp: 500, ready: () => new Date().getHours() >= 22 || new Date().getHours() <= 4 },
-    { id: 'sec_cyber', isSecret: true, title: '💠 Cyan Overclock', desc: '??? [Secret Quest — Condition Hidden]', cred: 400, xp: 450, ready: () => p?.profile_theme === 'theme-cyber' },
+    { id: 'sec_cyber', isSecret: true, title: '💠 Cyan Overclock', desc: '??? [Secret Quest — Condition Hidden]', cred: 400, xp: 450, ready: () => localStorage.getItem('zynk_theme') === 'theme-cyber' },
     { id: 'sec_24h', isSecret: true, title: '⏱ Military Precision', desc: '??? [Secret Quest — Condition Hidden]', cred: 350, xp: 400, ready: () => localStorage.getItem('zynk_format') === '24' },
     { id: 'sec_cloak', isSecret: true, title: '🕵️ Ghost Protocol', desc: '??? [Secret Quest — Condition Hidden]', cred: 450, xp: 500, ready: () => (localStorage.getItem('zynk_cloak') || 'none') !== 'none' },
-    { id: 'sec_crimson', isSecret: true, title: '🩸 Crimson Shadow', desc: '??? [Secret Quest — Condition Hidden]', cred: 450, xp: 500, ready: () => p?.profile_theme === 'theme-crimson' },
+    { id: 'sec_crimson', isSecret: true, title: '🩸 Crimson Shadow', desc: '??? [Secret Quest — Condition Hidden]', cred: 450, xp: 500, ready: () => localStorage.getItem('zynk_theme') === 'theme-crimson' },
     { id: 'sec_zoom', isSecret: true, title: '🔬 Micro Vision', desc: '??? [Secret Quest — Condition Hidden]', cred: 300, xp: 350, ready: () => localStorage.getItem('zynk_zoom') === '0.9' }
   ];
 
@@ -142,11 +163,14 @@ async function renderLeaderboardQuestsAndAnnouncements() {
     const card = document.createElement('div');
     card.className = 'glass-card';
     card.innerHTML = `<span class="rarity-tag" style="color:${q.isSecret ? '#a855f7' : '#10b981'}">+${q.cred} Z-Credits • +${q.xp} XP</span><h3>${q.title}</h3><p class="sub-text" style="margin:6px 0 12px;">${q.desc}</p><button class="${canClaim ? 'btn-neon' : 'btn-outline'}" ${q.isDaily ? 'id="daily-quest-btn"' : ''} ${canClaim ? '' : 'disabled'}>${isDone ? '✓ Completed' : canClaim ? 'Claim Reward' : q.isSecret ? '🔒 Discover Secret' : 'In Progress'}</button>`;
-    card.querySelector('button').onclick = async () => {
-      if (!p || !canClaim) return;
+    const btn = card.querySelector('button');
+    btn.onclick = async () => {
+      if (!p || !canClaim || btn.disabled) return;
+      btn.disabled = true;
+      btn.textContent = 'Claiming...';
       const patch = { credits: p.credits + q.cred, xp: (p.xp || 0) + q.xp };
       if (q.isDaily) patch.last_daily = Date.now();
-      else patch.claimed = [...(p.claimed || []), q.id];
+      else patch.claimed = [...new Set([...(p.claimed || []), q.id])];
       await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', patch, window.authToken);
       await window.refreshMyProfile();
       window.notify(`Quest Complete! +${q.cred} Z-Credits & +${q.xp} XP`);
@@ -164,6 +188,7 @@ document.addEventListener('click', async (e) => {
     const p = window.userProfile;
     if (!p) return window.notify('Sign in to claim daily Z-Credits!', true);
     if (Date.now() - (p.last_daily || 0) < 86400000) return window.notify('Daily reward is still on cooldown!', true);
+    e.target.disabled = true;
     await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + 150, xp: (p.xp || 0) + 100, last_daily: Date.now() }, window.authToken);
     await window.refreshMyProfile();
     window.notify('Claimed +150 Daily Z-Credits!');
