@@ -1,4 +1,4 @@
-const SB_URL = 'https://api.ZynkOS.linkpc.net';
+const SB_URL = 'https://linkpc.net';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nbHlibW56c3B2eXJ1end3Z2RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUyOTkzMDQsImV4cCI6MjExMDg3NTMwNH0.E2pZaS0OGtkEk6hfsMSOJ2MUu8i-iZyAHnEKg-RhnH0';
 
 window.notify = function(msg, isError = false) {
@@ -30,10 +30,8 @@ window.authToken = null;
 let isSignup = false;
 
 function lockScreen(locked) {
-  const m = document.getElementById('auth-modal');
-  const s = document.querySelector('.os-shell');
-  if (m) m.classList.toggle('hidden', !locked);
-  if (s) s.classList.toggle('hidden', locked);
+  document.getElementById('auth-modal')?.classList.toggle('hidden', !locked);
+  document.querySelector('.os-shell')?.classList.toggle('hidden', locked);
 }
 
 async function bootUser(user, token, preferredName) {
@@ -47,6 +45,7 @@ async function bootUser(user, token, preferredName) {
     const created = await window.sbRest('users', 'POST', {
       id: user.id,
       username: uname,
+      email: user.email,
       avatar: 'https://dicebear.com' + encodeURIComponent(uname),
       role: isFounder ? 'FOUNDER' : 'MEMBER',
       is_beta: isFounder,
@@ -54,20 +53,21 @@ async function bootUser(user, token, preferredName) {
     }, token);
     prof = Array.isArray(created) && created.length ? created.at(0) : null;
   } else {
-    await window.sbRest('users?id=eq.' + user.id, 'PATCH', { online: true }, token);
+    const fixAv = !prof.avatar || prof.avatar.startsWith('https://dicebear.com') ? 'https://dicebear.com' + encodeURIComponent(prof.username) : prof.avatar;
+    await window.sbRest('users?id=eq.' + user.id, 'PATCH', { online: true, email: user.email, avatar: fixAv }, token);
+    prof.avatar = fixAv;
   }
   window.userProfile = prof;
   lockScreen(false);
   const topBtn = document.getElementById('top-auth-btn');
   if (topBtn) topBtn.textContent = 'Sign Out';
   const isFounder = prof && prof.role === 'FOUNDER';
-  const isBeta = (prof && prof.is_beta) || isFounder;
+  const isBeta = (prof && (prof.is_beta || prof.role === 'BETA')) || isFounder;
   document.getElementById('nav-admin-btn')?.classList.toggle('hidden', !isFounder);
   document.getElementById('nav-beta-btn')?.classList.toggle('hidden', !isBeta);
   window.dispatchEvent(new Event('zynk-profile-updated'));
   window.notify('Welcome back, ' + ((prof && prof.username) || 'Operator') + '!');
 }
-
 window.refreshMyProfile = async function() {
   if (!window.currentUser) return;
   const rows = await window.sbRest('users?id=eq.' + window.currentUser.id, 'GET', null, window.authToken);
@@ -85,6 +85,7 @@ document.addEventListener('click', async (e) => {
     isSignup = !isSignup;
     document.getElementById('auth-title').textContent = isSignup ? 'Create ZynkOS Account' : 'ZynkOS // System Access';
     document.getElementById('auth-submit-btn').textContent = isSignup ? 'Create Account & Boot' : 'Boot Into ZynkOS';
+    document.getElementById('auth-email').placeholder = isSignup ? 'Email Address' : 'Username or Email Address';
     e.target.textContent = isSignup ? 'Have an Account? Switch to Sign In' : 'Need an account? Switch to Create Account';
     document.getElementById('auth-user').classList.toggle('hidden', !isSignup);
   }
@@ -106,25 +107,33 @@ document.addEventListener('click', async (e) => {
   }
 
   if (id === 'auth-submit-btn') {
-    const email = document.getElementById('auth-email').value.trim();
+    let loginId = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-pass').value;
     const username = document.getElementById('auth-user').value.trim();
     const remBox = document.getElementById('remember-me');
-    if (!email || !password) return window.notify('Enter both email and password.', true);
+    if (!loginId || !password) return window.notify('Enter both username/email and password.', true);
     if (isSignup && !username) return window.notify('Please choose a username.', true);
 
     e.target.disabled = true;
     e.target.textContent = 'Connecting...';
     try {
+      if (!isSignup && !loginId.includes('@')) {
+        const cleanUser = loginId.replace(/^@/, '');
+        const found = await window.sbRest('users?username=ilike.' + encodeURIComponent(cleanUser));
+        const match = Array.isArray(found) ? found.at(0) : null;
+        if (!match || !match.email) throw new Error('Username not found. Try signing in with your email once.');
+        loginId = match.email;
+      }
+
       const endpoint = isSignup ? 'signup' : 'token?grant_type=password';
       const res = await fetch(SB_URL + '/auth/v1/' + endpoint, {
         method: 'POST',
         headers: { 'apikey': SB_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email: loginId, password })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error_description || data.msg || 'Authentication failed');
-      if (!data.access_token) throw new Error('Account created! Turn OFF Confirm email in Supabase, then Sign In.');
+      if (!data.access_token) throw new Error('Account created! Switch to Sign In.');
 
       const store = remBox && remBox.checked ? localStorage : sessionStorage;
       store.setItem('zynk_session', JSON.stringify({ user: data.user, token: data.access_token }));
