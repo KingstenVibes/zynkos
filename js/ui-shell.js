@@ -29,7 +29,7 @@ const dock = mk('aside', 'left-dock', `
   <div class="dock-top">
     <img src="logo.png" alt="ZynkOS" style="width:36px;height:36px;border-radius:8px;object-fit:cover;" />
     <span class="brand-title">ZynkOS</span>
-    <button class="collapse-btn" id="toggle-dock">☰</button>
+    <button class="collapse-btn" id="toggle-dock">▶</button>
   </div>
   <div class="dock-section">CORE</div>
   <button class="dock-btn active" data-tab="home-view"><span class="sym">⌂</span><span class="lbl">Dashboard</span></button>
