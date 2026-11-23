@@ -10,30 +10,39 @@ async function renderAdminAndBeta() {
   const isBeta = p && (p.role === 'FOUNDER' || p.role === 'BETA' || p.is_beta || (p.extra_roles || []).includes('BETA'));
 
   if (betaGrid && isBeta) {
+    const betaClaimed = Array.isArray(p?.claimed) && p.claimed.includes('beta_stipend_v2');
     betaGrid.innerHTML = `
       <div class="glass-card"><span class="rarity-tag" style="color:#06b6d4">BETA FEATURE 1</span><h3>Live Page Theme Switcher</h3><p class="sub-text">Test steady page color themes before public release.</p><div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn-outline" data-th="default">Emerald</button><button class="btn-outline" data-th="theme-cyber">Cyber Cyan</button><button class="btn-outline" data-th="theme-crimson">Crimson</button><button class="btn-outline" data-th="theme-gold">Gold</button><button class="btn-outline" data-th="theme-violet">Violet</button></div></div>
-      <div class="glass-card"><span class="rarity-tag" style="color:#06b6d4">BETA FEATURE 2</span><h3>Beta Tester Stipend</h3><p class="sub-text">Claim +250 Z-Credits for testing experimental ZynkOS builds.</p><button class="btn-neon" id="beta-bonus-btn">Claim +250 Z-Credits</button></div>
+      <div class="glass-card"><span class="rarity-tag" style="color:#06b6d4">BETA FEATURE 2</span><h3>Beta Tester Stipend</h3><p class="sub-text">One-time +250 Z-Credits reward for testing ZynkOS builds.</p><button class="${betaClaimed ? 'btn-outline' : 'btn-neon'}" id="beta-bonus-btn" ${betaClaimed ? 'disabled' : ''}>${betaClaimed ? '✓ Claimed' : 'Claim +250 Z-Credits'}</button></div>
       <div class="glass-card"><span class="rarity-tag" style="color:#06b6d4">BETA FEATURE 3</span><h3>Compact HUD Mode</h3><p class="sub-text">Toggle high-density spacing across ZynkOS panels.</p><button class="btn-outline" id="beta-compact-btn">Toggle Compact HUD</button></div>
-      <div class="glass-card"><span class="rarity-tag" style="color:#06b6d4">BETA FEATURE 4</span><h3>Neural XP Overdrive</h3><p class="sub-text">Test instant +150 Neural Sync XP progression.</p><button class="btn-outline" id="beta-xp-btn">Test +150 XP</button></div>`;
+      <div class="glass-card"><span class="rarity-tag" style="color:#06b6d4">BETA FEATURE 4</span><h3>Neural XP Overdrive</h3><p class="sub-text">Preview live XP bar scaling and level progression.</p><button class="btn-outline" id="beta-xp-btn">Toggle XP Bar Preview</button></div>`;
 
     betaGrid.querySelectorAll('[data-th]').forEach(b => (b.onclick = async () => {
+      localStorage.setItem('zynk_theme', b.dataset.th);
       document.body.className = b.dataset.th === 'default' ? '' : b.dataset.th;
       if (p) await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { profile_theme: b.dataset.th }, window.authToken);
       window.notify(`Applied theme: ${b.textContent}`);
     }));
-    document.getElementById('beta-bonus-btn').onclick = async () => {
-      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + 250 }, window.authToken);
+
+    const bBtn = document.getElementById('beta-bonus-btn');
+    bBtn.onclick = async () => {
+      if (betaClaimed || bBtn.disabled) return;
+      bBtn.disabled = true;
+      bBtn.textContent = 'Claiming...';
+      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + 250, claimed: [...new Set([...(p.claimed || []), 'beta_stipend_v2'])] }, window.authToken);
       await window.refreshMyProfile();
-      window.notify('Beta +250 Z-Credits added!');
+      window.notify('Beta +250 Z-Credits claimed!');
     };
+
     document.getElementById('beta-compact-btn').onclick = () => {
       document.body.style.zoom = document.body.style.zoom === '0.92' ? '1' : '0.92';
       window.notify('Toggled Compact HUD scale.');
     };
-    document.getElementById('beta-xp-btn').onclick = async () => {
-      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { xp: (p.xp || 0) + 150 }, window.authToken);
-      await window.refreshMyProfile();
-      window.notify('+150 Neural Sync XP granted!');
+
+    document.getElementById('beta-xp-btn').onclick = () => {
+      const bar = document.getElementById('hud-xp-bar');
+      if (bar) bar.style.width = bar.style.width === '100%' ? '25%' : '100%';
+      window.notify('Previewed Neural XP bar animation!');
     };
   }
 
@@ -79,10 +88,12 @@ async function renderAdminAndBeta() {
       if (!title || !body) return window.notify('Enter both title and message.', true);
       await window.sbRest('announcements', 'POST', { icon: document.getElementById('ann-icon').value, title, body, author: p.username }, window.authToken);
       window.notify('Announcement published to Dashboard!');
+      renderAdminAndBeta();
       window.dispatchEvent(new Event('zynk-profile-updated'));
     };
     sub.querySelectorAll('[data-del-ann]').forEach(b => (b.onclick = async () => {
       await window.sbRest(`announcements?id=eq.${b.dataset.delAnn}`, 'DELETE', null, window.authToken);
+      renderAdminAndBeta();
       window.dispatchEvent(new Event('zynk-profile-updated'));
     }));
   }
@@ -106,7 +117,7 @@ async function renderAdminAndBeta() {
           <button class="btn-neon" id="adm-add-item-btn" style="width:100%">Publish to Store</button>
         </div>
         <div class="glass-card">
-          <h3>🔥 Daily Deals & User Requests</h3>
+          <h3>🔥 Daily Deals & Member Requests</h3>
           <div style="max-height:175px;overflow-y:auto;">
             ${(storeItems || []).map(it => `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span>${it.name}</span><div style="display:flex;gap:6px;"><button class="${it.is_daily_deal ? 'btn-neon' : 'btn-outline'}" data-deal-id="${it.id}" data-deal-on="${it.is_daily_deal ? '1' : '0'}">${it.is_daily_deal ? '10% OFF' : 'Deal'}</button><button class="btn-ghost" data-del-item="${it.id}">✕</button></div></div>`).join('')}
           </div>
@@ -118,29 +129,33 @@ async function renderAdminAndBeta() {
       const f = e.target.files?.at(0);
       if (!f) return;
       const r = new FileReader();
-      r.onload = () => { uploadedImg = r.result; window.notify('Image loaded & ready!'); };
+      r.onload = () => { uploadedImg = r.result; window.notify('Image loaded & ready to publish!'); };
       r.readAsDataURL(f);
     };
     document.getElementById('adm-add-item-btn').onclick = async () => {
       const name = document.getElementById('adm-item-name').value.trim();
       const img = uploadedImg || document.getElementById('adm-item-img').value.trim();
+      const rawVal = document.getElementById('adm-item-val').value.trim();
       if (!name) return window.notify('Enter item name.', true);
-      await window.sbRest('store_items', 'POST', { name, image_url: img, item_type: document.getElementById('adm-item-type').value, rarity: document.getElementById('adm-item-rarity').value, item_value: document.getElementById('adm-item-val').value.trim() || img || '#10b981', cost: parseInt(document.getElementById('adm-item-cost').value, 10) || 100, is_daily_deal: document.getElementById('adm-item-deal').checked }, window.authToken);
+      await window.sbRest('store_items', 'POST', { name, image_url: img, item_type: document.getElementById('adm-item-type').value, rarity: document.getElementById('adm-item-rarity').value, item_value: rawVal || img || '#10b981', cost: parseInt(document.getElementById('adm-item-cost').value, 10) || 100, is_daily_deal: document.getElementById('adm-item-deal').checked }, window.authToken);
       uploadedImg = '';
       window.notify('Published to Store!');
+      renderAdminAndBeta();
       window.dispatchEvent(new Event('zynk-profile-updated'));
     };
     sub.querySelectorAll('[data-deal-id]').forEach(b => (b.onclick = async () => {
       await window.sbRest(`store_items?id=eq.${b.dataset.dealId}`, 'PATCH', { is_daily_deal: b.dataset.dealOn !== '1' }, window.authToken);
+      renderAdminAndBeta();
       window.dispatchEvent(new Event('zynk-profile-updated'));
     }));
     sub.querySelectorAll('[data-del-item]').forEach(b => (b.onclick = async () => {
       await window.sbRest(`store_items?id=eq.${b.dataset.delItem}`, 'DELETE', null, window.authToken);
+      renderAdminAndBeta();
       window.dispatchEvent(new Event('zynk-profile-updated'));
     }));
     sub.querySelectorAll('[data-del-req]').forEach(b => (b.onclick = async () => {
       await window.sbRest(`shop_requests?id=eq.${b.dataset.delReq}`, 'DELETE', null, window.authToken);
-      window.dispatchEvent(new Event('zynk-profile-updated'));
+      renderAdminAndBeta();
     }));
   }
   if (activeFounderTab === 'ROLES') {
