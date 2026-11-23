@@ -11,8 +11,11 @@ let activeShopFilter = 'ALL';
 function syncHud() {
   const p = window.userProfile;
   if (!p) return;
-  if (p.profile_theme && p.profile_theme !== 'default') document.body.className = p.profile_theme;
-  const rank = window.RANKS.at(p.rank_index || 0) || window.RANKS.at(0);
+  const savedTh = localStorage.getItem('zynk_theme');
+  const activeTh = savedTh || p.profile_theme || 'default';
+  document.body.className = activeTh === 'default' ? '' : activeTh;
+
+  const rank = window.RANKS[p.rank_index || 0] || window.RANKS[0];
   const lvl = Math.floor((p.xp || 0) / 1000) + 1;
   const extras = (p.extra_roles || []).length ? ' • ' + p.extra_roles.map(r => `[${r}]`).join(' ') : '';
   document.getElementById('hud-username').textContent = p.username;
@@ -45,10 +48,12 @@ async function renderRanksAndStore() {
       const card = document.createElement('div');
       card.className = 'glass-card';
       card.innerHTML = `<span class="rarity-tag" style="color:${r.color}">${r.priceLabel}</span><h3>${r.name}</h3><p class="sub-text" style="margin:8px 0 14px;">${r.perks}</p><button class="${owned ? 'btn-outline' : 'btn-neon'}" style="width:100%" ${owned ? 'disabled' : ''}>${owned ? '✓ Unlocked' : isCreditRank ? `Unlock (${r.cost} Z-Credits)` : `💳 ${r.priceLabel} (Checkout Soon)`}</button>`;
-      card.querySelector('button').onclick = async () => {
+      const btn = card.querySelector('button');
+      btn.onclick = async () => {
         if (!p) return window.notify('Sign in first!', true);
         if (!isCreditRank) return window.notify(`${r.name} (${r.priceLabel}) requires real-money checkout—coming soon!`, true);
         if (p.credits < r.cost) return window.notify('Not enough Z-Credits!', true);
+        btn.disabled = true;
         await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits - r.cost, rank_index: idx }, window.authToken);
         await window.refreshMyProfile();
         window.notify(`Unlocked ${r.name} Rank!`);
@@ -103,14 +108,15 @@ async function renderRanksAndStore() {
       const myAv = p?.avatar && !p.avatar.includes('dicebear') ? p.avatar : 'logo.png';
       const themeColors = { 'theme-cyber': '#06b6d4', 'theme-crimson': '#f43f5e', 'theme-gold': '#f59e0b', 'theme-violet': '#a855f7', default: '#10b981' };
       const imgSrc = it.image_url || (String(it.item_value || '').startsWith('data:image') || String(it.item_value || '').startsWith('http') ? it.item_value : '');
-      if (imgSrc) return `<img src="${imgSrc}" alt="${it.name}" style="width:100%;height:135px;object-fit:cover;border-radius:12px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.12);background:#04070b;" />`;
-      if (it.item_type === 'frame') return `<div style="height:135px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,${it.item_value}22,#04070b);border-radius:12px;margin-bottom:10px;"><img src="${myAv}" style="width:74px;height:74px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 3px ${it.item_value},0 0 22px ${it.item_value};" /></div>`;
+      if (imgSrc) return `<div style="height:140px;border-radius:12px;margin-bottom:10px;overflow:hidden;background:#04070b;border:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;"><img src="${imgSrc}" alt="${it.name}" style="width:100%;height:100%;object-fit:cover;" /></div>`;
+      if (it.item_type === 'avatar') return `<div style="height:140px;display:flex;align-items:center;justify-content:center;background:#04070b;border-radius:12px;margin-bottom:10px;"><img src="logo.png" style="width:82px;height:82px;border-radius:50%;object-fit:cover;border:2px solid #10b981;" /></div>`;
+      if (it.item_type === 'frame') return `<div style="height:140px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,${it.item_value}22,#04070b);border-radius:12px;margin-bottom:10px;"><img src="${myAv}" style="width:74px;height:74px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 3px ${it.item_value},0 0 22px ${it.item_value};" /></div>`;
       if (it.item_type === 'theme') {
         const c = themeColors[it.item_value] || it.item_value || '#10b981';
-        return `<div style="height:135px;display:flex;flex-direction:column;justify-content:center;align-items:center;background:radial-gradient(circle at top,${c}38,#04070b);border:1px solid ${c};border-radius:12px;margin-bottom:10px;"><span style="color:${c};font-weight:800;letter-spacing:1.5px;">STEADY THEME</span><span style="font-size:0.78rem;color:#cbd5e1;margin-top:4px;">${it.name}</span></div>`;
+        return `<div style="height:140px;display:flex;flex-direction:column;justify-content:center;align-items:center;background:radial-gradient(circle at top,${c}38,#04070b);border:1px solid ${c};border-radius:12px;margin-bottom:10px;"><span style="color:${c};font-weight:800;letter-spacing:1.5px;">STEADY THEME</span><span style="font-size:0.78rem;color:#cbd5e1;margin-top:4px;">${it.name}</span></div>`;
       }
-      if (it.item_type === 'color') return `<div style="height:135px;display:flex;align-items:center;justify-content:center;background:#04070b;border-radius:12px;margin-bottom:10px;"><strong style="color:${it.item_value};font-size:1.15rem;">@${p?.username || 'Member'}</strong></div>`;
-      return `<div style="height:135px;display:flex;align-items:center;justify-content:center;background:#04070b;border-radius:12px;margin-bottom:10px;"><span class="pill" style="border-color:#10b981;font-size:1rem;">${it.item_value || '★'} ${it.name}</span></div>`;
+      if (it.item_type === 'color') return `<div style="height:140px;display:flex;align-items:center;justify-content:center;background:#04070b;border-radius:12px;margin-bottom:10px;"><strong style="color:${it.item_value};font-size:1.15rem;">@${p?.username || 'Member'}</strong></div>`;
+      return `<div style="height:140px;display:flex;align-items:center;justify-content:center;background:#04070b;border-radius:12px;margin-bottom:10px;"><span class="pill" style="border-color:#10b981;font-size:1rem;">${it.item_value || '★'} ${it.name}</span></div>`;
     };
 
     const filtered = (items || []).filter(it => {
@@ -126,7 +132,7 @@ async function renderRanksAndStore() {
 
     filtered.forEach(it => {
       const finalCost = it.is_daily_deal ? Math.floor(it.cost * 0.9) : it.cost;
-      const owned = p && (p.owned_items || []).includes(it.id);
+      const owned = Array.isArray(p?.owned_items) && p.owned_items.includes(it.id);
       const rCol = it.is_daily_deal ? '#f59e0b' : (rarityColors[it.rarity] || '#10b981');
       const imgSrc = it.image_url || (String(it.item_value || '').startsWith('data:image') || String(it.item_value || '').startsWith('http') ? it.item_value : '');
       const card = document.createElement('div');
@@ -134,19 +140,27 @@ async function renderRanksAndStore() {
       card.style.borderColor = `${rCol}55`;
       card.innerHTML = `${getVisual(it)}<div style="display:flex;justify-content:space-between;align-items:center;"><span class="rarity-tag" style="color:${rCol}">${it.is_daily_deal ? '🔥 10% OFF DEAL' : it.rarity}</span><span class="mono-dim">${it.item_type.toUpperCase()}</span></div><h3 style="margin:2px 0;">${it.name}</h3><p class="sub-text" style="margin-bottom:12px;">${it.is_daily_deal ? `<s>${it.cost}</s> → <strong style="color:#f59e0b">${finalCost} Z-Credits</strong>` : `${finalCost} Z-Credits`}</p><div style="display:flex;gap:8px;"><button class="${owned ? 'btn-outline' : 'btn-neon'} buy-btn" style="flex:1">${owned ? 'Equip' : 'Buy'}</button><button class="btn-outline gift-btn" title="Gift to @user">🎁 Gift</button></div>`;
 
-      card.querySelector('.buy-btn').onclick = async () => {
+      const buyBtn = card.querySelector('.buy-btn');
+      buyBtn.onclick = async () => {
         if (!p) return window.notify('Sign in first!', true);
         if (!owned && p.credits < finalCost) return window.notify('Not enough Z-Credits!', true);
-        const up = owned ? {} : { credits: p.credits - finalCost, owned_items: [...(p.owned_items || []), it.id] };
-        if (it.item_type === 'avatar' && imgSrc) up.avatar = imgSrc;
-        if (it.item_type === 'frame') up.avatar_frame = it.item_value;
-        if (it.item_type === 'banner' && imgSrc) up.banner = imgSrc;
-        if (it.item_type === 'theme') up.profile_theme = it.item_value;
-        if (it.item_type === 'color') up.equipped_color = it.item_value;
-        if (it.item_type === 'badge') up.equipped_badge = it.item_value;
-        await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', up, window.authToken);
-        await window.refreshMyProfile();
-        window.notify(owned ? `Equipped ${it.name}!` : `Purchased & equipped ${it.name}!`);
+        buyBtn.disabled = true;
+        try {
+          const nextOwned = owned ? (p.owned_items || []) : [...(p.owned_items || []), it.id];
+          const up = owned ? {} : { credits: p.credits - finalCost, owned_items: nextOwned };
+          if (it.item_type === 'avatar' && imgSrc) up.avatar = imgSrc;
+          if (it.item_type === 'frame') up.avatar_frame = it.item_value;
+          if (it.item_type === 'banner' && imgSrc) up.banner = imgSrc;
+          if (it.item_type === 'theme') { up.profile_theme = it.item_value; localStorage.setItem('zynk_theme', it.item_value); }
+          if (it.item_type === 'color') up.equipped_color = it.item_value;
+          if (it.item_type === 'badge') up.equipped_badge = it.item_value;
+          await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', up, window.authToken);
+          await window.refreshMyProfile();
+          window.notify(owned ? `Equipped ${it.name}!` : `Purchased & equipped ${it.name}!`);
+        } catch (err) {
+          window.notify(err.message, true);
+          buyBtn.disabled = false;
+        }
       };
 
       card.querySelector('.gift-btn').onclick = async () => {
@@ -155,7 +169,7 @@ async function renderRanksAndStore() {
         const who = prompt(`Gift "${it.name}" (${finalCost} Z-Credits) to username:`)?.trim().replace(/^@/, '');
         if (!who) return;
         const res = await window.sbRest(`users?username=ilike.${encodeURIComponent(who)}`);
-        const friend = Array.isArray(res) ? res.at(0) : null;
+        const friend = Array.isArray(res) ? res[0] : null;
         if (!friend) return window.notify(`User @${who} not found.`, true);
         await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits - finalCost }, window.authToken);
         await window.sbRest(`users?id=eq.${friend.id}`, 'PATCH', { owned_items: [...new Set([...(friend.owned_items || []), it.id])] }, window.authToken);
