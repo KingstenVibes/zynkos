@@ -1,12 +1,13 @@
 let uploadedImg = '';
 let activeFounderTab = 'ANNOUNCE';
+let selectedMember = null;
 
 async function renderAdminAndBeta() {
   const p = window.userProfile;
   const adminBox = document.getElementById('admin-panel-container');
   const betaGrid = document.getElementById('beta-grid');
   const isFounder = p && p.role === 'FOUNDER';
-  const isBeta = (p && (p.is_beta || p.role === 'BETA')) || isFounder;
+  const isBeta = p && (p.role === 'FOUNDER' || p.role === 'BETA' || p.is_beta || (p.extra_roles || []).includes('BETA'));
 
   if (betaGrid && isBeta) {
     betaGrid.innerHTML = `
@@ -40,8 +41,8 @@ async function renderAdminAndBeta() {
   const fTabs = [
     { id: 'ANNOUNCE', label: '📢 Broadcast Announcements' },
     { id: 'SHOP', label: '🖼 Shop Upload & Daily Deals' },
-    { id: 'ROLES', label: '⚡ Roles & Ranks' },
-    { id: 'SECRETS', label: '🔒 Secret Quest Guide (Founder Only)' }
+    { id: 'ROLES', label: '⚡ Members, Roles & Credits' },
+    { id: 'SECRETS', label: '🔒 Quests & Secret Solution Key' }
   ];
 
   adminBox.innerHTML = `
@@ -54,7 +55,7 @@ async function renderAdminAndBeta() {
   const sub = document.getElementById('founder-subview');
 
   if (activeFounderTab === 'ANNOUNCE') {
-    const anns = await window.sbRest('announcements?order=id.desc&limit=20').catch(() => []);
+    const anns = await window.sbRest('announcements?order=id.desc&limit=25').catch(() => []);
     sub.innerHTML = `
       <div class="bento-grid" style="padding:0;">
         <div class="glass-card">
@@ -106,8 +107,10 @@ async function renderAdminAndBeta() {
         </div>
         <div class="glass-card">
           <h3>🔥 Daily Deals & User Requests</h3>
-          ${(storeItems || []).map(it => `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span>${it.name}</span><button class="${it.is_daily_deal ? 'btn-neon' : 'btn-outline'}" data-deal-id="${it.id}" data-deal-on="${it.is_daily_deal ? '1' : '0'}">${it.is_daily_deal ? '10% OFF ON' : 'Set Deal'}</button></div>`).join('')}
-          <h4 style="margin-top:14px;">💡 User Shop Requests (${(reqs || []).length})</h4>
+          <div style="max-height:175px;overflow-y:auto;">
+            ${(storeItems || []).map(it => `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span>${it.name}</span><div style="display:flex;gap:6px;"><button class="${it.is_daily_deal ? 'btn-neon' : 'btn-outline'}" data-deal-id="${it.id}" data-deal-on="${it.is_daily_deal ? '1' : '0'}">${it.is_daily_deal ? '10% OFF' : 'Deal'}</button><button class="btn-ghost" data-del-item="${it.id}">✕</button></div></div>`).join('')}
+          </div>
+          <h4 style="margin-top:14px;">💡 Member Shop Requests (${(reqs || []).length})</h4>
           ${(reqs || []).map(r => `<div style="display:flex;justify-content:space-between;padding:5px 0;"><span><strong>${r.item_name}</strong> (${r.category}) by @${r.username}</span><button class="btn-ghost" data-del-req="${r.id}">✕</button></div>`).join('') || '<p class="sub-text">No requests.</p>'}
         </div>
       </div>`;
@@ -115,7 +118,7 @@ async function renderAdminAndBeta() {
       const f = e.target.files?.at(0);
       if (!f) return;
       const r = new FileReader();
-      r.onload = () => { uploadedImg = r.result; window.notify('Image ready!'); };
+      r.onload = () => { uploadedImg = r.result; window.notify('Image loaded & ready!'); };
       r.readAsDataURL(f);
     };
     document.getElementById('adm-add-item-btn').onclick = async () => {
@@ -131,69 +134,140 @@ async function renderAdminAndBeta() {
       await window.sbRest(`store_items?id=eq.${b.dataset.dealId}`, 'PATCH', { is_daily_deal: b.dataset.dealOn !== '1' }, window.authToken);
       window.dispatchEvent(new Event('zynk-profile-updated'));
     }));
+    sub.querySelectorAll('[data-del-item]').forEach(b => (b.onclick = async () => {
+      await window.sbRest(`store_items?id=eq.${b.dataset.delItem}`, 'DELETE', null, window.authToken);
+      window.dispatchEvent(new Event('zynk-profile-updated'));
+    }));
     sub.querySelectorAll('[data-del-req]').forEach(b => (b.onclick = async () => {
       await window.sbRest(`shop_requests?id=eq.${b.dataset.delReq}`, 'DELETE', null, window.authToken);
       window.dispatchEvent(new Event('zynk-profile-updated'));
     }));
   }
   if (activeFounderTab === 'ROLES') {
+    const allMembers = await window.sbRest('users?order=username.asc&limit=200').catch(() => []);
     sub.innerHTML = `
-      <div class="glass-card" style="max-width:520px;">
-        <h3>⚡ Grant User Roles & Paid Ranks</h3>
-        <input id="adm-target-user" class="tool-input" placeholder="Exact Username" />
-        <label class="sub-text">Primary Role:</label>
-        <select id="adm-target-role" class="tool-input"><option value="MEMBER">MEMBER</option><option value="SUPPORTER">SUPPORTER</option><option value="VIP">VIP</option><option value="UPLOADER">UPLOADER</option><option value="BETA">BETA TESTER</option><option value="MODERATOR">MODERATOR</option><option value="FOUNDER">FOUNDER</option></select>
-        <label class="sub-text">Extra Badge Roles (hold Ctrl to pick multiple):</label>
-        <select id="adm-extra-roles" multiple class="tool-input" style="height:105px;"><option value="SUPPORTER">SUPPORTER</option><option value="VIP">VIP</option><option value="UPLOADER">UPLOADER</option><option value="DESIGNER">DESIGNER</option><option value="OG">OG OPERATOR</option></select>
-        <label class="sub-text">Paid Rank Override:</label>
-        <select id="adm-target-rank" class="tool-input"><option value="">Keep Current Rank</option><option value="1">Pulse</option><option value="2">Nova ($4.99)</option><option value="3">Titan ($9.99)</option><option value="4">Apex ($19.99)</option></select>
-        <button class="btn-neon" id="adm-grant-btn" style="width:100%">Apply Roles & Rank</button>
+      <div class="bento-grid" style="padding:0;">
+        <div class="glass-card">
+          <h3>🔍 Find & Select Member</h3>
+          <input id="adm-search-user" class="tool-input" placeholder="Type letters of username to filter..." autocomplete="off" />
+          <div id="adm-user-results" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;"></div>
+        </div>
+        <div class="glass-card" id="adm-user-editor">
+          <h3>⚡ Edit Selected Member</h3>
+          <p class="sub-text">Click a member on the left to activate their Roles, Ranks, and Z-Credits.</p>
+        </div>
       </div>`;
-    document.getElementById('adm-grant-btn').onclick = async () => {
-      const target = document.getElementById('adm-target-user').value.trim();
-      const role = document.getElementById('adm-target-role').value;
-      const extras = Array.from(document.getElementById('adm-extra-roles').selectedOptions).map(o => o.value);
-      const rankVal = document.getElementById('adm-target-rank').value;
-      if (!target) return window.notify('Enter username.', true);
-      const patch = { role, extra_roles: extras, is_beta: role === 'BETA' || role === 'FOUNDER' };
-      if (rankVal !== '') patch.rank_index = parseInt(rankVal, 10);
-      await window.sbRest(`users?username=ilike.${encodeURIComponent(target)}`, 'PATCH', patch, window.authToken);
-      window.notify(`Updated ${target}!`);
+
+    const resList = document.getElementById('adm-user-results');
+    const editor = document.getElementById('adm-user-editor');
+
+    const activateMember = (u) => {
+      selectedMember = u;
+      editor.innerHTML = `
+        <h3>⚡ Editing: <span style="color:#10b981">@${u.username}</span></h3>
+        <p class="mono-dim" style="margin-bottom:10px;">Current Balance: ${u.credits} Z-Credits • Role: [${u.role}]</p>
+        <label class="sub-text">Primary Role:</label>
+        <select id="ed-role" class="tool-input"><option value="MEMBER">MEMBER</option><option value="SUPPORTER">SUPPORTER</option><option value="VIP">VIP</option><option value="UPLOADER">UPLOADER</option><option value="DESIGNER">DESIGNER</option><option value="BETA">BETA TESTER</option><option value="MODERATOR">MODERATOR</option><option value="ADMIN">ADMIN</option><option value="FOUNDER">FOUNDER</option></select>
+        <label class="sub-text">Extra Badge Roles (Ctrl+Click for multiple):</label>
+        <select id="ed-extras" multiple class="tool-input" style="height:95px;"><option value="SUPPORTER">SUPPORTER</option><option value="VIP">VIP</option><option value="UPLOADER">UPLOADER</option><option value="DESIGNER">DESIGNER</option><option value="OG">OG MEMBER</option><option value="BETA">BETA</option></select>
+        <label class="sub-text">Rank Override:</label>
+        <select id="ed-rank" class="tool-input"><option value="0">Circuit (Free)</option><option value="1">Pulse (250 Z-Credits)</option><option value="2">Nova ($4.99)</option><option value="3">Titan ($9.99)</option><option value="4">Apex ($19.99)</option></select>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input id="ed-cred-amt" type="number" class="tool-input" style="margin:0;flex:1;" value="500" placeholder="Z-Credits amount" />
+          <button type="button" class="btn-outline" id="ed-add-cred">+ Add Credits</button>
+          <button type="button" class="btn-outline" id="ed-set-cred">Set Exact</button>
+        </div>
+        <button type="button" class="btn-neon" id="ed-save-all" style="width:100%;margin-top:12px;">Save Member Roles & Rank</button>`;
+
+      document.getElementById('ed-role').value = u.role || 'MEMBER';
+      document.getElementById('ed-rank').value = String(u.rank_index || 0);
+      Array.from(document.getElementById('ed-extras').options).forEach(opt => {
+        opt.selected = (u.extra_roles || []).includes(opt.value);
+      });
+
+      document.getElementById('ed-add-cred').onclick = async () => {
+        const add = parseInt(document.getElementById('ed-cred-amt').value, 10) || 0;
+        const next = (u.credits || 0) + add;
+        await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { credits: next }, window.authToken);
+        u.credits = next;
+        window.notify(`Added +${add} Z-Credits to @${u.username} (Now: ${next})`);
+        if (u.id === p.id) await window.refreshMyProfile();
+        activateMember(u);
+      };
+
+      document.getElementById('ed-set-cred').onclick = async () => {
+        const exact = Math.max(0, parseInt(document.getElementById('ed-cred-amt').value, 10) || 0);
+        await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { credits: exact }, window.authToken);
+        u.credits = exact;
+        window.notify(`Set @${u.username} balance to ${exact} Z-Credits`);
+        if (u.id === p.id) await window.refreshMyProfile();
+        activateMember(u);
+      };
+
+      document.getElementById('ed-save-all').onclick = async () => {
+        const role = document.getElementById('ed-role').value;
+        const extras = Array.from(document.getElementById('ed-extras').selectedOptions).map(o => o.value);
+        const rank_index = parseInt(document.getElementById('ed-rank').value, 10) || 0;
+        const is_beta = role === 'BETA' || role === 'FOUNDER' || extras.includes('BETA');
+        await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { role, extra_roles: extras, rank_index, is_beta }, window.authToken);
+        Object.assign(u, { role, extra_roles: extras, rank_index, is_beta });
+        window.notify(`Saved roles & rank for @${u.username}!`);
+        if (u.id === p.id) await window.refreshMyProfile();
+      };
     };
+
+    const renderMatches = (q) => {
+      const list = (allMembers || []).filter(m => m.username.toLowerCase().includes(q.toLowerCase()));
+      resList.innerHTML = list.map(m => `<div class="ac-item" data-pick="${m.id}" style="border-radius:8px;background:rgba(4,7,11,0.7);"><span><strong>@${m.username}</strong> <span class="mono-dim">[${m.role}]</span></span><span class="pill">${m.credits} Z</span></div>`).join('') || '<p class="sub-text">No matching members.</p>';
+      resList.querySelectorAll('[data-pick]').forEach(el => (el.onclick = () => {
+        const found = list.find(x => String(x.id) === el.dataset.pick);
+        if (found) activateMember(found);
+      }));
+    };
+
+    renderMatches('');
+    document.getElementById('adm-search-user').oninput = (e) => renderMatches(e.target.value);
+    if (selectedMember) activateMember(selectedMember);
   }
 
   if (activeFounderTab === 'SECRETS') {
-    const customSecrets = await window.sbRest('achievements_list?is_secret=eq.true&order=id.asc').catch(() => []);
+    const customQuests = await window.sbRest('achievements_list?order=id.desc').catch(() => []);
     sub.innerHTML = `
       <div class="bento-grid" style="padding:0;">
         <div class="glass-card">
           <h3>🔒 Founder-Only Secret Quest Solution Key</h3>
-          <p class="sub-text" style="margin-bottom:12px;">Only you (FOUNDER) can see how these secret quests are unlocked:</p>
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            <div style="padding:10px;background:#04070b;border-radius:8px;"><strong>🌙 Night Owl Protocol (+500 Z-Credits):</strong> Open Quests between 10:00 PM and 4:59 AM local time.</div>
-            <div style="padding:10px;background:#04070b;border-radius:8px;"><strong>💠 Cyan Overclock (+400 Z-Credits):</strong> Equip the <code>Cyber Cyan</code> steady page theme in Settings or My Profile.</div>
-            <div style="padding:10px;background:#04070b;border-radius:8px;"><strong>⏱ Military Precision (+350 Z-Credits):</strong> Switch Clock Format to <code>24-Hour (Military)</code> in Settings.</div>
-            <div style="padding:10px;background:#04070b;border-radius:8px;"><strong>🕵️ Ghost Protocol (+450 Z-Credits):</strong> Enable any Tab Disguise (Clever, Classroom, Drive, or Docs) in Settings.</div>
-            ${(customSecrets || []).map(s => `<div style="padding:10px;background:#04070b;border-radius:8px;"><strong>${s.title} (+${s.reward_credits}):</strong> ${s.secret_hint || s.description}</div>`).join('')}
+          <p class="sub-text" style="margin-bottom:10px;">Only visible to FOUNDER—shows how every secret quest is completed:</p>
+          <div style="display:flex;flex-direction:column;gap:8px;max-height:290px;overflow-y:auto;">
+            <div style="padding:8px;background:#04070b;border-radius:8px;"><strong>🌙 Night Owl Protocol (+500 Z):</strong> Open Quests between 10:00 PM and 4:59 AM local time.</div>
+            <div style="padding:8px;background:#04070b;border-radius:8px;"><strong>💠 Cyan Overclock (+400 Z):</strong> Equip the <code>Cyber Cyan</code> steady page theme.</div>
+            <div style="padding:8px;background:#04070b;border-radius:8px;"><strong>⏱ Military Precision (+350 Z):</strong> Switch Clock Format to <code>24-Hour (Military)</code> in Settings.</div>
+            <div style="padding:8px;background:#04070b;border-radius:8px;"><strong>🕵️ Ghost Protocol (+450 Z):</strong> Enable any Tab Disguise in Settings.</div>
+            <div style="padding:8px;background:#04070b;border-radius:8px;"><strong>🩸 Crimson Shadow (+450 Z):</strong> Equip the <code>Crimson Ops</code> steady page theme.</div>
+            <div style="padding:8px;background:#04070b;border-radius:8px;"><strong>🔬 Micro Vision (+300 Z):</strong> Set UI Interface Scale to <code>90% (Compact)</code> in Settings.</div>
+            ${(customQuests || []).map(s => `<div style="padding:8px;background:#04070b;border-radius:8px;display:flex;justify-content:space-between;align-items:center;"><div><strong>${s.is_secret ? '🔒 ' : '📋 '}${s.title} (+${s.reward_credits} Z):</strong> ${s.secret_hint || s.description}</div><button class="btn-ghost" data-del-q="${s.id}">✕</button></div>`).join('')}
           </div>
         </div>
         <div class="glass-card">
-          <h3>➕ Create New Normal or Secret Quest</h3>
+          <h3>➕ Create Normal or Secret Quest</h3>
           <input id="adm-ach-title" class="tool-input" placeholder="Quest Title" />
-          <input id="adm-ach-desc" class="tool-input" placeholder="Public Description" />
+          <input id="adm-ach-desc" class="tool-input" placeholder="Public Description (hidden if Secret Quest is checked)" />
           <input id="adm-ach-hint" class="tool-input" placeholder="Founder-Only Secret Solution / How to Complete" />
-          <div style="display:flex;gap:8px;"><input id="adm-ach-cred" type="number" class="tool-input" value="250" /><input id="adm-ach-xp" type="number" class="tool-input" value="300" /></div>
-          <label class="remember-row"><input type="checkbox" id="adm-ach-sec" /><span>🔒 Hide conditions as a Secret Quest</span></label>
+          <div style="display:flex;gap:8px;"><input id="adm-ach-cred" type="number" class="tool-input" value="250" placeholder="Z-Credits" /><input id="adm-ach-xp" type="number" class="tool-input" value="300" placeholder="XP" /></div>
+          <label class="remember-row"><input type="checkbox" id="adm-ach-sec" /><span>🔒 Publish as Secret Quest (Anyone can claim, condition hidden)</span></label>
           <button class="btn-neon" id="adm-add-ach-btn" style="width:100%">Publish Quest</button>
         </div>
       </div>`;
     document.getElementById('adm-add-ach-btn').onclick = async () => {
       const title = document.getElementById('adm-ach-title').value.trim();
       if (!title) return window.notify('Enter quest title.', true);
-      await window.sbRest('achievements_list', 'POST', { title, description: document.getElementById('adm-ach-desc').value.trim(), secret_hint: document.getElementById('adm-ach-hint').value.trim(), reward_credits: parseInt(document.getElementById('adm-ach-cred').value, 10) || 100, reward_xp: parseInt(document.getElementById('adm-ach-xp').value, 10) || 250, is_secret: document.getElementById('adm-ach-sec').checked }, window.authToken);
+      await window.sbRest('achievements_list', 'POST', { title, description: document.getElementById('adm-ach-desc').value.trim() || 'Complete this ZynkOS challenge.', secret_hint: document.getElementById('adm-ach-hint').value.trim(), reward_credits: parseInt(document.getElementById('adm-ach-cred').value, 10) || 100, reward_xp: parseInt(document.getElementById('adm-ach-xp').value, 10) || 250, is_secret: document.getElementById('adm-ach-sec').checked }, window.authToken);
       window.notify('Quest published!');
       renderAdminAndBeta();
     };
+    sub.querySelectorAll('[data-del-q]').forEach(b => (b.onclick = async () => {
+      await window.sbRest(`achievements_list?id=eq.${b.dataset.delQ}`, 'DELETE', null, window.authToken);
+      renderAdminAndBeta();
+    }));
   }
 }
 
