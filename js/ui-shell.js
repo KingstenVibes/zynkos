@@ -42,7 +42,9 @@ const dock = mk('aside', 'left-dock', `
   <button class="dock-btn" data-tab="profile-view"><span class="sym">◉</span><span class="lbl">My Profile</span></button>
   <button class="dock-btn" data-tab="achieve-view"><span class="sym">★</span><span class="lbl">Achievements</span></button>
   <button class="dock-btn" data-tab="leader-view"><span class="sym">≡</span><span class="lbl">Leaderboards</span></button>
-  <button class="dock-btn" data-tab="tools-view"><span class="sym">⌘</span><span class="lbl">Utility Tools</span></button>
+  <button class="dock-btn" data-tab="tools-view"><span class="sym">⌘</span><span class="lbl">Utility Tools</span></button> 
+  <button class="dock-btn" data-tab="browser-view"><span class="sym">🌐</span><span class="lbl">Zynk Browser</span></button>
+  <button class="dock-btn" data-tab="support-view"><span class="sym">🛟</span><span class="lbl">Support & Ideas</span></button>
   <div class="dock-section">ACCESS</div>
   <button class="dock-btn hidden" id="nav-beta-btn" data-tab="beta-view"><span class="sym">⚛</span><span class="lbl">Beta Lab</span></button>
   <button class="dock-btn hidden" id="nav-admin-btn" data-tab="admin-view"><span class="sym">⚡</span><span class="lbl">Founder Panel</span></button>
