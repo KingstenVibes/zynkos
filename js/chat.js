@@ -9,6 +9,7 @@ let lastChatHash = '';
 let lastTypingPing = 0;
 
 const CHAT_SVG = {
+  react: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
   reply: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>`,
   edit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`,
   trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`
@@ -23,7 +24,26 @@ if (!typingBar && document.getElementById('chat-form')) {
 }
 
 const ROLE_POWER = { FOUNDER: 100, ADMIN: 80, MODERATOR: 60, BETA: 30, UPLOADER: 25, DESIGNER: 25, VIP: 20, SUPPORTER: 15, MEMBER: 10, SYSTEM: 90 };
-const QUICK_EMOJIS = ['👍', '❤️', '😂', '🔥', '💀', '🎉'];
+const QUICK_EMOJIS = ['👍', '❤️', '😂', '🔥', '💀', '🎉', '👀', '💯'];
+
+window.openReactPicker = function(btn, msgId) {
+  document.querySelectorAll('.react-popover').forEach(p => p.remove());
+  document.querySelectorAll('.msg-actions.open').forEach(a => a.classList.remove('open'));
+  const bar = btn.closest('.msg-actions');
+  if (!bar) return;
+  bar.classList.add('open');
+  const pop = document.createElement('div');
+  pop.className = 'react-popover';
+  pop.innerHTML = QUICK_EMOJIS.map(em => `<button type="button" class="react-choice" onclick="toggleReaction(${msgId}, '${em}')">${em}</button>`).join('');
+  bar.appendChild(pop);
+};
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.msg-actions')) {
+    document.querySelectorAll('.react-popover').forEach(p => p.remove());
+    document.querySelectorAll('.msg-actions.open').forEach(a => a.classList.remove('open'));
+  }
+});
 const SLASH_CMDS = [
   { cmd: '/help', desc: 'Show all available commands', staff: false },
   { cmd: '/credits', desc: 'Check your Z-Credits & Level', staff: false },
@@ -41,8 +61,8 @@ const SLASH_CMDS = [
 function parseDurationMs(str) {
   const m = String(str || '').match(/^(\d+)([mhd])$/i);
   if (!m) return 600000;
-  const n = parseInt(m, 10);
-  const unit = m.toLowerCase();
+  const n = parseInt(m[1], 10);
+  const unit = m[2].toLowerCase();
   return unit === 'd' ? n * 86400000 : unit === 'h' ? n * 3600000 : n * 60000;
 }
 
@@ -58,8 +78,9 @@ function canDeleteMsg(me, msg) {
 window.toggleReaction = async function(msgId, emoji) {
   const me = window.userProfile;
   if (!me) return window.notify?.('Sign in to react to messages!', true);
+  document.querySelectorAll('.react-popover').forEach(p => p.remove());
   const rows = await window.sbRest(`messages?id=eq.${msgId}`).catch(() => []);
-  const m = Array.isArray(rows) ? rows : null;
+  const m = Array.isArray(rows) ? rows[0] : null;
   if (!m) return;
   const reacts = m.reactions && typeof m.reactions === 'object' ? { ...m.reactions } : {};
   const list = Array.isArray(reacts[emoji]) ? [...reacts[emoji]] : [];
@@ -129,10 +150,10 @@ function renderMessages(msgs) {
 
     div.innerHTML = `
       <div class="msg-actions">
-        ${QUICK_EMOJIS.map(em => `<button type="button" class="msg-act-btn" onclick="toggleReaction(${m.id}, '${em}')">${em}</button>`).join('')}
-        <button type="button" class="msg-act-btn" title="Reply" onclick="setChatReply('${m.username}', \`${String(m.content || '').replace(/`/g, '')}\`)">${CHAT_SVG.reply} Reply</button>
-        ${isOwner ? `<button type="button" class="msg-act-btn" title="Edit" onclick="editChatMsg(${m.id}, \`${String(m.content || '').replace(/`/g, '')}\`)">${CHAT_SVG.edit} Edit</button>` : ''}
-        ${canDel ? `<button type="button" class="msg-act-btn" style="color:#f43f5e;" title="Delete" onclick="deleteChatMsg(${m.id})">${CHAT_SVG.trash}</button>` : ''}
+        <button type="button" class="msg-act-btn" title="Add Reaction" onclick="openReactPicker(this, ${m.id})">${CHAT_SVG.react}</button>
+        <button type="button" class="msg-act-btn" title="Reply" onclick="setChatReply('${m.username}', \`${String(m.content || '').replace(/`/g, '')}\`)">${CHAT_SVG.reply}</button>
+        ${isOwner ? `<button type="button" class="msg-act-btn" title="Edit Message" onclick="editChatMsg(${m.id}, \`${String(m.content || '').replace(/`/g, '')}\`)">${CHAT_SVG.edit}</button>` : ''}
+        ${canDel ? `<button type="button" class="msg-act-btn" style="color:#f43f5e;" title="Delete Message" onclick="deleteChatMsg(${m.id})">${CHAT_SVG.trash}</button>` : ''}
       </div>
       <img class="msg-avatar" src="${av}" />
       <div style="flex:1;">
