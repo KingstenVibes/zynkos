@@ -117,3 +117,11 @@ body { background: radial-gradient(circle at top right, color-mix(in srgb, var(-
 .autocomplete-pop { position: absolute; bottom: 68px; left: 24px; right: 24px; max-height: 190px; overflow-y: auto; background: #0b121c; border: 1px solid var(--neon-emerald); border-radius: 12px; z-index: 80; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
 .ac-item { padding: 9px 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.86rem; }
 .ac-item:hover { background: color-mix(in srgb, var(--neon-emerald) 18%, transparent); }
+.msg-act-btn { display: inline-flex; align-items: center; gap: 4px; background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 0.76rem; padding: 3px 6px; border-radius: 6px; }
+.msg-act-btn svg { width: 14px; height: 14px; }
+.typing-bar { min-height: 22px; padding: 2px 24px 6px; font-size: 0.78rem; color: var(--text-dim); display: flex; align-items: center; gap: 6px; }
+.typing-dots { display: inline-flex; gap: 3px; align-items: center; }
+.typing-dots span { width: 5px; height: 5px; border-radius: 50%; background: var(--neon-emerald); animation: zynkDotFade 1.2s infinite ease-in-out; }
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes zynkDotFade { 0%, 80%, 100% { opacity: 0.15; transform: scale(0.85); } 40% { opacity: 1; transform: scale(1.1); } }
