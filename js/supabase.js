@@ -1,7 +1,7 @@
 const SB_URL = 'https://api.ZynkOS.linkpc.net';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nbHlibW56c3B2eXJ1end3Z2RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUyOTkzMDQsImV4cCI6MjExMDg3NTMwNH0.E2pZaS0OGtkEk6hfsMSOJ2MUu8i-iZyAHnEKg-RhnH0';
 
-window.notify = function(msg, isError = false) {
+window.notify = function(msg, isError = false, onClick = null) {
   let box = document.getElementById('zynk-toast-box');
   if (!box) {
     box = document.createElement('div');
@@ -12,8 +12,9 @@ window.notify = function(msg, isError = false) {
   const t = document.createElement('div');
   t.className = 'zynk-toast' + (isError ? ' err' : '');
   t.textContent = msg;
+  if (onClick) { t.style.cursor = 'pointer'; t.onclick = () => { onClick(); t.remove(); }; }
   box.appendChild(t);
-  setTimeout(() => t.remove(), 4500);
+  setTimeout(() => t.remove(), 5500);
 };
 
 window.sbRest = async function(path, method = 'GET', body = null, token = null) {
@@ -34,6 +35,15 @@ function lockScreen(locked) {
   document.querySelector('.os-shell')?.classList.toggle('hidden', locked);
 }
 
+function applyStaffDockVisibility(prof) {
+  const isFounder = prof && prof.role === 'FOUNDER';
+  const isBeta = prof && (prof.role === 'FOUNDER' || prof.role === 'BETA' || prof.is_beta || (prof.extra_roles || []).includes('BETA'));
+  const adminBtn = document.getElementById('nav-admin-btn');
+  const betaBtn = document.getElementById('nav-beta-btn');
+  if (adminBtn) { adminBtn.classList.toggle('hidden', !isFounder); adminBtn.style.display = isFounder ? 'flex' : 'none'; }
+  if (betaBtn) { betaBtn.classList.toggle('hidden', !isBeta); betaBtn.style.display = isBeta ? 'flex' : 'none'; }
+}
+
 async function bootUser(user, token, preferredName) {
   window.currentUser = user;
   window.authToken = token;
@@ -43,30 +53,29 @@ async function bootUser(user, token, preferredName) {
     const uname = preferredName || user.email.split('@').at(0);
     const isFounder = uname.toLowerCase() === 'kingstenvibes';
     const created = await window.sbRest('users', 'POST', {
-      id: user.id,
-      username: uname,
-      email: user.email,
-      avatar: 'https://dicebear.com' + encodeURIComponent(uname),
-      role: isFounder ? 'FOUNDER' : 'MEMBER',
-      is_beta: isFounder,
-      online: true
+      id: user.id, username: uname, email: user.email, avatar: 'logo.png',
+      role: isFounder ? 'FOUNDER' : 'MEMBER', is_beta: isFounder, online: true
     }, token);
     prof = Array.isArray(created) && created.length ? created.at(0) : null;
   } else {
-    const fixAv = !prof.avatar || prof.avatar.startsWith('https://dicebear.com') ? 'https://dicebear.com' + encodeURIComponent(prof.username) : prof.avatar;
-    await window.sbRest('users?id=eq.' + user.id, 'PATCH', { online: true, email: user.email, avatar: fixAv }, token);
-    prof.avatar = fixAv;
+    if (prof.ban_until && prof.ban_until > Date.now()) {
+      const mins = Math.ceil((prof.ban_until - Date.now()) / 60000);
+      throw new Error(`Account banned (${mins}m left). Reason: ${prof.ban_reason || 'Rule violation'}`);
+    }
+    const isFounder = prof.username.toLowerCase() === 'kingstenvibes' || prof.role === 'FOUNDER';
+    const fixAv = !prof.avatar || prof.avatar.includes('dicebear') ? 'logo.png' : prof.avatar;
+    const patch = { online: true, email: user.email, avatar: fixAv };
+    if (isFounder) { patch.role = 'FOUNDER'; patch.is_beta = true; }
+    await window.sbRest('users?id=eq.' + user.id, 'PATCH', patch, token);
+    Object.assign(prof, patch);
   }
   window.userProfile = prof;
   lockScreen(false);
+  applyStaffDockVisibility(prof);
   const topBtn = document.getElementById('top-auth-btn');
   if (topBtn) topBtn.textContent = 'Sign Out';
-  const isFounder = prof && prof.role === 'FOUNDER';
-  const isBeta = (prof && (prof.is_beta || prof.role === 'BETA')) || isFounder;
-  document.getElementById('nav-admin-btn')?.classList.toggle('hidden', !isFounder);
-  document.getElementById('nav-beta-btn')?.classList.toggle('hidden', !isBeta);
   window.dispatchEvent(new Event('zynk-profile-updated'));
-  window.notify('Welcome back, ' + ((prof && prof.username) || 'Operator') + '!');
+  window.notify('Welcome back, ' + ((prof && prof.username) || 'Member') + '!');
 }
 window.refreshMyProfile = async function() {
   if (!window.currentUser) return;
@@ -74,6 +83,7 @@ window.refreshMyProfile = async function() {
   const prof = Array.isArray(rows) && rows.length ? rows.at(0) : null;
   if (prof) {
     window.userProfile = prof;
+    applyStaffDockVisibility(prof);
     window.dispatchEvent(new Event('zynk-profile-updated'));
   }
 };
@@ -91,6 +101,7 @@ document.addEventListener('click', async (e) => {
   }
 
   if (id === 'auth-close-btn') {
+    applyStaffDockVisibility(null);
     lockScreen(false);
     window.notify('Booted in Guest Mode.');
   }
@@ -103,6 +114,7 @@ document.addEventListener('click', async (e) => {
     sessionStorage.removeItem('zynk_session');
     window.currentUser = null;
     window.userProfile = null;
+    applyStaffDockVisibility(null);
     lockScreen(true);
   }
 
@@ -121,10 +133,9 @@ document.addEventListener('click', async (e) => {
         const cleanUser = loginId.replace(/^@/, '');
         const found = await window.sbRest('users?username=ilike.' + encodeURIComponent(cleanUser));
         const match = Array.isArray(found) ? found.at(0) : null;
-        if (!match || !match.email) throw new Error('Username not found. Try signing in with your email once.');
+        if (!match || !match.email) throw new Error('Username not found. Sign in with email once to link it.');
         loginId = match.email;
       }
-
       const endpoint = isSignup ? 'signup' : 'token?grant_type=password';
       const res = await fetch(SB_URL + '/auth/v1/' + endpoint, {
         method: 'POST',
@@ -148,9 +159,10 @@ document.addEventListener('click', async (e) => {
 });
 
 window.addEventListener('DOMContentLoaded', () => {
+  applyStaffDockVisibility(null);
   lockScreen(true);
   const saved = JSON.parse(localStorage.getItem('zynk_session') || sessionStorage.getItem('zynk_session') || 'null');
   if (saved && saved.user && saved.token) {
-    bootUser(saved.user, saved.token).catch(() => lockScreen(true));
+    bootUser(saved.user, saved.token).catch((err) => { window.notify(err.message, true); lockScreen(true); });
   }
 });
