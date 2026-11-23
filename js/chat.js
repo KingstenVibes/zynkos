@@ -1,98 +1,101 @@
-const msgBox = document.getElementById('native-messages');
-const memberBox = document.getElementById('member-sidebar');
-const BOT_AV = "data:image/svg+xml,<svg xmlns='http://w3.org' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23080d14'/><text x='50' y='66' font-size='52' text-anchor='middle' fill='%2306b6d4'>◈</text></svg>";
+const msgBox = document.getElementById('chat-messages');
+const memBox = document.getElementById('online-members-list');
 let lastMsgId = 0;
 
 function appendMsg(m) {
+  if (!msgBox || document.querySelector(`[data-mid="${m.id}"]`)) return;
   const div = document.createElement('div');
-  div.className = `chat-msg ${m.is_bot ? 'bot-msg' : ''}`;
+  div.className = 'chat-msg';
+  div.dataset.mid = m.id;
+  const av = m.avatar && !m.avatar.startsWith('https://dicebear.com') ? m.avatar : `https://dicebear.com{encodeURIComponent(m.username || 'Zynk')}`;
   div.innerHTML = `
-    <img class="msg-avatar" src="${m.avatar}" data-uid="${m.uid || ''}" />
+    <img class="msg-avatar" src="${av}" data-uid="${m.user_id || ''}" />
     <div>
-      <div><span class="role-chip" style="background:${m.color}22;color:${m.color}">${m.role}</span><strong class="clickable-user" style="color:${m.color}" data-uid="${m.uid || ''}">${m.username}</strong></div>
-      <div style="margin-top:3px;">${m.content}</div>
+      <div><strong style="color:${m.color || '#10b981'}">${m.username}</strong> <span class="mono-dim">[${m.role || 'MEMBER'}]${m.is_beta ? ' [BETA]' : ''}</span></div>
+      <div style="margin-top:3px;">${m.content.replace(/</g, '&lt;')}</div>
     </div>`;
-  div.querySelectorAll('[data-uid]').forEach(el => { if (el.dataset.uid) el.onclick = () => window.openUserModal?.(el.dataset.uid); });
+  div.querySelector('.msg-avatar').onclick = () => { if (m.user_id && window.openUserModal) window.openUserModal(m.user_id); };
   msgBox.appendChild(div);
   msgBox.scrollTop = msgBox.scrollHeight;
 }
 
 async function pollChatAndMembers() {
   if (!window.sbRest) return;
-  try {
-    const msgs = await window.sbRest(`messages?id=gt.${lastMsgId}&order=id.asc&limit=50`);
-    (msgs || []).forEach(m => { lastMsgId = Math.max(lastMsgId, m.id); appendMsg(m); });
-
-    const users = await window.sbRest('users?order=username.asc');
-    if (users && memberBox) {
-      const on = users.filter(u => u.online), off = users.filter(u => !u.online);
-      const row = (u, isOn) => `<div class="member-row ${isOn ? '' : 'offline'}" data-uid="${u.id}"><img class="member-mini-av" src="${u.avatar}" /><span class="status-dot" style="background:${isOn ? '#10b981' : '#64748b'}"></span><strong style="color:${u.equipped_color}">${u.username}</strong></div>`;
-      memberBox.innerHTML = `<div class="member-cat">ONLINE — ${on.length}</div>${on.map(u => row(u, true)).join('') || '<div class="mono-dim">None</div>'}<div class="member-cat">OFFLINE — ${off.length}</div>${off.map(u => row(u, false)).join('') || '<div class="mono-dim">None</div>'}`;
-      memberBox.querySelectorAll('[data-uid]').forEach(el => (el.onclick = () => window.openUserModal?.(el.dataset.uid)));
-    }
-  } catch {}
+  const msgs = await window.sbRest(`messages?id=gt.${lastMsgId}&order=id.asc&limit=80`).catch(() => []);
+  if (Array.isArray(msgs) && msgs.length) {
+    msgs.forEach(m => { appendMsg(m); lastMsgId = Math.max(lastMsgId, m.id); });
+  }
+  const users = await window.sbRest('users?order=online.desc,xp.desc&limit=40').catch(() => []);
+  if (memBox && Array.isArray(users)) {
+    memBox.innerHTML = users.map(u => `<div class="member-item" onclick="openUserModal('${u.id}')"><span style="color:${u.online ? '#10b981' : '#64748b'}">●</span><span style="color:${u.equipped_color || '#f8fafc'}">${u.username}</span></div>`).join('');
+  }
 }
-async function botSay(text) {
-  await window.sbRest('messages', 'POST', { uid: '00000000-0000-0000-0000-000000000000', username: 'ZynkBot', avatar: BOT_AV, role: 'BOT', color: '#06b6d4', content: text, is_bot: true }, window.authToken);
+async function botPost(text) {
+  if (!window.sbRest) return;
+  await window.sbRest('messages', 'POST', { username: 'ZynkBot', avatar: 'logo.png', role: 'SYSTEM', color: '#06b6d4', content: text }, window.authToken);
   await pollChatAndMembers();
 }
 
-document.getElementById('native-chat-form')?.addEventListener('submit', async (e) => {
+document.getElementById('chat-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const p = window.userProfile;
-  if (!p) return window.notify?.('Sign in to chat!', true);
-  if (p.role === 'MUTED') return window.notify?.('You are muted in Zynk Chat.', true);
-  const input = document.getElementById('native-msg-input');
-  const raw = input.value.trim();
+  const inp = document.getElementById('chat-input');
+  const raw = inp.value.trim();
   if (!raw) return;
-  input.value = '';
+  const p = window.userProfile;
+  if (!p) return window.notify?.('Sign in to send messages in Zynk Chat!', true);
+  if (p.is_muted) return window.notify?.('You are muted in Zynk Chat.', true);
+  inp.value = '';
 
   const isStaff = p.role === 'FOUNDER' || p.role === 'MODERATOR';
   const isFounder = p.role === 'FOUNDER';
 
   if (raw.startsWith('/')) {
-    const parts = raw.split(/\s+/);
-    const cmd = parts[0].toLowerCase();
-    const targetName = (parts[1] || '').replace(/^@/, '');
-    const amt = parseInt(parts[2], 10);
+    const parts = raw.split(' ');
+    const cmd = parts.at(0).toLowerCase();
+    const targetName = parts.at(1)?.replace(/^@/, '');
+    const amt = parseInt(parts.at(2), 10);
 
-    if (cmd === '/help') return botSay('User: <code>/pay @user amt</code>, <code>/daily</code>, <code>/roll</code>, <code>/bal</code> | Mod: <code>/mute @user</code>, <code>/unmute @user</code>, <code>/warn @user reason</code>, <code>/announce msg</code>, <code>/clear</code> | Founder: <code>/give @user amt</code>');
-    if (cmd === '/bal') return botSay(`${p.username} has <strong>${p.credits} Z-Credits</strong>.`);
-    if (cmd === '/daily') {
-      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + 100 }, window.authToken);
-      await window.refreshMyProfile?.();
-      return botSay(`+100 Daily Z-Credits claimed by ${p.username}!`);
-    }
-    if (cmd === '/roll') return botSay(`🎲 ${p.username} rolled <strong>${Math.floor(Math.random() * 100) + 1}</strong> / 100!`);
+    if (cmd === '/help') return botPost('Commands: /help, /credits, /pay @user <amt>' + (isStaff ? ' | Staff: /warn @user, /mute @user, /clear' : '') + (isFounder ? ' | Founder: /give @user <amt>, /announce <msg>' : ''));
+    if (cmd === '/credits') return botPost(`@${p.username} balance: ${p.credits} Z-Credits (Level ${Math.floor((p.xp || 0) / 1000) + 1})`);
     if (cmd === '/clear' && isStaff) {
       await window.sbRest('messages?id=gt.0', 'DELETE', null, window.authToken);
-      msgBox.innerHTML = '';
-      return botSay(`🧹 Chat cleared by ${p.username}.`);
+      if (msgBox) msgBox.innerHTML = '';
+      lastMsgId = 0;
+      return botPost(`Chat cleared by @${p.username}.`);
     }
-    if (cmd === '/announce' && isStaff) return botSay(`📢 <strong>ANNOUNCEMENT:</strong> ${parts.slice(1).join(' ')}`);
-    if (cmd === '/warn' && isStaff) return botSay(`⚠️ <strong>@${targetName}</strong> was warned by ${p.username}: ${parts.slice(2).join(' ') || 'Follow rules'}`);
-    if ((cmd === '/mute' || cmd === '/unmute') && isStaff) {
-      const nextRole = cmd === '/mute' ? 'MUTED' : 'MEMBER';
-      await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`, 'PATCH', { role: nextRole }, window.authToken);
-      return botSay(`${cmd === '/mute' ? '🔇 Muted' : '🔊 Unmuted'} <strong>@${targetName}</strong>.`);
+    if (cmd === '/announce' && isFounder) return botPost(`[BROADCAST] ${parts.slice(1).join(' ')}`);
+    if (cmd === '/mute' && isStaff && targetName) {
+      await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`, 'PATCH', { is_muted: true }, window.authToken);
+      return botPost(`@${targetName} was muted by @${p.username}.`);
     }
-    if ((cmd === '/pay' || (cmd === '/give' && isFounder)) && targetName && amt > 0) {
-      if (cmd === '/pay' && amt > p.credits) return window.notify?.('Insufficient Z-Credits.', true);
+    if (cmd === '/warn' && isStaff && targetName) {
+      return botPost(`@${targetName} received a staff warning from @${p.username}.`);
+    }
+    if (cmd === '/give' && isFounder && targetName && amt > 0) {
       const found = await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`);
-      const tUser = found?.[0];
-      if (!tUser) return window.notify?.(`User @${targetName} not found.`, true);
-      if (cmd === '/pay') await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits - amt }, window.authToken);
-      await window.sbRest(`users?id=eq.${tUser.id}`, 'PATCH', { credits: tUser.credits + amt }, window.authToken);
-      await window.refreshMyProfile?.();
-      return botSay(cmd === '/give' ? `⚡ Founder <strong>${p.username}</strong> minted <strong>+${amt} Z-Credits</strong> to <strong>${tUser.username}</strong>!` : `💸 <strong>${p.username}</strong> paid <strong>${amt} Z-Credits</strong> to <strong>${tUser.username}</strong>!`);
+      const u = Array.isArray(found) ? found.at(0) : null;
+      if (!u) return window.notify(`User @${targetName} not found.`, true);
+      await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { credits: u.credits + amt }, window.authToken);
+      await window.refreshMyProfile();
+      return botPost(`Founder @${p.username} granted +${amt} Z-Credits to @${u.username}!`);
+    }
+    if (cmd === '/pay' && targetName && amt > 0) {
+      if (p.credits < amt) return window.notify('Not enough Z-Credits.', true);
+      const found = await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`);
+      const u = Array.isArray(found) ? found.at(0) : null;
+      if (!u) return window.notify(`User @${targetName} not found.`, true);
+      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits - amt }, window.authToken);
+      await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { credits: u.credits + amt }, window.authToken);
+      await window.refreshMyProfile();
+      return botPost(`@${p.username} sent ${amt} Z-Credits to @${u.username}!`);
     }
   }
 
-  await window.sbRest('messages', 'POST', { uid: p.id, username: p.username, avatar: p.avatar, role: p.role, color: p.equipped_color, content: raw, is_bot: false }, window.authToken);
-  await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + 5, xp: p.xp + 25 }, window.authToken);
-  await window.refreshMyProfile?.();
+  await window.sbRest('messages', 'POST', { user_id: p.id, username: p.username, avatar: p.avatar, role: p.role, is_beta: p.is_beta, color: p.equipped_color, content: raw }, window.authToken);
+  await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + 5, xp: (p.xp || 0) + 25, msg_count: (p.msg_count || 0) + 1 }, window.authToken);
+  await window.refreshMyProfile();
   await pollChatAndMembers();
 });
 
-setInterval(pollChatAndMembers, 3500);
+setInterval(pollChatAndMembers, 2500);
 pollChatAndMembers();
