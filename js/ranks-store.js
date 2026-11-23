@@ -1,9 +1,9 @@
 window.RANKS = [
   { name: 'Circuit', cost: 0, priceLabel: 'FREE', monthly: 100, color: '#94a3b8', perks: 'Base ZynkOS Access, 100 Monthly Z-Credits, Standard Chat' },
   { name: 'Pulse', cost: 250, priceLabel: '250 Z-Credits', monthly: 250, color: '#10b981', perks: 'All Circuit Perks, 250 Monthly Z-Credits, +25% Chat XP' },
-  { name: 'Nova', cost: -1, priceLabel: '/$4.99 / mo', monthly: 600, color: '#06b6d4', perks: 'All Pulse Perks, 600 Monthly Z-Credits, +50% Chat XP' },
-  { name: 'Titan', cost: -1, priceLabel: '/$9.99 / mo', monthly: 1200, color: '#a855f7', perks: 'All Nova Perks, 1,200 Monthly Z-Credits, Custom Frame Glow' },
-  { name: 'Apex', cost: -1, priceLabel: '/$19.99 / mo', monthly: 2500, color: '#f59e0b', perks: 'All Titan Perks, 2,500 Monthly Z-Credits, Priority Access' }
+  { name: 'Nova', cost: -1, priceLabel: '$4.99 / mo', monthly: 600, color: '#06b6d4', perks: 'All Pulse Perks, 600 Monthly Z-Credits, +50% Chat XP' },
+  { name: 'Titan', cost: -1, priceLabel: '$9.99 / mo', monthly: 1200, color: '#a855f7', perks: 'All Nova Perks, 1,200 Monthly Z-Credits, Custom Frame Glow' },
+  { name: 'Apex', cost: -1, priceLabel: '$19.99 / mo', monthly: 2500, color: '#f59e0b', perks: 'All Titan Perks, 2,500 Monthly Z-Credits, Priority Access' }
 ];
 
 let activeShopFilter = 'ALL';
@@ -16,7 +16,7 @@ function syncHud() {
   const lvl = Math.floor((p.xp || 0) / 1000) + 1;
   const extras = (p.extra_roles || []).length ? ' • ' + p.extra_roles.map(r => `[${r}]`).join(' ') : '';
   document.getElementById('hud-username').textContent = p.username;
-  document.getElementById('hud-role-tag').textContent = `[${p.role}] • [${rank.name.toUpperCase()}]${p.is_beta ? ' • [BETA]' : ''}${extras}`;
+  document.getElementById('hud-role-tag').textContent = `[${p.role}] • [${rank.name.toUpperCase()}]${extras}`;
   document.getElementById('hud-credits').textContent = `${p.credits} Z-Credits`;
   document.getElementById('chat-credits').textContent = `${p.credits} Z-Credits`;
   document.getElementById('store-credits').textContent = `${p.credits} Z-Credits`;
@@ -26,7 +26,7 @@ function syncHud() {
   document.getElementById('hud-xp-bar').style.width = `${((p.xp || 0) % 1000) / 10}%`;
   const av = document.getElementById('hud-avatar-img');
   if (av) {
-    av.src = p.avatar && !p.avatar.startsWith('https://dicebear.com') ? p.avatar : `https://dicebear.com{encodeURIComponent(p.username)}`;
+    av.src = p.avatar && !p.avatar.includes('dicebear') ? p.avatar : 'logo.png';
     av.style.borderColor = p.equipped_color || '#10b981';
     av.style.boxShadow = p.avatar_frame && p.avatar_frame !== 'none' ? `0 0 0 3px ${p.avatar_frame}, 0 0 18px ${p.avatar_frame}` : 'none';
   }
@@ -47,7 +47,7 @@ async function renderRanksAndStore() {
       card.innerHTML = `<span class="rarity-tag" style="color:${r.color}">${r.priceLabel}</span><h3>${r.name}</h3><p class="sub-text" style="margin:8px 0 14px;">${r.perks}</p><button class="${owned ? 'btn-outline' : 'btn-neon'}" style="width:100%" ${owned ? 'disabled' : ''}>${owned ? '✓ Unlocked' : isCreditRank ? `Unlock (${r.cost} Z-Credits)` : `💳 ${r.priceLabel} (Checkout Soon)`}</button>`;
       card.querySelector('button').onclick = async () => {
         if (!p) return window.notify('Sign in first!', true);
-        if (!isCreditRank) return window.notify(`${r.name} (${r.priceLabel}) requires real-money checkout—payment gateway coming soon!`, true);
+        if (!isCreditRank) return window.notify(`${r.name} (${r.priceLabel}) requires real-money checkout—coming soon!`, true);
         if (p.credits < r.cost) return window.notify('Not enough Z-Credits!', true);
         await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits - r.cost, rank_index: idx }, window.authToken);
         await window.refreshMyProfile();
@@ -83,7 +83,7 @@ async function renderRanksAndStore() {
       area.innerHTML = `
         <div class="glass-card" style="max-width:480px;">
           <h3>💡 Request a Shop Item</h3>
-          <p class="sub-text" style="margin:6px 0 12px;">Suggest a custom avatar, frame, banner, or theme for the Founder to upload!</p>
+          <p class="sub-text" style="margin:6px 0 12px;">Suggest a custom avatar, frame, banner, or theme to be added to Zynk Store!</p>
           <input id="req-item-name" class="tool-input" placeholder="Item Name (e.g. Emerald Matrix Frame)" />
           <select id="req-item-cat" class="tool-input"><option value="Avatar">Avatar</option><option value="Avatar Frame">Avatar Frame</option><option value="Banner / Theme">Banner / Theme</option><option value="Badge / Color">Badge / Color</option></select>
           <input id="req-item-notes" class="tool-input" placeholder="Color or style details (optional)" />
@@ -94,22 +94,23 @@ async function renderRanksAndStore() {
         const name = document.getElementById('req-item-name').value.trim();
         if (!name) return window.notify('Enter an item name first.', true);
         await window.sbRest('shop_requests', 'POST', { username: p.username, item_name: name, category: document.getElementById('req-item-cat').value, notes: document.getElementById('req-item-notes').value.trim() }, window.authToken);
-        window.notify('Shop request sent to the Founder!');
+        window.notify('Shop request submitted!');
       };
       return;
     }
 
     const getVisual = (it) => {
-      const myAv = p?.avatar && !p.avatar.startsWith('https://dicebear.com') ? p.avatar : 'https://dicebear.com';
+      const myAv = p?.avatar && !p.avatar.includes('dicebear') ? p.avatar : 'logo.png';
       const themeColors = { 'theme-cyber': '#06b6d4', 'theme-crimson': '#f43f5e', 'theme-gold': '#f59e0b', 'theme-violet': '#a855f7', default: '#10b981' };
-      if (it.image_url) return `<img src="${it.image_url}" alt="${it.name}" style="width:100%;height:130px;object-fit:cover;border-radius:12px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.1);" />`;
-      if (it.item_type === 'frame') return `<div style="height:130px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,${it.item_value}22,#04070b);border-radius:12px;margin-bottom:10px;"><img src="${myAv}" style="width:74px;height:74px;border-radius:50%;box-shadow:0 0 0 3px ${it.item_value},0 0 22px ${it.item_value};" /></div>`;
+      const imgSrc = it.image_url || (String(it.item_value || '').startsWith('data:image') || String(it.item_value || '').startsWith('http') ? it.item_value : '');
+      if (imgSrc) return `<img src="${imgSrc}" alt="${it.name}" style="width:100%;height:135px;object-fit:cover;border-radius:12px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.12);background:#04070b;" />`;
+      if (it.item_type === 'frame') return `<div style="height:135px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,${it.item_value}22,#04070b);border-radius:12px;margin-bottom:10px;"><img src="${myAv}" style="width:74px;height:74px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 3px ${it.item_value},0 0 22px ${it.item_value};" /></div>`;
       if (it.item_type === 'theme') {
         const c = themeColors[it.item_value] || it.item_value || '#10b981';
-        return `<div style="height:130px;display:flex;flex-direction:column;justify-content:center;align-items:center;background:radial-gradient(circle at top,${c}38,#04070b);border:1px solid ${c};border-radius:12px;margin-bottom:10px;"><span style="color:${c};font-weight:800;letter-spacing:1.5px;">STEADY THEME</span><span style="font-size:0.78rem;color:#cbd5e1;margin-top:4px;">${it.name}</span></div>`;
+        return `<div style="height:135px;display:flex;flex-direction:column;justify-content:center;align-items:center;background:radial-gradient(circle at top,${c}38,#04070b);border:1px solid ${c};border-radius:12px;margin-bottom:10px;"><span style="color:${c};font-weight:800;letter-spacing:1.5px;">STEADY THEME</span><span style="font-size:0.78rem;color:#cbd5e1;margin-top:4px;">${it.name}</span></div>`;
       }
-      if (it.item_type === 'color') return `<div style="height:130px;display:flex;align-items:center;justify-content:center;background:#04070b;border-radius:12px;margin-bottom:10px;"><strong style="color:${it.item_value};font-size:1.15rem;">@${p?.username || 'Operator'}</strong></div>`;
-      return `<div style="height:130px;display:flex;align-items:center;justify-content:center;background:#04070b;border-radius:12px;margin-bottom:10px;"><span class="pill" style="border-color:#10b981;font-size:1rem;">${it.item_value || '★'} ${it.name}</span></div>`;
+      if (it.item_type === 'color') return `<div style="height:135px;display:flex;align-items:center;justify-content:center;background:#04070b;border-radius:12px;margin-bottom:10px;"><strong style="color:${it.item_value};font-size:1.15rem;">@${p?.username || 'Member'}</strong></div>`;
+      return `<div style="height:135px;display:flex;align-items:center;justify-content:center;background:#04070b;border-radius:12px;margin-bottom:10px;"><span class="pill" style="border-color:#10b981;font-size:1rem;">${it.item_value || '★'} ${it.name}</span></div>`;
     };
 
     const filtered = (items || []).filter(it => {
@@ -121,12 +122,13 @@ async function renderRanksAndStore() {
     });
 
     area.className = 'cards-grid';
-    area.innerHTML = filtered.length ? '' : '<div class="glass-card"><p class="sub-text">No items in this category yet—upload some in your Founder Panel!</p></div>';
+    area.innerHTML = filtered.length ? '' : '<div class="glass-card"><p class="sub-text">No items in this category yet—check back soon!</p></div>';
 
     filtered.forEach(it => {
       const finalCost = it.is_daily_deal ? Math.floor(it.cost * 0.9) : it.cost;
       const owned = p && (p.owned_items || []).includes(it.id);
       const rCol = it.is_daily_deal ? '#f59e0b' : (rarityColors[it.rarity] || '#10b981');
+      const imgSrc = it.image_url || (String(it.item_value || '').startsWith('data:image') || String(it.item_value || '').startsWith('http') ? it.item_value : '');
       const card = document.createElement('div');
       card.className = 'glass-card';
       card.style.borderColor = `${rCol}55`;
@@ -136,9 +138,9 @@ async function renderRanksAndStore() {
         if (!p) return window.notify('Sign in first!', true);
         if (!owned && p.credits < finalCost) return window.notify('Not enough Z-Credits!', true);
         const up = owned ? {} : { credits: p.credits - finalCost, owned_items: [...(p.owned_items || []), it.id] };
-        if (it.item_type === 'avatar') up.avatar = it.image_url;
+        if (it.item_type === 'avatar' && imgSrc) up.avatar = imgSrc;
         if (it.item_type === 'frame') up.avatar_frame = it.item_value;
-        if (it.item_type === 'banner') up.banner = it.image_url;
+        if (it.item_type === 'banner' && imgSrc) up.banner = imgSrc;
         if (it.item_type === 'theme') up.profile_theme = it.item_value;
         if (it.item_type === 'color') up.equipped_color = it.item_value;
         if (it.item_type === 'badge') up.equipped_badge = it.item_value;
