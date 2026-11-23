@@ -28,28 +28,28 @@ userModal.id = 'user-modal';
 const shell = mk('div', 'os-shell');
 const dock = mk('aside', 'left-dock', `
   <div class="dock-top">
-    <img src="logo.png" alt="ZynkOS" style="width:34px;height:34px;border-radius:8px;object-fit:cover;flex-shrink:0;" />
+    <img src="logo.png" alt="ZynkOS" style="width:32px;height:32px;border-radius:8px;object-fit:cover;flex-shrink:0;" />
     <span class="brand-title">ZynkOS</span>
-    <button class="collapse-btn" id="toggle-dock" title="Expand / Collapse Sidebar">${ic.arrow || '▶'}</button>
+    <button type="button" class="collapse-btn" id="toggle-dock" onclick="document.getElementById('left-dock').classList.toggle('expanded')" title="Expand / Collapse Sidebar">${ic.arrow || '▶'}</button>
   </div>
   <div class="dock-section">
-    <button class="dock-btn active" data-tab="dash-view"><span class="sym">${ic.home}</span><span class="lbl">Dashboard</span></button>
-    <button class="dock-btn" data-tab="chat-view"><span class="sym">${ic.chat}</span><span class="lbl">Zynk Chat</span></button>
-    <button class="dock-btn" data-tab="vortex-view"><span class="sym">${ic.vortex}</span><span class="lbl">Vortex Guild</span></button>
-    <button class="dock-btn" data-tab="arcade-view"><span class="sym">${ic.arcade}</span><span class="lbl">UGS Arcade</span></button>
-    <button class="dock-btn" data-tab="ranks-view"><span class="sym">${ic.ranks}</span><span class="lbl">Ranks</span></button>
-    <button class="dock-btn" data-tab="store-view"><span class="sym">${ic.store}</span><span class="lbl">Zynk Store</span></button>
+    <button class="dock-btn active" data-tab="dash-view"><span class="sym">${ic.home || '⌂'}</span><span class="lbl">Dashboard</span></button>
+    <button class="dock-btn" data-tab="chat-view"><span class="sym">${ic.chat || '💬'}</span><span class="lbl">Zynk Chat</span></button>
+    <button class="dock-btn" data-tab="vortex-view"><span class="sym">${ic.vortex || '❖'}</span><span class="lbl">Vortex Guild</span></button>
+    <button class="dock-btn" data-tab="arcade-view"><span class="sym">${ic.arcade || '🎮'}</span><span class="lbl">UGS Arcade</span></button>
+    <button class="dock-btn" data-tab="ranks-view"><span class="sym">${ic.ranks || '★'}</span><span class="lbl">Ranks</span></button>
+    <button class="dock-btn" data-tab="store-view"><span class="sym">${ic.store || '🛒'}</span><span class="lbl">Zynk Store</span></button>
   </div>
   <div class="dock-section">
-    <button class="dock-btn" data-tab="profile-view"><span class="sym">${ic.profile}</span><span class="lbl">My Profile</span></button>
-    <button class="dock-btn" data-tab="achieve-view"><span class="sym">${ic.quests}</span><span class="lbl">Quests</span></button>
-    <button class="dock-btn" data-tab="leader-view"><span class="sym">${ic.leader}</span><span class="lbl">Leaderboards</span></button>
-    <button class="dock-btn" data-tab="tools-view"><span class="sym">${ic.tools}</span><span class="lbl">Utility Tools</span></button>
-    <button class="dock-btn" data-tab="browser-view"><span class="sym">${ic.browser}</span><span class="lbl">Zynk Browser</span></button>
-    <button class="dock-btn" data-tab="support-view"><span class="sym">${ic.support}</span><span class="lbl">Support & Ideas</span></button>
-    <button class="dock-btn hidden" id="nav-beta-btn" data-tab="beta-view"><span class="sym">${ic.beta}</span><span class="lbl">Beta Lab</span></button>
-    <button class="dock-btn hidden" id="nav-admin-btn" data-tab="admin-view"><span class="sym">${ic.admin}</span><span class="lbl">Founder Panel</span></button>
-    <button class="dock-btn" data-tab="settings-view"><span class="sym">${ic.settings}</span><span class="lbl">Settings</span></button>
+    <button class="dock-btn" data-tab="profile-view"><span class="sym">${ic.profile || '👤'}</span><span class="lbl">My Profile</span></button>
+    <button class="dock-btn" data-tab="achieve-view"><span class="sym">${ic.quests || '🏆'}</span><span class="lbl">Quests</span></button>
+    <button class="dock-btn" data-tab="leader-view"><span class="sym">${ic.leader || '📊'}</span><span class="lbl">Leaderboards</span></button>
+    <button class="dock-btn" data-tab="tools-view"><span class="sym">${ic.tools || '⌘'}</span><span class="lbl">Utility Tools</span></button>
+    <button class="dock-btn" data-tab="browser-view"><span class="sym">${ic.browser || '🌐'}</span><span class="lbl">Zynk Browser</span></button>
+    <button class="dock-btn" data-tab="support-view"><span class="sym">${ic.support || '🛟'}</span><span class="lbl">Support & Ideas</span></button>
+    <button class="dock-btn hidden" id="nav-beta-btn" data-tab="beta-view"><span class="sym">${ic.beta || '⚛'}</span><span class="lbl">Beta Lab</span></button>
+    <button class="dock-btn hidden" id="nav-admin-btn" data-tab="admin-view"><span class="sym">${ic.admin || '⚡'}</span><span class="lbl">Founder Panel</span></button>
+    <button class="dock-btn" data-tab="settings-view"><span class="sym">${ic.settings || '⚙'}</span><span class="lbl">Settings</span></button>
   </div>
   <div class="dock-clock"><span id="dock-hr">12</span><span class="dock-sep">:</span><span id="dock-min">00</span></div>
 `);
