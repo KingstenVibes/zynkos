@@ -20,7 +20,9 @@ window.notify = function(msg, isError = false, onClick = null) {
 window.sbRest = async function(path, method = 'GET', body = null, token = null) {
   const headers = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + (token || SB_KEY), 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
   const res = await fetch(SB_URL + '/rest/v1/' + path, { method, headers, body: body ? JSON.stringify(body) : null });
-  const data = await res.json().catch(() => null);
+  const raw = await res.text();
+  let data = null;
+  try { data = raw ? JSON.parse(raw) : null; } catch { data = { message: 'Server waking up — try again in a few seconds.' }; }
   if (!res.ok) throw new Error((data && data.message) || 'Database error');
   return data;
 };
@@ -44,7 +46,27 @@ function applyStaffDockVisibility(prof) {
   if (betaBtn) { betaBtn.classList.toggle('hidden', !isBeta); betaBtn.style.display = isBeta ? 'flex' : 'none'; }
 }
 
-async function bootUser(user, token, preferredName) {
+async function renewStoredSession(saved) {
+  if (!saved || !saved.refresh_token) return saved;
+  const res = await fetch(SB_URL + '/auth/v1/token?grant_type=refresh_token', {
+    method: 'POST',
+    headers: { 'apikey': SB_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: saved.refresh_token })
+  });
+  const raw = await res.text();
+  let data = null;
+  try { data = JSON.parse(raw); } catch { return saved; }
+  if (res.ok && data && data.access_token) {
+    const updated = { user: data.user || saved.user, token: data.access_token, refresh_token: data.refresh_token || saved.refresh_token, remember: saved.remember };
+    const store = saved.remember ? localStorage : sessionStorage;
+    store.setItem('zynk_session', JSON.stringify(updated));
+    window.authToken = updated.token;
+    return updated;
+  }
+  if (res.status === 400 || res.status === 401) throw new Error('Session expired — please sign in again.');
+  return saved;
+}
+async function bootUser(user, token, preferredName, silent = false) {
   window.currentUser = user;
   window.authToken = token;
   const rows = await window.sbRest('users?id=eq.' + user.id, 'GET', null, token);
@@ -75,8 +97,9 @@ async function bootUser(user, token, preferredName) {
   const topBtn = document.getElementById('top-auth-btn');
   if (topBtn) topBtn.textContent = 'Sign Out';
   window.dispatchEvent(new Event('zynk-profile-updated'));
-  window.notify('Welcome back, ' + ((prof && prof.username) || 'Member') + '!');
+  if (!silent) window.notify('Welcome back, ' + ((prof && prof.username) || 'Member') + '!');
 }
+
 window.refreshMyProfile = async function() {
   if (!window.currentUser) return;
   const rows = await window.sbRest('users?id=eq.' + window.currentUser.id, 'GET', null, window.authToken);
@@ -114,6 +137,7 @@ document.addEventListener('click', async (e) => {
     sessionStorage.removeItem('zynk_session');
     window.currentUser = null;
     window.userProfile = null;
+    window.authToken = null;
     applyStaffDockVisibility(null);
     lockScreen(true);
   }
@@ -142,12 +166,15 @@ document.addEventListener('click', async (e) => {
         headers: { 'apikey': SB_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: loginId, password })
       });
-      const data = await res.json();
+      const raw = await res.text();
+      let data = {};
+      try { data = JSON.parse(raw); } catch { throw new Error('Server waking up — try again in 5 seconds.'); }
       if (!res.ok) throw new Error(data.error_description || data.msg || 'Authentication failed');
       if (!data.access_token) throw new Error('Account created! Switch to Sign In.');
 
-      const store = remBox && remBox.checked ? localStorage : sessionStorage;
-      store.setItem('zynk_session', JSON.stringify({ user: data.user, token: data.access_token }));
+      const remember = Boolean(remBox && remBox.checked);
+      const store = remember ? localStorage : sessionStorage;
+      store.setItem('zynk_session', JSON.stringify({ user: data.user, token: data.access_token, refresh_token: data.refresh_token, remember }));
       await bootUser(data.user, data.access_token, username);
     } catch (err) {
       window.notify(err.message, true);
@@ -158,11 +185,25 @@ document.addEventListener('click', async (e) => {
   }
 });
 
-window.addEventListener('DOMContentLoaded', () => {
+setInterval(() => {
+  const saved = JSON.parse(localStorage.getItem('zynk_session') || sessionStorage.getItem('zynk_session') || 'null');
+  if (saved && saved.refresh_token && window.currentUser) {
+    renewStoredSession(saved).catch(() => {});
+  }
+}, 40 * 60 * 1000);
+
+window.addEventListener('DOMContentLoaded', async () => {
   applyStaffDockVisibility(null);
   lockScreen(true);
-  const saved = JSON.parse(localStorage.getItem('zynk_session') || sessionStorage.getItem('zynk_session') || 'null');
+  const rawSaved = localStorage.getItem('zynk_session') || sessionStorage.getItem('zynk_session');
+  const saved = rawSaved ? JSON.parse(rawSaved) : null;
   if (saved && saved.user && saved.token) {
-    bootUser(saved.user, saved.token).catch((err) => { window.notify(err.message, true); lockScreen(true); });
+    try {
+      const fresh = await renewStoredSession(saved);
+      await bootUser(fresh.user, fresh.token);
+    } catch (err) {
+      window.notify(err.message, true);
+      lockScreen(true);
+    }
   }
 });
