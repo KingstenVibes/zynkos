@@ -1,9 +1,9 @@
 window.RANKS = [
   { name: 'Circuit', cost: 0, priceLabel: 'FREE', monthly: 100, color: '#94a3b8', perks: 'Base ZynkOS Access, 100 Monthly Z-Credits, Standard Chat' },
   { name: 'Pulse', cost: 250, priceLabel: '250 Z-Credits', monthly: 250, color: '#10b981', perks: 'All Circuit Perks, 250 Monthly Z-Credits, +25% Chat XP' },
-  { name: 'Nova', cost: -1, priceLabel: '$4.99 / mo', monthly: 600, color: '#06b6d4', perks: 'All Pulse Perks, 600 Monthly Z-Credits, +50% Chat XP' },
-  { name: 'Titan', cost: -1, priceLabel: '$9.99 / mo', monthly: 1200, color: '#a855f7', perks: 'All Nova Perks, 1,200 Monthly Z-Credits, Custom Frame Glow' },
-  { name: 'Apex', cost: -1, priceLabel: '$19.99 / mo', monthly: 2500, color: '#f59e0b', perks: 'All Titan Perks, 2,500 Monthly Z-Credits, Priority Access' }
+  { name: 'Nova', cost: -1, priceLabel: '/$4.99 / mo', monthly: 600, color: '#06b6d4', perks: 'All Pulse Perks, 600 Monthly Z-Credits, +50% Chat XP' },
+  { name: 'Titan', cost: -1, priceLabel: '/$9.99 / mo', monthly: 1200, color: '#a855f7', perks: 'All Nova Perks, 1,200 Monthly Z-Credits, Custom Frame Glow' },
+  { name: 'Apex', cost: -1, priceLabel: '/$19.99 / mo', monthly: 2500, color: '#f59e0b', perks: 'All Titan Perks, 2,500 Monthly Z-Credits, Priority Access' }
 ];
 
 let activeShopFilter = 'ALL';
