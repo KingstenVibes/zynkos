@@ -2,6 +2,25 @@ let uploadedImg = '';
 let activeFounderTab = 'ANNOUNCE';
 let selectedMember = null;
 
+function compressImageFile(file, maxDim = 320) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/webp', 0.85));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 async function renderAdminAndBeta() {
   const p = window.userProfile;
   const adminBox = document.getElementById('admin-panel-container');
@@ -49,7 +68,7 @@ async function renderAdminAndBeta() {
   if (!adminBox || !isFounder) return;
   const fTabs = [
     { id: 'ANNOUNCE', label: '📢 Broadcast Announcements' },
-    { id: 'SHOP', label: '🖼 Shop Upload & Daily Deals' },
+    { id: 'SHOP', label: '🖼 Shop Upload, Delete & Stripe' },
     { id: 'ROLES', label: '⚡ Members, Roles & Credits' },
     { id: 'SECRETS', label: '🔒 Quests & Secret Solution Key' }
   ];
@@ -100,6 +119,8 @@ async function renderAdminAndBeta() {
   if (activeFounderTab === 'SHOP') {
     const storeItems = await window.sbRest('store_items?order=id.asc').catch(() => []);
     const reqs = await window.sbRest('shop_requests?order=id.desc').catch(() => []);
+    const sLinks = JSON.parse(localStorage.getItem('zynk_stripe_links') || '{}');
+
     sub.innerHTML = `
       <div class="bento-grid" style="padding:0;">
         <div class="glass-card">
@@ -117,21 +138,25 @@ async function renderAdminAndBeta() {
           <button class="btn-neon" id="adm-add-item-btn" style="width:100%">Publish to Store</button>
         </div>
         <div class="glass-card">
-          <h3>🔥 Daily Deals & Member Requests</h3>
+          <h3>🗑 Manage Store Items & Daily Deals (${(storeItems || []).length})</h3>
           <div style="max-height:175px;overflow-y:auto;">
-            ${(storeItems || []).map(it => `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span>${it.name}</span><div style="display:flex;gap:6px;"><button class="${it.is_daily_deal ? 'btn-neon' : 'btn-outline'}" data-deal-id="${it.id}" data-deal-on="${it.is_daily_deal ? '1' : '0'}">${it.is_daily_deal ? '10% OFF' : 'Deal'}</button><button class="btn-ghost" data-del-item="${it.id}">✕</button></div></div>`).join('')}
+            ${(storeItems || []).map(it => `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span>${it.name} <span class="mono-dim">(${it.item_type})</span></span><div style="display:flex;gap:6px;"><button class="${it.is_daily_deal ? 'btn-neon' : 'btn-outline'}" style="padding:4px 8px;font-size:0.75rem;" data-deal-id="${it.id}" data-deal-on="${it.is_daily_deal ? '1' : '0'}">${it.is_daily_deal ? '10% OFF' : 'Deal'}</button><button class="btn-outline" style="padding:4px 8px;font-size:0.75rem;color:#f43f5e;border-color:#f43f5e;" data-del-item="${it.id}" title="Delete Item">Delete</button></div></div>`).join('') || '<p class="sub-text">No store items yet.</p>'}
           </div>
-          <h4 style="margin-top:14px;">💡 Member Shop Requests (${(reqs || []).length})</h4>
-          ${(reqs || []).map(r => `<div style="display:flex;justify-content:space-between;padding:5px 0;"><span><strong>${r.item_name}</strong> (${r.category}) by @${r.username}</span><button class="btn-ghost" data-del-req="${r.id}">✕</button></div>`).join('') || '<p class="sub-text">No requests.</p>'}
+          <h4 style="margin-top:14px;">💳 Stripe Payment Links (Paid Ranks)</h4>
+          <input id="st-nova" class="tool-input" style="margin-top:6px;" value="${sLinks.Nova || ''}" placeholder="Nova ($4.99) Stripe Payment Link (https://stripe.com...)" />
+          <input id="st-titan" class="tool-input" value="${sLinks.Titan || ''}" placeholder="Titan ($9.99) Stripe Payment Link" />
+          <input id="st-apex" class="tool-input" value="${sLinks.Apex || ''}" placeholder="Apex ($19.99) Stripe Payment Link" />
+          <button class="btn-outline" id="save-stripe-btn" style="width:100%">Save Stripe Checkout Links</button>
         </div>
       </div>`;
-    document.getElementById('adm-item-file').onchange = (e) => {
+
+    document.getElementById('adm-item-file').onchange = async (e) => {
       const f = e.target.files?.at(0);
       if (!f) return;
-      const r = new FileReader();
-      r.onload = () => { uploadedImg = r.result; window.notify('Image loaded & ready to publish!'); };
-      r.readAsDataURL(f);
+      uploadedImg = await compressImageFile(f, 340);
+      window.notify('Image compressed & ready to publish!');
     };
+
     document.getElementById('adm-add-item-btn').onclick = async () => {
       const name = document.getElementById('adm-item-name').value.trim();
       const img = uploadedImg || document.getElementById('adm-item-img').value.trim();
@@ -143,19 +168,28 @@ async function renderAdminAndBeta() {
       renderAdminAndBeta();
       window.dispatchEvent(new Event('zynk-profile-updated'));
     };
+
+    document.getElementById('save-stripe-btn').onclick = () => {
+      localStorage.setItem('zynk_stripe_links', JSON.stringify({
+        Nova: document.getElementById('st-nova').value.trim(),
+        Titan: document.getElementById('st-titan').value.trim(),
+        Apex: document.getElementById('st-apex').value.trim()
+      }));
+      window.notify('Stripe Payment Links saved!');
+      window.dispatchEvent(new Event('zynk-profile-updated'));
+    };
+
     sub.querySelectorAll('[data-deal-id]').forEach(b => (b.onclick = async () => {
       await window.sbRest(`store_items?id=eq.${b.dataset.dealId}`, 'PATCH', { is_daily_deal: b.dataset.dealOn !== '1' }, window.authToken);
       renderAdminAndBeta();
       window.dispatchEvent(new Event('zynk-profile-updated'));
     }));
+
     sub.querySelectorAll('[data-del-item]').forEach(b => (b.onclick = async () => {
       await window.sbRest(`store_items?id=eq.${b.dataset.delItem}`, 'DELETE', null, window.authToken);
+      window.notify('Deleted item from Zynk Store!');
       renderAdminAndBeta();
       window.dispatchEvent(new Event('zynk-profile-updated'));
-    }));
-    sub.querySelectorAll('[data-del-req]').forEach(b => (b.onclick = async () => {
-      await window.sbRest(`shop_requests?id=eq.${b.dataset.delReq}`, 'DELETE', null, window.authToken);
-      renderAdminAndBeta();
     }));
   }
   if (activeFounderTab === 'ROLES') {
@@ -253,12 +287,12 @@ async function renderAdminAndBeta() {
           <h3>🔒 Founder-Only Secret Quest Solution Key</h3>
           <p class="sub-text" style="margin-bottom:10px;">Only visible to FOUNDER—shows how every secret quest is completed:</p>
           <div style="display:flex;flex-direction:column;gap:8px;max-height:290px;overflow-y:auto;">
-            <div style="padding:8px;background:#04070b;border-radius:8px;"><strong>🌙 Night Owl Protocol (+500 Z):</strong> Open Quests between 10:00 PM and 4:59 AM local time.</div>
-            <div style="padding:8px;background:#04070b;border-radius:8px;"><strong>💠 Cyan Overclock (+400 Z):</strong> Equip the <code>Cyber Cyan</code> steady page theme.</div>
-            <div style="padding:8px;background:#04070b;border-radius:8px;"><strong>⏱ Military Precision (+350 Z):</strong> Switch Clock Format to <code>24-Hour (Military)</code> in Settings.</div>
-            <div style="padding:8px;background:#04070b;border-radius:8px;"><strong>🕵️ Ghost Protocol (+450 Z):</strong> Enable any Tab Disguise in Settings.</div>
-            <div style="padding:8px;background:#04070b;border-radius:8px;"><strong>🩸 Crimson Shadow (+450 Z):</strong> Equip the <code>Crimson Ops</code> steady page theme.</div>
-            <div style="padding:8px;background:#04070b;border-radius:8px;"><strong>🔬 Micro Vision (+300 Z):</strong> Set UI Interface Scale to <code>90% (Compact)</code> in Settings.</div>
+            <div style="padding:8px;background:#04070b;border-radius:8px;"><strong>🌙 Midnight Operator (+650 Z):</strong> Open Quests between 12:00 AM and 3:59 AM local time.</div>
+            <div style="padding:8px;background:#04070b;border-radius:8px;"><strong>💠 Cyan Overclock (+450 Z):</strong> Equip the <code>Cyber Cyan</code> steady page theme.</div>
+            <div style="padding:8px;background:#04070b;border-radius:8px;"><strong>⏱ Military Precision (+400 Z):</strong> Switch Clock Format to <code>24-Hour (Military)</code> in Settings.</div>
+            <div style="padding:8px;background:#04070b;border-radius:8px;"><strong>🕵️ Ghost Protocol (+500 Z):</strong> Enable any Tab Disguise in Settings.</div>
+            <div style="padding:8px;background:#04070b;border-radius:8px;"><strong>🔮 Void Resonance (+500 Z):</strong> Equip the <code>Violet Pulse</code> steady page theme.</div>
+            <div style="padding:8px;background:#04070b;border-radius:8px;"><strong>🔬 Micro Vision (+350 Z):</strong> Set UI Interface Scale to <code>90% (Compact)</code> in Settings.</div>
             ${(customQuests || []).map(s => `<div style="padding:8px;background:#04070b;border-radius:8px;display:flex;justify-content:space-between;align-items:center;"><div><strong>${s.is_secret ? '🔒 ' : '📋 '}${s.title} (+${s.reward_credits} Z):</strong> ${s.secret_hint || s.description}</div><button class="btn-ghost" data-del-q="${s.id}">✕</button></div>`).join('')}
           </div>
         </div>
