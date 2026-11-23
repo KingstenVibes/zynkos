@@ -82,6 +82,8 @@ const stage = mk('main', 'center-stage', `
   <section id="achieve-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Achievements</h2></div></div><div class="cards-grid" id="achieve-grid"></div></section>
   <section id="leader-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Global Leaderboards</h2></div></div><div class="glass-card" id="leaderboard-list"></div></section>
   <section id="tools-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Utility Tools</h2></div></div><div class="cards-grid" id="tools-grid"></div></section>
+  <section id="browser-view" class="tab-view padded-view"><div id="browser-container" style="max-width:860px;margin:auto;width:100%;"></div></section>
+  <section id="support-view" class="tab-view padded-view"><div id="support-container" style="max-width:860px;margin:auto;width:100%;"></div></section>
   <section id="beta-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>⚛ ZynkOS Beta Lab</h2></div></div><div class="cards-grid" id="beta-grid"></div></section>
   <section id="admin-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>⚡ Founder Developer Panel</h2></div></div><div id="admin-panel-container"></div></section>
   <section id="settings-view" class="tab-view padded-view"><div class="glass-card settings-card"><h2>System Settings</h2><div id="settings-controls"></div><div class="settings-actions"><button id="save-settings-btn" class="btn-neon">Save Preferences</button><button id="about-blank-btn" class="btn-outline">↗ Open in about:blank</button><span id="save-msg" class="save-msg"></span></div></div></section>
