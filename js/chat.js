@@ -2,6 +2,7 @@ const msgBox = document.getElementById('chat-messages');
 const memBox = document.getElementById('online-members-list');
 const acBox = document.getElementById('chat-ac-box');
 const chatInput = document.getElementById('chat-input');
+const chatForm = document.getElementById('chat-form');
 let cachedUsers = [];
 let initialChatLoaded = false;
 let activeReply = null;
@@ -12,38 +13,58 @@ const CHAT_SVG = {
   react: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
   reply: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>`,
   edit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`,
-  trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`
+  trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
+  plus: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  sticker: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z"/><path d="M15 3v6h6"/></svg>`
 };
 
+const ALL_EMOJIS = [
+  '👍','❤️','😂','🔥','💀','🎉','👀','💯','😭','😍','🥺','😎','🤯','🥳','😡','🤔',
+  '👏','🙌','🤝','✌️','🫡','🙏','💪','⚡','💎','🚀','👑','🏆','🎮','🎵','🌟','✨',
+  '💚','💙','💜','🧡','🖤','🤍','💔','💥','💫','💤','✅','❌','⚠️','🛡️','🔮','🛸'
+];
+
+if (chatForm && !document.getElementById('chat-file-inp')) {
+  const fileInp = document.createElement('input');
+  fileInp.type = 'file';
+  fileInp.id = 'chat-file-inp';
+  fileInp.accept = 'image/*';
+  fileInp.className = 'hidden';
+
+  const imgBtn = document.createElement('button');
+  imgBtn.type = 'button';
+  imgBtn.className = 'chat-tool-btn';
+  imgBtn.title = 'Upload Image (Max 5MB)';
+  imgBtn.innerHTML = CHAT_SVG.plus;
+  imgBtn.onclick = () => fileInp.click();
+
+  const stkBtn = document.createElement('button');
+  stkBtn.type = 'button';
+  stkBtn.className = 'chat-tool-btn';
+  stkBtn.title = 'Stickers & Emojis';
+  stkBtn.innerHTML = CHAT_SVG.sticker;
+  stkBtn.onclick = () => window.toggleChatDrawer();
+
+  chatForm.prepend(fileInp, imgBtn, stkBtn);
+}
+
+let drawerBox = document.getElementById('chat-drawer-box');
+if (!drawerBox && chatForm) {
+  drawerBox = document.createElement('div');
+  drawerBox.id = 'chat-drawer-box';
+  drawerBox.className = 'sticker-drawer hidden';
+  chatForm.before(drawerBox);
+}
+
 let typingBar = document.getElementById('chat-typing-bar');
-if (!typingBar && document.getElementById('chat-form')) {
+if (!typingBar && chatForm) {
   typingBar = document.createElement('div');
   typingBar.id = 'chat-typing-bar';
   typingBar.className = 'typing-bar';
-  document.getElementById('chat-form').before(typingBar);
+  chatForm.before(typingBar);
 }
-
 const ROLE_POWER = { FOUNDER: 100, ADMIN: 80, MODERATOR: 60, BETA: 30, UPLOADER: 25, DESIGNER: 25, VIP: 20, SUPPORTER: 15, MEMBER: 10, SYSTEM: 90 };
-const QUICK_EMOJIS = ['👍', '❤️', '😂', '🔥', '💀', '🎉', '👀', '💯'];
 
-window.openReactPicker = function(btn, msgId) {
-  document.querySelectorAll('.react-popover').forEach(p => p.remove());
-  document.querySelectorAll('.msg-actions.open').forEach(a => a.classList.remove('open'));
-  const bar = btn.closest('.msg-actions');
-  if (!bar) return;
-  bar.classList.add('open');
-  const pop = document.createElement('div');
-  pop.className = 'react-popover';
-  pop.innerHTML = QUICK_EMOJIS.map(em => `<button type="button" class="react-choice" onclick="toggleReaction(${msgId}, '${em}')">${em}</button>`).join('');
-  bar.appendChild(pop);
-};
-
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.msg-actions')) {
-    document.querySelectorAll('.react-popover').forEach(p => p.remove());
-    document.querySelectorAll('.msg-actions.open').forEach(a => a.classList.remove('open'));
-  }
-});
 const SLASH_CMDS = [
   { cmd: '/help', desc: 'Show all available commands', staff: false },
   { cmd: '/credits', desc: 'Check your Z-Credits & Level', staff: false },
@@ -75,12 +96,106 @@ function canDeleteMsg(me, msg) {
   return myPow >= 60 && myPow > targetPow;
 }
 
+function getStickerLimit(p) {
+  if (!p) return 0;
+  if (p.role !== 'MEMBER' || (p.rank_index || 0) >= 1 || (p.extra_roles || []).length > 0) return 10;
+  return 2;
+}
+
+window.openReactPicker = function(btn, msgId) {
+  document.querySelectorAll('.react-popover').forEach(p => p.remove());
+  document.querySelectorAll('.msg-actions.open').forEach(a => a.classList.remove('open'));
+  const bar = btn.closest('.msg-actions');
+  if (!bar) return;
+  bar.classList.add('open');
+  const pop = document.createElement('div');
+  pop.className = 'react-popover';
+  pop.innerHTML = ALL_EMOJIS.map(em => `<button type="button" class="react-choice" onclick="toggleReaction(${msgId}, '${em}')">${em}</button>`).join('');
+  bar.appendChild(pop);
+};
+
+window.toggleChatDrawer = function() {
+  if (!drawerBox) return;
+  drawerBox.classList.toggle('hidden');
+  if (drawerBox.classList.contains('hidden')) return;
+  const p = window.userProfile;
+  const limit = getStickerLimit(p);
+  const myStickers = Array.isArray(p?.stickers) ? p.stickers : [];
+  drawerBox.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <strong style="font-size:0.84rem;color:#10b981;">Stickers (${myStickers.length}/${limit}) & Emojis</strong>
+      <div style="display:flex;gap:6px;">
+        <button type="button" class="btn-outline" style="padding:4px 10px;font-size:0.78rem;" id="add-sticker-btn">+ Upload Sticker</button>
+        <button type="button" class="btn-ghost" onclick="drawerBox.classList.add('hidden')">✕</button>
+      </div>
+    </div>
+    <input type="file" id="sticker-file-inp" accept="image/*" class="hidden" />
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+      ${myStickers.map((src, i) => `<img src="${src}" style="width:58px;height:58px;border-radius:8px;object-fit:cover;cursor:pointer;border:1px solid rgba(255,255,255,0.12);" onclick="sendStickerImg(${i})" title="Click to send sticker" />`).join('') || '<span class="mono-dim">No custom stickers uploaded yet.</span>'}
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px;border-top:1px solid rgba(255,255,255,0.08);padding-top:8px;">
+      ${ALL_EMOJIS.map(em => `<button type="button" class="react-choice" onclick="chatInput.value+='${em}';chatInput.focus();">${em}</button>`).join('')}
+    </div>`;
+
+  document.getElementById('add-sticker-btn').onclick = () => {
+    if (!p) return window.notify?.('Sign in to upload stickers!', true);
+    if (myStickers.length >= limit) return window.notify?.(`Sticker limit reached (${limit} max for your rank/role). Upgrade rank for up to 10!`, true);
+    document.getElementById('sticker-file-inp').click();
+  };
+  document.getElementById('sticker-file-inp').onchange = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 5 * 1024 * 1024) return window.notify?.('Sticker must be under 5MB!', true);
+    const r = new FileReader();
+    r.onload = async () => {
+      const next = [...myStickers, r.result];
+      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { stickers: next }, window.authToken);
+      await window.refreshMyProfile();
+      window.notify('Sticker saved!');
+      window.toggleChatDrawer();
+    };
+    r.readAsDataURL(f);
+  };
+};
+
+window.sendStickerImg = async function(idx) {
+  const p = window.userProfile;
+  const src = p?.stickers?.[idx];
+  if (!p || !src) return;
+  drawerBox?.classList.add('hidden');
+  await window.sbRest('messages', 'POST', { user_id: p.id, username: p.username, avatar: p.avatar, role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: '[Sticker]', image_url: src }, window.authToken);
+  lastChatHash = '';
+  pollChatAndMembers();
+};
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.msg-actions')) {
+    document.querySelectorAll('.react-popover').forEach(p => p.remove());
+    document.querySelectorAll('.msg-actions.open').forEach(a => a.classList.remove('open'));
+  }
+});
+
+document.getElementById('chat-file-inp')?.addEventListener('change', (e) => {
+  const f = e.target.files?.[0];
+  const p = window.userProfile;
+  if (!f || !p) return;
+  if (f.size > 5 * 1024 * 1024) return window.notify?.('File must be 5MB or smaller!', true);
+  const r = new FileReader();
+  r.onload = async () => {
+    await window.sbRest('messages', 'POST', { user_id: p.id, username: p.username, avatar: p.avatar, role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: chatInput.value.trim() || f.name, image_url: r.result }, window.authToken);
+    chatInput.value = '';
+    e.target.value = '';
+    lastChatHash = '';
+    pollChatAndMembers();
+  };
+  r.readAsDataURL(f);
+});
+
 window.toggleReaction = async function(msgId, emoji) {
   const me = window.userProfile;
   if (!me) return window.notify?.('Sign in to react to messages!', true);
   document.querySelectorAll('.react-popover').forEach(p => p.remove());
   const rows = await window.sbRest(`messages?id=eq.${msgId}`).catch(() => []);
-  const m = Array.isArray(rows) ? rows[0] : null;
+  const m = Array.isArray(rows) ? rows : null;
   if (!m) return;
   const reacts = m.reactions && typeof m.reactions === 'object' ? { ...m.reactions } : {};
   const list = Array.isArray(reacts[emoji]) ? [...reacts[emoji]] : [];
@@ -115,7 +230,7 @@ window.setChatReply = function(username, text) {
     bar = document.createElement('div');
     bar.id = 'reply-preview-bar';
     bar.className = 'reply-banner';
-    document.getElementById('chat-form')?.before(bar);
+    chatForm?.before(bar);
   }
   bar.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;">${CHAT_SVG.reply} Replying to <strong>${activeReply}</strong></span><button type="button" class="btn-ghost" onclick="clearChatReply()">✕</button>`;
   chatInput?.focus();
@@ -125,6 +240,7 @@ window.clearChatReply = function() {
   activeReply = null;
   document.getElementById('reply-preview-bar')?.remove();
 };
+
 function renderMessages(msgs) {
   if (!msgBox) return;
   const me = window.userProfile;
@@ -145,7 +261,8 @@ function renderMessages(msgs) {
     const reacts = m.reactions && typeof m.reactions === 'object' ? m.reactions : {};
     const reactHtml = Object.entries(reacts).filter(([, arr]) => Array.isArray(arr) && arr.length).map(([em, arr]) => {
       const mine = me && arr.includes(me.username);
-      return `<button type="button" class="react-pill ${mine ? 'mine' : ''}" onclick="toggleReaction(${m.id}, '${em}')">${em} ${arr.length}</button>`;
+      const who = arr.map(u => '@' + u).join(', ');
+      return `<button type="button" class="react-pill ${mine ? 'mine' : ''}" title="Reacted by ${who}" onclick="toggleReaction(${m.id}, '${em}')">${em} ${arr.length}</button>`;
     }).join('');
 
     div.innerHTML = `
@@ -157,9 +274,10 @@ function renderMessages(msgs) {
       </div>
       <img class="msg-avatar" src="${av}" />
       <div style="flex:1;">
-        ${m.reply_to ? `<div class="mono-dim" style="display:flex;align-items:center;gap:5px;border-left:2px solid #10b981;padding-left:8px;margin-bottom:4px;">${CHAT_SVG.reply} ${String(m.reply_to).replace(/</g, '&lt;')}</div>` : ''}
+        ${m.reply_to ? `<div class="reply-quote">${CHAT_SVG.reply} <span>${String(m.reply_to).replace(/</g, '&lt;')}</span></div>` : ''}
         <div><strong style="color:${m.color || '#10b981'}">${m.username}</strong> <span class="mono-dim">[${m.role || 'MEMBER'}]${m.is_beta ? ' [BETA]' : ''} • ${timeStr}</span></div>
-        <div style="margin-top:3px;">${safeText}${m.edited ? ' <span class="mono-dim">(edited)</span>' : ''}</div>
+        ${m.content !== '[Sticker]' ? `<div style="margin-top:3px;">${safeText}${m.edited ? ' <span class="mono-dim">(edited)</span>' : ''}</div>` : ''}
+        ${m.image_url ? `<img src="${m.image_url}" class="chat-img-attach" style="${m.content === '[Sticker]' ? 'width:110px;height:110px;border:none;' : ''}" />` : ''}
         ${reactHtml ? `<div class="react-row">${reactHtml}</div>` : ''}
       </div>`;
     div.querySelector('.msg-avatar').onclick = () => { if (m.user_id && window.openUserModal) window.openUserModal(m.user_id); };
@@ -168,7 +286,6 @@ function renderMessages(msgs) {
 
   if (wasAtBottom || !initialChatLoaded) msgBox.scrollTop = msgBox.scrollHeight;
 }
-
 async function pollChatAndMembers() {
   if (!window.sbRest) return;
   try {
@@ -190,27 +307,41 @@ async function pollChatAndMembers() {
   }
   initialChatLoaded = true;
 
-  const users = await window.sbRest('users?order=online.desc,xp.desc&limit=50').catch(() => []);
+  const users = await window.sbRest('users?order=online.desc,xp.desc&limit=60').catch(() => []);
   if (Array.isArray(users)) {
     cachedUsers = users;
     const me = window.userProfile;
     const typers = users.filter(u => u.typing_until && u.typing_until > Date.now() && (!me || u.id !== me.id));
     if (typingBar) {
       if (typers.length) {
-        const names = typers.length === 1 ? `@${typers[0].username} is typing` : `${typers.map(t => '@' + t.username).join(', ')} are typing`;
+        const names = typers.length === 1 ? `@${typers.at(0).username} is typing` : `${typers.map(t => '@' + t.username).join(', ')} are typing`;
         typingBar.innerHTML = `<span class="typing-dots"><span></span><span></span><span></span></span><span>${names}</span>`;
       } else {
         typingBar.innerHTML = '';
       }
     }
     if (memBox) {
-      memBox.innerHTML = users.map(u => `<div class="member-item" onclick="openUserModal('${u.id}')"><span style="color:${u.online ? '#10b981' : '#64748b'}">●</span><span style="color:${u.equipped_color || '#f8fafc'}">${u.username}</span></div>`).join('');
+      const online = users.filter(u => u.online);
+      const offline = users.filter(u => !u.online);
+      const renderMem = (u, isOn) => {
+        const av = u.avatar && !u.avatar.includes('dicebear') ? u.avatar : 'logo.png';
+        return `<div class="member-item" style="opacity:${isOn ? '1' : '0.55'}" onclick="openUserModal('${u.id}')">
+          <div class="mem-av-wrap"><img src="${av}" /><span class="mem-dot" style="background:${isOn ? '#10b981' : '#64748b'}"></span></div>
+          <div><div style="color:${u.equipped_color || '#f8fafc'};font-weight:600;">${u.username}</div><div class="mono-dim" style="font-size:0.68rem;">${u.role}</div></div>
+        </div>`;
+      };
+      memBox.innerHTML = `
+        <div class="members-head">ONLINE — ${online.length}</div>
+        ${online.map(u => renderMem(u, true)).join('') || '<div class="mono-dim" style="padding:4px 8px;">None</div>'}
+        <div class="members-head">OFFLINE — ${offline.length}</div>
+        ${offline.map(u => renderMem(u, false)).join('')}`;
     }
   }
 }
+
 chatInput?.addEventListener('input', () => {
   const p = window.userProfile;
-  if (p && chatInput.value.trim() && Date.now() - lastTypingPing > 2500) {
+  if (p && chatInput.value.trim() && Date.now() - lastTypingPing > 2200) {
     lastTypingPing = Date.now();
     window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { typing_until: Date.now() + 4500 }, window.authToken).catch(() => {});
   }
@@ -222,7 +353,7 @@ chatInput?.addEventListener('input', () => {
 
   if (val.startsWith('/')) {
     const q = val.toLowerCase();
-    const matches = SLASH_CMDS.filter(c => (!c.staff || isStaff) && (!c.founder || isFounder) && c.cmd.startsWith(q.split(' ')[0]));
+    const matches = SLASH_CMDS.filter(c => (!c.staff || isStaff) && (!c.founder || isFounder) && c.cmd.startsWith(q.split(' ').at(0)));
     if (!matches.length) return acBox.classList.add('hidden');
     acBox.innerHTML = matches.map(c => `<div class="ac-item" data-fill="${c.cmd.split(' ').slice(0, 2).join(' ')} "><strong>${c.cmd}</strong><span class="mono-dim">${c.desc}</span></div>`).join('');
     acBox.classList.remove('hidden');
@@ -232,7 +363,7 @@ chatInput?.addEventListener('input', () => {
 
   const atMatch = val.match(/(?:^|\s)@([a-zA-Z0-9_]*)$/);
   if (atMatch) {
-    const query = atMatch[1].toLowerCase();
+    const query = atMatch.at(1).toLowerCase();
     const matches = cachedUsers.filter(u => u.username.toLowerCase().startsWith(query)).slice(0, 8);
     if (!matches.length) return acBox.classList.add('hidden');
     acBox.innerHTML = matches.map(u => `<div class="ac-item" data-uname="${u.username}"><span style="color:${u.equipped_color || '#10b981'}">@${u.username}</span><span class="mono-dim">[${u.role}]</span></div>`).join('');
@@ -246,7 +377,6 @@ chatInput?.addEventListener('input', () => {
   }
   acBox.classList.add('hidden');
 });
-
 async function botPost(text) {
   if (!window.sbRest) return;
   await window.sbRest('messages', 'POST', { username: 'ZynkBot', avatar: 'logo.png', role: 'SYSTEM', color: '#06b6d4', content: text }, window.authToken);
@@ -254,7 +384,7 @@ async function botPost(text) {
   await pollChatAndMembers();
 }
 
-document.getElementById('chat-form')?.addEventListener('submit', async (e) => {
+chatForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
   acBox?.classList.add('hidden');
   const raw = chatInput.value.trim();
@@ -275,8 +405,8 @@ document.getElementById('chat-form')?.addEventListener('submit', async (e) => {
 
     if (raw.startsWith('/')) {
       const parts = raw.split(' ');
-      const cmd = parts[0].toLowerCase();
-      const targetName = parts[1]?.replace(/^@/, '');
+      const cmd = parts.at(0).toLowerCase();
+      const targetName = parts.at(1)?.replace(/^@/, '');
 
       if (cmd === '/help') return botPost('Commands: /help, /credits, /pay @user <amt>' + (isStaff ? ' | Staff: /warn @user <reason>, /mute @user <10m/1h/1d> <reason>, /unmute @user, /ban @user <10m/1h/1d> <reason>, /unban @user, /clear' : '') + (isFounder ? ' | Founder: /give @user <amt>, /announce <msg>' : ''));
       if (cmd === '/credits') return botPost(`@${p.username}: ${p.credits} Z-Credits (Level ${Math.floor((p.xp || 0) / 1000) + 1})`);
@@ -288,40 +418,40 @@ document.getElementById('chat-form')?.addEventListener('submit', async (e) => {
       if (cmd === '/announce' && isFounder) return botPost(`[BROADCAST] ${parts.slice(1).join(' ')}`);
       if (cmd === '/warn' && isStaff && targetName) return botPost(`@${targetName} was warned by @${p.username}. Reason: ${parts.slice(2).join(' ') || 'Follow community rules'}`);
       if (cmd === '/mute' && isStaff && targetName) {
-        const durMs = parseDurationMs(parts[2]);
+        const durMs = parseDurationMs(parts.at(2));
         const reason = parts.slice(3).join(' ') || 'Chat violation';
         await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`, 'PATCH', { is_muted: true, mute_until: Date.now() + durMs, mute_reason: reason }, window.authToken);
-        return botPost(`@${targetName} muted for ${parts[2] || '10m'} by @${p.username}. Reason: ${reason}`);
+        return botPost(`@${targetName} muted for ${parts.at(2) || '10m'} by @${p.username}. Reason: ${reason}`);
       }
       if (cmd === '/unmute' && isStaff && targetName) {
         await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`, 'PATCH', { is_muted: false, mute_until: 0, mute_reason: '' }, window.authToken);
         return botPost(`@${targetName} was unmuted by @${p.username}.`);
       }
       if (cmd === '/ban' && isStaff && targetName) {
-        const durMs = parseDurationMs(parts[2]);
+        const durMs = parseDurationMs(parts.at(2));
         const reason = parts.slice(3).join(' ') || 'Rule violation';
         await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`, 'PATCH', { ban_until: Date.now() + durMs, ban_reason: reason, online: false }, window.authToken);
-        return botPost(`@${targetName} banned for ${parts[2] || '10m'} by @${p.username}. Reason: ${reason}`);
+        return botPost(`@${targetName} banned for ${parts.at(2) || '10m'} by @${p.username}. Reason: ${reason}`);
       }
       if (cmd === '/unban' && isStaff && targetName) {
         await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`, 'PATCH', { ban_until: 0, ban_reason: '' }, window.authToken);
         return botPost(`@${targetName} was unbanned by @${p.username}.`);
       }
       if (cmd === '/give' && isFounder && targetName) {
-        const amt = parseInt(parts[2], 10);
+        const amt = parseInt(parts.at(2), 10);
         if (!(amt > 0)) return window.notify('Specify a valid amount.', true);
         const found = await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`);
-        const u = Array.isArray(found) ? found[0] : null;
+        const u = Array.isArray(found) ? found.at(0) : null;
         if (!u) return window.notify(`User @${targetName} not found.`, true);
         await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { credits: u.credits + amt }, window.authToken);
         await window.refreshMyProfile();
         return botPost(`Founder @${p.username} granted +${amt} Z-Credits to @${u.username}!`);
       }
       if (cmd === '/pay' && targetName) {
-        const amt = parseInt(parts[2], 10);
+        const amt = parseInt(parts.at(2), 10);
         if (!(amt > 0) || p.credits < amt) return window.notify('Invalid or insufficient Z-Credits.', true);
         const found = await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`);
-        const u = Array.isArray(found) ? found[0] : null;
+        const u = Array.isArray(found) ? found.at(0) : null;
         if (!u) return window.notify(`User @${targetName} not found.`, true);
         await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits - amt }, window.authToken);
         await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { credits: u.credits + amt }, window.authToken);
