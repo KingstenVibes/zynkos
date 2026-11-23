@@ -111,3 +111,9 @@ body { background: radial-gradient(circle at top right, color-mix(in srgb, var(-
 .zynk-toast-box { position: fixed; bottom: 18px; right: 18px; display: flex; flex-direction: column; gap: 8px; z-index: 9999; }
 .zynk-toast { background: #0b121c; border: 1px solid var(--neon-emerald); color: var(--text-main); padding: 10px 16px; border-radius: 10px; font-size: 0.85rem; box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
 .zynk-toast.err { border-color: #f43f5e; color: #fda4af; }
+#mouse-halo { position: fixed; inset: 0; pointer-events: none; z-index: 0; background: radial-gradient(520px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--neon-emerald) 16%, transparent), transparent 65%); }
+.os-shell { position: relative; z-index: 2; }
+.chat-msg.pinged { background: color-mix(in srgb, var(--neon-emerald) 16%, transparent); border-left: 3px solid var(--neon-emerald); box-shadow: 0 0 18px color-mix(in srgb, var(--neon-emerald) 25%, transparent); border-radius: 10px; padding: 8px 10px; }
+.autocomplete-pop { position: absolute; bottom: 68px; left: 24px; right: 24px; max-height: 190px; overflow-y: auto; background: #0b121c; border: 1px solid var(--neon-emerald); border-radius: 12px; z-index: 80; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
+.ac-item { padding: 9px 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.86rem; }
+.ac-item:hover { background: color-mix(in srgb, var(--neon-emerald) 18%, transparent); }
