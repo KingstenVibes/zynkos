@@ -31,7 +31,7 @@ const authModal = mk('div', 'startup-gate', `
     <img src="logo.png" alt="ZynkOS" style="width:54px;height:54px;margin:0 auto 10px;border-radius:12px;object-fit:cover;display:block;" />
     <h2 id="auth-title" style="text-align:center;">ZynkOS // System Access</h2>
     <p class="sub-text" style="text-align:center;margin-bottom:14px;">Sign in with your username or email to boot.</p>
-    <input id="auth-user" class="tool-input hidden" type="text" placeholder="Username (e.g. PaulBuhrmester)" />
+    <input id="auth-user" class="tool-input hidden" type="text" placeholder="Username (e.g. yourname)" />
     <input id="auth-email" class="tool-input" type="text" placeholder="Username or Email Address" />
     <input id="auth-pass" class="tool-input" type="password" placeholder="Password (6+ chars)" />
     <label class="remember-row"><input type="checkbox" id="remember-me" checked /><span>Remember me</span></label>
@@ -83,7 +83,7 @@ const main = mk('main', 'main-viewport', `
         <div class="profile-row">
           <img class="avatar-ring" id="hud-avatar-img" src="logo.png" alt="Avatar" />
           <div class="profile-meta">
-            <div class="role-badge" id="hud-role-tag">[GUEST]</div>
+            <div id="hud-role-tag" class="badges-row" style="margin-bottom:4px;"></div>
             <h2 id="hud-username" style="font-size:1.45rem;">Guest Member</h2>
             <div class="stats-inline"><span id="hud-credits">0 Z-Credits</span> • <span id="hud-rank-pill">Rank: Circuit</span></div>
           </div>
@@ -113,7 +113,7 @@ const main = mk('main', 'main-viewport', `
       <div class="glass-card" style="display:flex;flex-direction:column;justify-content:space-between;">
         <div>
           <div class="card-head"><span>🎁 Daily Member Stipend</span><span class="mono-dim">+150 Z-CREDITS</span></div>
-          <p class="sub-text" style="margin-bottom:14px;">Claim your daily Z-Credit bonus every 24 hours to unlock Store gear and Pulse rank.</p>
+          <p class="sub-text" style="margin-bottom:14px;">Claim your daily Z-Credit bonus every 24 hours to unlock Store items.</p>
         </div>
         <button class="btn-neon" id="dash-daily-btn" style="width:100%;">Claim +150 Daily Z-Credits</button>
       </div>
@@ -126,7 +126,7 @@ const main = mk('main', 'main-viewport', `
   </section>
 
   <section id="chat-view" class="tab-view chat-layout">
-    <div class="chat-main" style="position:relative;">
+    <div class="chat-main">
       <div class="view-topbar"><div><h2># zynk-global</h2><span class="sub-text">Type / for commands or @ to mention & ping a member</span></div><span class="pill" id="chat-credits">0 Z-Credits</span></div>
       <div class="chat-feed" id="chat-messages"></div>
       <div id="chat-ac-box" class="autocomplete-pop hidden"></div>
@@ -135,12 +135,23 @@ const main = mk('main', 'main-viewport', `
     <aside class="members-panel"><div class="members-head">ONLINE MEMBERS</div><div id="online-members-list"></div></aside>
   </section>
 
-  <section id="vortex-view" class="tab-view full-embed"><iframe src="https://vortexos.net" style="width:100%;height:100%;border:none;" allow="clipboard-write"></iframe></section>
+  <section id="vortex-view" class="tab-view padded-view">
+    <div class="glass-card" style="max-width:560px;margin:auto;text-align:center;padding:32px;">
+      <span class="rarity-tag">PARTNER NETWORK • VORTEXOS</span>
+      <h2 style="margin:6px 0 10px;">Vortex Guild & Community Chat</h2>
+      <p class="sub-text" style="margin-bottom:20px;">VortexOS blocks direct iframe embedding in browsers—launch the live Vortex Guild chat directly in a dedicated tab.</p>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+        <button class="btn-neon" onclick="window.open('https://vortexos.net')">Open Vortex Guild Chat ↗</button>
+        <button class="btn-outline" onclick="window.open('https://vortexos.net','_blank')">Visit VortexOS.net</button>
+      </div>
+    </div>
+  </section>
+
   <section id="arcade-view" class="tab-view full-embed"><div id="custom-game-container" style="width:100%;height:100%;display:flex;"></div></section>
-  <section id="ranks-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Ranks</h2><span class="sub-text">Unlock Pulse with Z-Credits or upgrade to higher tiers</span></div></div><div class="cards-grid" id="ranks-grid"></div></section>
+  <section id="ranks-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Ranks</h2><span class="sub-text">Unlock Pulse with Z-Credits or upgrade to higher tiers</span></div></div><div id="ranks-grid"></div></section>
   <section id="store-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Zynk Store</h2><span class="sub-text">Daily deals, avatars, frames, themes & gifting</span></div><span class="pill" id="store-credits">0 Z-Credits</span></div><div id="store-grid"></div></section>
   <section id="profile-view" class="tab-view padded-view"><div id="my-profile-container"></div></section>
-  <section id="achieve-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Quests & Daily Rewards</h2><span class="sub-text">Track uncompleted, completed & secret quests</span></div></div><div id="achieve-grid"></div></section>
+  <section id="achieve-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Quests & Daily Rewards</h2><span class="sub-text">Daily, Weekly & Secret challenges</span></div></div><div id="achieve-grid"></div></section>
   <section id="leader-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Global Leaderboards</h2><span class="sub-text">Top ZynkOS members ranked by Z-Credits & XP</span></div></div><div class="glass-card" id="leaderboard-list"></div></section>
   <section id="tools-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Utility Tools</h2></div></div><div class="cards-grid" id="tools-grid"></div></section>
   <section id="beta-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Beta Lab</h2><span class="sub-text">Experimental themes, HUD scale & tester rewards</span></div></div><div class="cards-grid" id="beta-grid"></div></section>
