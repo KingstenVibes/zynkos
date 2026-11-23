@@ -1,14 +1,16 @@
-document.getElementById('toggle-dock')?.addEventListener('click', () => {
-  document.getElementById('left-dock')?.classList.toggle('expanded');
-});
-
 window.openTab = function(tabId) {
+  if (!tabId) return;
   document.querySelectorAll('.dock-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
   document.querySelectorAll('.tab-view').forEach(v => v.classList.toggle('active', v.id === tabId));
 };
 
-document.querySelectorAll('.dock-btn').forEach(btn => {
-  btn.addEventListener('click', () => window.openTab(btn.dataset.tab));
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#toggle-dock')) {
+    document.getElementById('left-dock')?.classList.toggle('expanded');
+    return;
+  }
+  const tabBtn = e.target.closest('.dock-btn');
+  if (tabBtn && tabBtn.dataset.tab) window.openTab(tabBtn.dataset.tab);
 });
 
 const sBox = document.getElementById('settings-controls');
@@ -18,10 +20,9 @@ if (sBox) {
     <div class="setting-group"><label>Timezone</label><select id="tz-select" class="tool-input"><option value="auto">Auto-Detect (Local Time)</option><option value="America/New_York">Eastern Time (ET)</option><option value="America/Chicago">Central Time (CT)</option><option value="America/Denver">Mountain Time (MT)</option><option value="America/Los_Angeles">Pacific Time (PT)</option></select></div>
     <div class="setting-group"><label>Clock Format</label><select id="format-select" class="tool-input"><option value="12">12-Hour (AM / PM)</option><option value="24">24-Hour (Military)</option></select></div>
     <div class="setting-group"><label>Tab Disguise (Cloaking)</label><select id="cloak-select" class="tool-input"><option value="none">None (ZynkOS Default)</option><option value="clever">Clever | Portal</option><option value="classroom">Home - Classroom</option><option value="drive">My Drive - Google Drive</option><option value="docs">Untitled document - Google Docs</option></select></div>
-    <div class="setting-group"><label>Instant Panic Key (Redirects to Google Classroom)</label><select id="panic-select" class="tool-input"><option value="none">Disabled</option><option value="Escape">Escape Key (Esc)</option><option value="`">Backtick Key (\`)</option></select></div>
+    <div class="setting-group"><label>Instant Panic Key (Redirects to Google Classroom)</label><select id="panic-select" class="tool-input"><option value="none">Disabled</option><option value="Escape">Escape Key (Esc)</option><option value="\`">Backtick Key (\`)</option></select></div>
     <div class="setting-group"><label>UI Interface Scale</label><select id="zoom-select" class="tool-input"><option value="1">100% (Standard)</option><option value="0.9">90% (Compact)</option><option value="1.1">110% (Large)</option></select></div>`;
 }
-
 function applyCloak(type) {
   const presets = {
     none: { title: 'ZynkOS — Neural OS & Arcade', icon: "data:image/svg+xml,<svg xmlns='http://w3.org' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💠</text></svg>" },
