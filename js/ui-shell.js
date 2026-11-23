@@ -31,7 +31,7 @@ const authModal = mk('div', 'startup-gate', `
     <img src="logo.png" alt="ZynkOS" style="width:54px;height:54px;margin:0 auto 10px;border-radius:12px;object-fit:cover;display:block;" />
     <h2 id="auth-title" style="text-align:center;">ZynkOS // System Access</h2>
     <p class="sub-text" style="text-align:center;margin-bottom:14px;">Sign in with your username or email to boot.</p>
-    <input id="auth-user" class="tool-input hidden" type="text" placeholder="Username (e.g. yourname)" />
+    <input id="auth-user" class="tool-input hidden" type="text" placeholder="Username (e.g. PaulBuhrmester)" />
     <input id="auth-email" class="tool-input" type="text" placeholder="Username or Email Address" />
     <input id="auth-pass" class="tool-input" type="password" placeholder="Password (6+ chars)" />
     <label class="remember-row"><input type="checkbox" id="remember-me" checked /><span>Remember me</span></label>
