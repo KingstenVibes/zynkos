@@ -2,10 +2,28 @@ const msgBox = document.getElementById('chat-messages');
 const memBox = document.getElementById('online-members-list');
 const acBox = document.getElementById('chat-ac-box');
 const chatInput = document.getElementById('chat-input');
-let lastMsgId = 0;
 let cachedUsers = [];
 let initialChatLoaded = false;
+let activeReply = null;
+let lastChatHash = '';
+let lastTypingPing = 0;
 
+const CHAT_SVG = {
+  reply: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>`,
+  edit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`,
+  trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`
+};
+
+let typingBar = document.getElementById('chat-typing-bar');
+if (!typingBar && document.getElementById('chat-form')) {
+  typingBar = document.createElement('div');
+  typingBar.id = 'chat-typing-bar';
+  typingBar.className = 'typing-bar';
+  document.getElementById('chat-form').before(typingBar);
+}
+
+const ROLE_POWER = { FOUNDER: 100, ADMIN: 80, MODERATOR: 60, BETA: 30, UPLOADER: 25, DESIGNER: 25, VIP: 20, SUPPORTER: 15, MEMBER: 10, SYSTEM: 90 };
+const QUICK_EMOJIS = ['👍', '❤️', '😂', '🔥', '💀', '🎉'];
 const SLASH_CMDS = [
   { cmd: '/help', desc: 'Show all available commands', staff: false },
   { cmd: '/credits', desc: 'Check your Z-Credits & Level', staff: false },
@@ -23,59 +41,161 @@ const SLASH_CMDS = [
 function parseDurationMs(str) {
   const m = String(str || '').match(/^(\d+)([mhd])$/i);
   if (!m) return 600000;
-  const n = parseInt(m[1], 10);
-  const unit = m[2].toLowerCase();
+  const n = parseInt(m, 10);
+  const unit = m.toLowerCase();
   return unit === 'd' ? n * 86400000 : unit === 'h' ? n * 3600000 : n * 60000;
 }
 
-function appendMsg(m) {
-  if (!msgBox || !m || (m.id && document.querySelector(`[data-mid="${m.id}"]`))) return;
-  const me = window.userProfile;
-  const isPinged = me && m.content && new RegExp(`@${me.username}\\b`, 'i').test(m.content) && m.username !== me.username;
-  if (isPinged && initialChatLoaded) {
-    window.notify?.(`🔔 @${m.username} pinged you: "${m.content}"`, false, () => window.openTab('chat-view'));
-  }
+function canDeleteMsg(me, msg) {
+  if (!me) return false;
+  if (me.role === 'FOUNDER') return true;
+  if (msg.user_id && String(msg.user_id) === String(me.id)) return true;
+  const myPow = ROLE_POWER[me.role] || 10;
+  const targetPow = ROLE_POWER[msg.role] || 10;
+  return myPow >= 60 && myPow > targetPow;
+}
 
-  const div = document.createElement('div');
-  div.className = 'chat-msg' + (isPinged ? ' pinged' : '');
-  if (m.id) div.dataset.mid = m.id;
-  const av = m.avatar && !m.avatar.includes('dicebear') ? m.avatar : 'logo.png';
-  const safeText = String(m.content || '').replace(/</g, '&lt;').replace(/(@[a-zA-Z0-9_]+)/g, '<strong style="color:#10b981;">$1</strong>');
-  div.innerHTML = `
-    <img class="msg-avatar" src="${av}" />
-    <div>
-      <div><strong style="color:${m.color || '#10b981'}">${m.username}</strong> <span class="mono-dim">[${m.role || 'MEMBER'}]${m.is_beta ? ' [BETA]' : ''}</span></div>
-      <div style="margin-top:3px;">${safeText}</div>
-    </div>`;
-  div.querySelector('.msg-avatar').onclick = () => { if (m.user_id && window.openUserModal) window.openUserModal(m.user_id); };
-  msgBox.appendChild(div);
-  msgBox.scrollTop = msgBox.scrollHeight;
+window.toggleReaction = async function(msgId, emoji) {
+  const me = window.userProfile;
+  if (!me) return window.notify?.('Sign in to react to messages!', true);
+  const rows = await window.sbRest(`messages?id=eq.${msgId}`).catch(() => []);
+  const m = Array.isArray(rows) ? rows : null;
+  if (!m) return;
+  const reacts = m.reactions && typeof m.reactions === 'object' ? { ...m.reactions } : {};
+  const list = Array.isArray(reacts[emoji]) ? [...reacts[emoji]] : [];
+  const idx = list.indexOf(me.username);
+  if (idx >= 0) list.splice(idx, 1);
+  else list.push(me.username);
+  if (list.length) reacts[emoji] = list;
+  else delete reacts[emoji];
+  await window.sbRest(`messages?id=eq.${msgId}`, 'PATCH', { reactions: reacts }, window.authToken);
+  lastChatHash = '';
+  pollChatAndMembers();
+};
+
+window.deleteChatMsg = async function(msgId) {
+  await window.sbRest(`messages?id=eq.${msgId}`, 'DELETE', null, window.authToken);
+  lastChatHash = '';
+  pollChatAndMembers();
+};
+
+window.editChatMsg = async function(msgId, oldText) {
+  const next = prompt('Edit your message:', oldText);
+  if (!next || !next.trim() || next.trim() === oldText) return;
+  await window.sbRest(`messages?id=eq.${msgId}`, 'PATCH', { content: next.trim(), edited: true }, window.authToken);
+  lastChatHash = '';
+  pollChatAndMembers();
+};
+
+window.setChatReply = function(username, text) {
+  activeReply = `@${username}: ${text.slice(0, 65)}`;
+  let bar = document.getElementById('reply-preview-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'reply-preview-bar';
+    bar.className = 'reply-banner';
+    document.getElementById('chat-form')?.before(bar);
+  }
+  bar.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;">${CHAT_SVG.reply} Replying to <strong>${activeReply}</strong></span><button type="button" class="btn-ghost" onclick="clearChatReply()">✕</button>`;
+  chatInput?.focus();
+};
+
+window.clearChatReply = function() {
+  activeReply = null;
+  document.getElementById('reply-preview-bar')?.remove();
+};
+function renderMessages(msgs) {
+  if (!msgBox) return;
+  const me = window.userProfile;
+  const wasAtBottom = msgBox.scrollHeight - msgBox.scrollTop - msgBox.clientHeight < 90;
+  msgBox.innerHTML = '';
+
+  msgs.forEach(m => {
+    const isPinged = me && m.content && new RegExp(`@${me.username}\\b`, 'i').test(m.content) && m.username !== me.username;
+    const div = document.createElement('div');
+    div.className = 'chat-msg' + (isPinged ? ' pinged' : '');
+    div.dataset.mid = m.id;
+    const av = m.avatar && !m.avatar.includes('dicebear') ? m.avatar : 'logo.png';
+    const timeStr = m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    const safeText = String(m.content || '').replace(/</g, '&lt;').replace(/(@[a-zA-Z0-9_]+)/g, '<strong style="color:#10b981;">$1</strong>');
+
+    const isOwner = me && m.user_id && String(m.user_id) === String(me.id);
+    const canDel = canDeleteMsg(me, m);
+    const reacts = m.reactions && typeof m.reactions === 'object' ? m.reactions : {};
+    const reactHtml = Object.entries(reacts).filter(([, arr]) => Array.isArray(arr) && arr.length).map(([em, arr]) => {
+      const mine = me && arr.includes(me.username);
+      return `<button type="button" class="react-pill ${mine ? 'mine' : ''}" onclick="toggleReaction(${m.id}, '${em}')">${em} ${arr.length}</button>`;
+    }).join('');
+
+    div.innerHTML = `
+      <div class="msg-actions">
+        ${QUICK_EMOJIS.map(em => `<button type="button" class="msg-act-btn" onclick="toggleReaction(${m.id}, '${em}')">${em}</button>`).join('')}
+        <button type="button" class="msg-act-btn" title="Reply" onclick="setChatReply('${m.username}', \`${String(m.content || '').replace(/`/g, '')}\`)">${CHAT_SVG.reply} Reply</button>
+        ${isOwner ? `<button type="button" class="msg-act-btn" title="Edit" onclick="editChatMsg(${m.id}, \`${String(m.content || '').replace(/`/g, '')}\`)">${CHAT_SVG.edit} Edit</button>` : ''}
+        ${canDel ? `<button type="button" class="msg-act-btn" style="color:#f43f5e;" title="Delete" onclick="deleteChatMsg(${m.id})">${CHAT_SVG.trash}</button>` : ''}
+      </div>
+      <img class="msg-avatar" src="${av}" />
+      <div style="flex:1;">
+        ${m.reply_to ? `<div class="mono-dim" style="display:flex;align-items:center;gap:5px;border-left:2px solid #10b981;padding-left:8px;margin-bottom:4px;">${CHAT_SVG.reply} ${String(m.reply_to).replace(/</g, '&lt;')}</div>` : ''}
+        <div><strong style="color:${m.color || '#10b981'}">${m.username}</strong> <span class="mono-dim">[${m.role || 'MEMBER'}]${m.is_beta ? ' [BETA]' : ''} • ${timeStr}</span></div>
+        <div style="margin-top:3px;">${safeText}${m.edited ? ' <span class="mono-dim">(edited)</span>' : ''}</div>
+        ${reactHtml ? `<div class="react-row">${reactHtml}</div>` : ''}
+      </div>`;
+    div.querySelector('.msg-avatar').onclick = () => { if (m.user_id && window.openUserModal) window.openUserModal(m.user_id); };
+    msgBox.appendChild(div);
+  });
+
+  if (wasAtBottom || !initialChatLoaded) msgBox.scrollTop = msgBox.scrollHeight;
 }
 
 async function pollChatAndMembers() {
   if (!window.sbRest) return;
   try {
-    const msgs = await window.sbRest(`messages?id=gt.${lastMsgId}&order=id.asc&limit=80`);
-    if (Array.isArray(msgs) && msgs.length) {
-      msgs.forEach(m => { appendMsg(m); lastMsgId = Math.max(lastMsgId, m.id || 0); });
+    const msgs = await window.sbRest('messages?order=id.asc&limit=90');
+    if (Array.isArray(msgs)) {
+      const hash = JSON.stringify(msgs.map(m => [m.id, m.content, m.edited, m.reactions]));
+      if (hash !== lastChatHash) {
+        const newest = msgs.at(-1);
+        const me = window.userProfile;
+        if (initialChatLoaded && newest && me && newest.username !== me.username && new RegExp(`@${me.username}\\b`, 'i').test(newest.content)) {
+          window.notify?.(`@${newest.username} pinged you: "${newest.content}"`, false, () => window.openTab('chat-view'));
+        }
+        lastChatHash = hash;
+        renderMessages(msgs);
+      }
     }
   } catch (err) {
-    console.warn('Chat poll:', err.message);
+    console.warn('Chat sync:', err.message);
   }
   initialChatLoaded = true;
 
   const users = await window.sbRest('users?order=online.desc,xp.desc&limit=50').catch(() => []);
   if (Array.isArray(users)) {
     cachedUsers = users;
+    const me = window.userProfile;
+    const typers = users.filter(u => u.typing_until && u.typing_until > Date.now() && (!me || u.id !== me.id));
+    if (typingBar) {
+      if (typers.length) {
+        const names = typers.length === 1 ? `@${typers[0].username} is typing` : `${typers.map(t => '@' + t.username).join(', ')} are typing`;
+        typingBar.innerHTML = `<span class="typing-dots"><span></span><span></span><span></span></span><span>${names}</span>`;
+      } else {
+        typingBar.innerHTML = '';
+      }
+    }
     if (memBox) {
       memBox.innerHTML = users.map(u => `<div class="member-item" onclick="openUserModal('${u.id}')"><span style="color:${u.online ? '#10b981' : '#64748b'}">●</span><span style="color:${u.equipped_color || '#f8fafc'}">${u.username}</span></div>`).join('');
     }
   }
 }
 chatInput?.addEventListener('input', () => {
+  const p = window.userProfile;
+  if (p && chatInput.value.trim() && Date.now() - lastTypingPing > 2500) {
+    lastTypingPing = Date.now();
+    window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { typing_until: Date.now() + 4500 }, window.authToken).catch(() => {});
+  }
+
   if (!acBox) return;
   const val = chatInput.value;
-  const p = window.userProfile;
   const isStaff = p && ['FOUNDER', 'ADMIN', 'MODERATOR'].includes(p.role);
   const isFounder = p && p.role === 'FOUNDER';
 
@@ -108,8 +228,9 @@ chatInput?.addEventListener('input', () => {
 
 async function botPost(text) {
   if (!window.sbRest) return;
-  const saved = await window.sbRest('messages', 'POST', { username: 'ZynkBot', avatar: 'logo.png', role: 'SYSTEM', color: '#06b6d4', content: text }, window.authToken);
-  if (Array.isArray(saved) && saved[0]) { appendMsg(saved[0]); lastMsgId = Math.max(lastMsgId, saved[0].id); }
+  await window.sbRest('messages', 'POST', { username: 'ZynkBot', avatar: 'logo.png', role: 'SYSTEM', color: '#06b6d4', content: text }, window.authToken);
+  lastChatHash = '';
+  await pollChatAndMembers();
 }
 
 document.getElementById('chat-form')?.addEventListener('submit', async (e) => {
@@ -124,6 +245,8 @@ document.getElementById('chat-form')?.addEventListener('submit', async (e) => {
     return window.notify?.(`You are muted (${mins}). Reason: ${p.mute_reason || 'Staff action'}`, true);
   }
   chatInput.value = '';
+  const replyText = activeReply || '';
+  window.clearChatReply();
 
   try {
     const isStaff = ['FOUNDER', 'ADMIN', 'MODERATOR'].includes(p.role) || (p.extra_roles || []).some(r => ['ADMIN', 'MODERATOR'].includes(r));
@@ -138,31 +261,30 @@ document.getElementById('chat-form')?.addEventListener('submit', async (e) => {
       if (cmd === '/credits') return botPost(`@${p.username}: ${p.credits} Z-Credits (Level ${Math.floor((p.xp || 0) / 1000) + 1})`);
       if (cmd === '/clear' && isStaff) {
         await window.sbRest('messages?id=gt.0', 'DELETE', null, window.authToken);
-        if (msgBox) msgBox.innerHTML = '';
-        lastMsgId = 0;
+        lastChatHash = '';
         return botPost(`Chat cleared by @${p.username}.`);
       }
       if (cmd === '/announce' && isFounder) return botPost(`[BROADCAST] ${parts.slice(1).join(' ')}`);
-      if (cmd === '/warn' && isStaff && targetName) return botPost(`⚠️ @${targetName} was warned by @${p.username}. Reason: ${parts.slice(2).join(' ') || 'Follow community rules'}`);
+      if (cmd === '/warn' && isStaff && targetName) return botPost(`@${targetName} was warned by @${p.username}. Reason: ${parts.slice(2).join(' ') || 'Follow community rules'}`);
       if (cmd === '/mute' && isStaff && targetName) {
         const durMs = parseDurationMs(parts[2]);
         const reason = parts.slice(3).join(' ') || 'Chat violation';
         await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`, 'PATCH', { is_muted: true, mute_until: Date.now() + durMs, mute_reason: reason }, window.authToken);
-        return botPost(`🔇 @${targetName} muted for ${parts[2] || '10m'} by @${p.username}. Reason: ${reason}`);
+        return botPost(`@${targetName} muted for ${parts[2] || '10m'} by @${p.username}. Reason: ${reason}`);
       }
       if (cmd === '/unmute' && isStaff && targetName) {
         await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`, 'PATCH', { is_muted: false, mute_until: 0, mute_reason: '' }, window.authToken);
-        return botPost(`🔊 @${targetName} was unmuted by @${p.username}.`);
+        return botPost(`@${targetName} was unmuted by @${p.username}.`);
       }
       if (cmd === '/ban' && isStaff && targetName) {
         const durMs = parseDurationMs(parts[2]);
         const reason = parts.slice(3).join(' ') || 'Rule violation';
         await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`, 'PATCH', { ban_until: Date.now() + durMs, ban_reason: reason, online: false }, window.authToken);
-        return botPost(`⛔ @${targetName} banned for ${parts[2] || '10m'} by @${p.username}. Reason: ${reason}`);
+        return botPost(`@${targetName} banned for ${parts[2] || '10m'} by @${p.username}. Reason: ${reason}`);
       }
       if (cmd === '/unban' && isStaff && targetName) {
         await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`, 'PATCH', { ban_until: 0, ban_reason: '' }, window.authToken);
-        return botPost(`✅ @${targetName} was unbanned by @${p.username}.`);
+        return botPost(`@${targetName} was unbanned by @${p.username}.`);
       }
       if (cmd === '/give' && isFounder && targetName) {
         const amt = parseInt(parts[2], 10);
@@ -172,7 +294,7 @@ document.getElementById('chat-form')?.addEventListener('submit', async (e) => {
         if (!u) return window.notify(`User @${targetName} not found.`, true);
         await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { credits: u.credits + amt }, window.authToken);
         await window.refreshMyProfile();
-        return botPost(`⚡ Founder @${p.username} granted +${amt} Z-Credits to @${u.username}!`);
+        return botPost(`Founder @${p.username} granted +${amt} Z-Credits to @${u.username}!`);
       }
       if (cmd === '/pay' && targetName) {
         const amt = parseInt(parts[2], 10);
@@ -183,18 +305,19 @@ document.getElementById('chat-form')?.addEventListener('submit', async (e) => {
         await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits - amt }, window.authToken);
         await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { credits: u.credits + amt }, window.authToken);
         await window.refreshMyProfile();
-        return botPost(`💸 @${p.username} sent ${amt} Z-Credits to @${u.username}!`);
+        return botPost(`@${p.username} sent ${amt} Z-Credits to @${u.username}!`);
       }
     }
 
-    const saved = await window.sbRest('messages', 'POST', { user_id: p.id, username: p.username, avatar: p.avatar, role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: raw }, window.authToken);
-    if (Array.isArray(saved) && saved[0]) { appendMsg(saved[0]); lastMsgId = Math.max(lastMsgId, saved[0].id); }
-    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + 5, xp: (p.xp || 0) + 25, msg_count: (p.msg_count || 0) + 1 }, window.authToken);
+    await window.sbRest('messages', 'POST', { user_id: p.id, username: p.username, avatar: p.avatar, role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: raw, reply_to: replyText }, window.authToken);
+    lastChatHash = '';
+    await pollChatAndMembers();
+    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + 5, xp: (p.xp || 0) + 25, msg_count: (p.msg_count || 0) + 1, typing_until: 0 }, window.authToken);
     await window.refreshMyProfile();
   } catch (err) {
     window.notify('Chat error: ' + err.message, true);
   }
 });
 
-setInterval(pollChatAndMembers, 2500);
+setInterval(pollChatAndMembers, 2000);
 pollChatAndMembers();
