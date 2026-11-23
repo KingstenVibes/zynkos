@@ -24,7 +24,7 @@ const authModal = mk('div', 'startup-gate', `
     <img src="logo.png" alt="ZynkOS" style="width:52px;height:52px;margin:0 auto 10px;border-radius:12px;object-fit:cover;display:block;" />
     <h2 id="auth-title" style="text-align:center;">ZynkOS // System Access</h2>
     <p class="sub-text" style="text-align:center;margin-bottom:14px;">Sign in with your username or email to boot.</p>
-    <input id="auth-user" class="tool-input hidden" type="text" placeholder="Choose Username (e.g. yourname)" />
+    <input id="auth-user" class="tool-input hidden" type="text" placeholder="Username (e.g. yourname)" />
     <input id="auth-email" class="tool-input" type="text" placeholder="Username or Email Address" />
     <input id="auth-pass" class="tool-input" type="password" placeholder="Password (6+ chars)" />
     <label class="remember-row"><input type="checkbox" id="remember-me" checked /><span>Remember me</span></label>
@@ -57,7 +57,6 @@ const dock = mk('aside', 'left-dock', `
     <button type="button" class="dock-btn" data-tab="achieve-view" onclick="openTab('achieve-view')"><span class="sym">${ic.quests || '🏆'}</span><span class="lbl">Quests</span></button>
     <button type="button" class="dock-btn" data-tab="leader-view" onclick="openTab('leader-view')"><span class="sym">${ic.leader || '📊'}</span><span class="lbl">Leaderboards</span></button>
     <button type="button" class="dock-btn" data-tab="tools-view" onclick="openTab('tools-view')"><span class="sym">${ic.tools || '⌘'}</span><span class="lbl">Utility Tools</span></button>
-    <button type="button" class="dock-btn" data-tab="support-view" onclick="openTab('support-view')"><span class="sym">${ic.support || '🛟'}</span><span class="lbl">Support & Ideas</span></button>
     <button type="button" class="dock-btn hidden" id="nav-beta-btn" data-tab="beta-view" onclick="openTab('beta-view')"><span class="sym">${ic.beta || '⚛'}</span><span class="lbl">Beta Lab</span></button>
     <button type="button" class="dock-btn hidden" id="nav-admin-btn" data-tab="admin-view" onclick="openTab('admin-view')"><span class="sym">${ic.admin || '⚡'}</span><span class="lbl">Founder Panel</span></button>
     <button type="button" class="dock-btn" data-tab="settings-view" onclick="openTab('settings-view')"><span class="sym">${ic.settings || '⚙'}</span><span class="lbl">Settings</span></button>
@@ -75,7 +74,7 @@ const main = mk('main', 'main-viewport', `
     </div>
     <div class="dash-topbar">
       <div class="status-pill"><span class="pulse-dot"></span> ZynkOS Network Live</div>
-      <div class="top-actions"><button class="btn-outline" id="top-auth-btn">Sign Out</button></div>
+      <div class="top-actions"><span class="mono-dim" id="tz-badge">TZ: Local</span><button class="btn-outline" id="top-auth-btn">Sign Out</button></div>
     </div>
     <div class="bento-grid">
       <div class="glass-card profile-card">
@@ -96,28 +95,20 @@ const main = mk('main', 'main-viewport', `
           <button class="btn-neon" onclick="openTab('chat-view')">Open Chat</button>
           <button class="btn-outline" onclick="openTab('store-view')">Zynk Store</button>
           <button class="btn-outline" onclick="openTab('achieve-view')">Quests</button>
-          <button class="btn-outline" onclick="openTab('arcade-view')">Arcade</button>
         </div>
       </div>
 
-      <div class="glass-card">
-        <div class="card-head"><span>📢 Founder Announcements</span><span class="mono-dim">LIVE BROADCASTS</span></div>
-        <div id="dash-announcements-list" style="max-height:210px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-right:4px;">
-          <p class="sub-text">Loading announcements...</p>
+      <div class="glass-card" style="display:flex;flex-direction:column;justify-content:space-between;">
+        <div>
+          <div class="card-head"><span>🎁 Daily Operator Stipend</span><span class="mono-dim">+150 Z-CREDITS</span></div>
+          <p class="sub-text" style="margin-bottom:12px;">Claim your daily Z-Credit drop every 24 hours to unlock Store gear and Pulse rank.</p>
         </div>
+        <button class="btn-neon" id="dash-daily-btn" style="width:100%;">Claim +150 Daily Z-Credits</button>
       </div>
 
-      <div class="glass-card">
-        <div class="card-head"><span>🎁 Daily Z-Credit Drop</span><span class="mono-dim">24H CYCLE</span></div>
-        <h3 style="margin-bottom:6px;">+150 Free Z-Credits</h3>
-        <p class="sub-text" style="margin-bottom:12px;">Claim your daily login bonus every 24 hours to unlock store gear & gifts.</p>
-        <button class="btn-neon" id="dash-daily-btn" style="width:100%">Checking timer...</button>
-      </div>
-
-      <div class="glass-card">
-        <div class="card-head"><span>🛡 Account & Network Standing</span><span class="mono-dim">VERIFIED</span></div>
-        <h3 style="color:#10b981;margin-bottom:6px;">● All Systems Nominal</h3>
-        <p class="sub-text" id="dash-standing-text">Good standing • Zero infractions • Encrypted relay active.</p>
+      <div class="glass-card" style="grid-column:1 / -1;">
+        <div class="card-head"><span>📢 System Announcements</span><span class="mono-dim">SCROLLABLE BROADCAST LOG</span></div>
+        <div id="dash-announcements-list" style="max-height:230px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-right:4px;"></div>
       </div>
     </div>
   </section>
@@ -134,14 +125,13 @@ const main = mk('main', 'main-viewport', `
   <section id="vortex-view" class="tab-view full-embed"><div id="vortex-slot" style="width:100%;height:100%;display:flex;"></div></section>
   <section id="arcade-view" class="tab-view full-embed"><div id="custom-game-container" style="width:100%;height:100%;display:flex;"></div></section>
   <section id="ranks-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Ranks</h2><span class="sub-text">Unlock Pulse with Z-Credits or upgrade to higher tiers</span></div></div><div class="cards-grid" id="ranks-grid"></div></section>
-  <section id="store-view" class="tab-view padded-view"><div id="store-grid" style="width:100%;"></div></section>
+  <section id="store-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Zynk Store</h2><span class="sub-text">Daily deals, avatars, frames, themes & gifting</span></div><span class="pill" id="store-credits">0 Z-Credits</span></div><div id="store-grid"></div></section>
   <section id="profile-view" class="tab-view padded-view"><div id="my-profile-container"></div></section>
-  <section id="achieve-view" class="tab-view padded-view"><div id="achieve-grid" style="width:100%;"></div></section>
+  <section id="achieve-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Quests & Daily Rewards</h2><span class="sub-text">Track uncompleted, completed & secret quests</span></div></div><div id="achieve-grid"></div></section>
   <section id="leader-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Global Leaderboards</h2><span class="sub-text">Top ZynkOS operators ranked by Z-Credits & XP</span></div></div><div class="glass-card" id="leaderboard-list"></div></section>
   <section id="tools-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Utility Tools</h2></div></div><div class="cards-grid" id="tools-grid"></div></section>
-  <section id="support-view" class="tab-view padded-view"><div id="support-container" style="max-width:860px;margin:auto;width:100%;"></div></section>
-  <section id="beta-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Beta Lab</h2><span class="sub-text">Exclusive to Beta Testers & Founder</span></div></div><div class="cards-grid" id="beta-grid"></div></section>
-  <section id="admin-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Founder Command Panel</h2><span class="sub-text">Broadcast announcements, upload store items, secret quest guide & roles</span></div></div><div id="admin-panel-container"></div></section>
+  <section id="beta-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Beta Lab</h2><span class="sub-text">Experimental themes, HUD scale & tester rewards</span></div></div><div class="cards-grid" id="beta-grid"></div></section>
+  <section id="admin-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Founder Command Panel</h2><span class="sub-text">Broadcast announcements, upload shop items, secret quest guide & roles</span></div></div><div id="admin-panel-container"></div></section>
   <section id="settings-view" class="tab-view padded-view">
     <div class="glass-card settings-box">
       <h2>System Settings</h2>
