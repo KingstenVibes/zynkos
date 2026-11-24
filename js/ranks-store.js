@@ -2,10 +2,10 @@ const TWO_MONTHS_MS = 60 * 86400000;
 
 window.RANKS = [
   { name: 'Circuit', cost: 0, priceLabel: 'FREE', monthly: 100, discount: 0, color: '#94a3b8', perks: 'Base ZynkOS Access, 100 Z-Credits / 2 mos, 2 Chat Stickers' },
-  { name: 'Pulse', cost: 250, priceLabel: '250 Z-Credits', monthly: 250, discount: 0.05, color: '#10b981', perks: '5% Off Store Items, 250 Z-Credits / 2 mos, 10 Chat Stickers, +25% XP' },
-  { name: 'Nova', cost: -1, priceLabel: '$4.99 / 2 mos', monthly: 600, discount: 0.10, color: '#06b6d4', perks: '10% Off Store Items, 600 Z-Credits / 2 mos, 10 Chat Stickers, +50% XP' },
-  { name: 'Titan', cost: -1, priceLabel: '$9.99 / 2 mos', monthly: 1200, discount: 0.15, color: '#a855f7', perks: '15% Off Store Items, 1,200 Z-Credits / 2 mos, Custom Frame Glow' },
-  { name: 'Apex', cost: -1, priceLabel: '$19.99 / 2 mos', monthly: 2500, discount: 0.20, color: '#f59e0b', perks: '20% Off Store Items, 2,500 Z-Credits / 2 mos, Priority Access' }
+  { name: 'Pulse', cost: 250, priceLabel: '250 Z-Credits / 2 mos', monthly: 250, discount: 0.05, color: '#10b981', perks: '5% Off Store Items, 250 Z-Credits / 2 mos, 10 Chat Stickers, +25% XP' },
+  { name: 'Nova', cost: -1, priceLabel: '$2.99 / 2 mos', monthly: 600, discount: 0.10, color: '#06b6d4', perks: '10% Off Store Items, 600 Z-Credits / 2 mos, 10 Chat Stickers, +50% XP' },
+  { name: 'Titan', cost: -1, priceLabel: '$4.99 / 2 mos', monthly: 1200, discount: 0.15, color: '#a855f7', perks: '15% Off Store Items, 1,200 Z-Credits / 2 mos, Custom Frame Glow' },
+  { name: 'Apex', cost: -1, priceLabel: '$9.99 / 2 mos', monthly: 2500, discount: 0.20, color: '#f59e0b', perks: '20% Off Store Items, 2,500 Z-Credits / 2 mos, Priority Access' }
 ];
 
 window.ROLE_COLORS = {
@@ -33,6 +33,10 @@ function syncHud() {
   const savedTh = localStorage.getItem('zynk_theme');
   const activeTh = savedTh || p.profile_theme || 'default';
   document.body.className = activeTh === 'default' ? '' : activeTh;
+
+  if (p.role !== 'FOUNDER' && (p.rank_index || 0) > 0 && p.rank_expires_at && p.rank_expires_at < Date.now()) {
+    window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { rank_index: 0, rank_expires_at: 0 }, window.authToken).then(() => window.refreshMyProfile()).catch(() => {});
+  }
 
   const rank = window.RANKS.at(p.rank_index || 0) || window.RANKS.at(0);
   const lvl = Math.floor((p.xp || 0) / 1000) + 1;
@@ -100,103 +104,6 @@ async function openGiftSearchModal(item, finalCost) {
   draw('');
   document.getElementById('gift-search-inp').oninput = (e) => draw(e.target.value);
 }
-async function renderRanksAndStore() {
-  syncHud();
-  const p = window.userProfile;
-
-  const rGrid = document.getElementById('ranks-grid');
-  if (rGrid) {
-    const myRankIdx = p ? (p.rank_index || 0) : 0;
-    const myRank = window.RANKS.at(myRankIdx) || window.RANKS.at(0);
-    const rem = TWO_MONTHS_MS - (Date.now() - (p?.last_monthly || 0));
-    const daysLeft = Math.max(0, Math.floor(rem / 86400000));
-    const hrsLeft = Math.max(0, Math.floor((rem % 86400000) / 3600000));
-    const stripeLinks = JSON.parse(localStorage.getItem('zynk_stripe_links') || '{}');
-
-    rGrid.style.display = 'block';
-    rGrid.innerHTML = `
-      <div class="glass-card" style="margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-        <div>
-          <span class="rarity-tag">ACTIVE RANK PERKS: ${myRank.name.toUpperCase()} (${Math.round(myRank.discount * 100)}% STORE DISCOUNT)</span>
-          <h3>2-Month Rank Credit Stipend (+${myRank.monthly} Z-Credits)</h3>
-          <p class="sub-text">${rem <= 0 ? 'Your 2-month rank stipend is ready to claim!' : `Time left until next stipend renewal: <strong>${daysLeft}d ${hrsLeft}h</strong>`}</p>
-        </div>
-        <button class="${rem <= 0 ? 'btn-neon' : 'btn-outline'}" id="claim-monthly-btn" ${rem > 0 ? 'disabled' : ''}>${rem <= 0 ? `Claim +${myRank.monthly} Z-Credits` : `⏳ ${daysLeft}d ${hrsLeft}h Left`}</button>
-      </div>
-      <div class="cards-grid" id="ranks-cards-wrap"></div>`;
-
-    document.getElementById('claim-monthly-btn').onclick = async () => {
-      if (!p || rem > 0) return;
-      document.getElementById('claim-monthly-btn').disabled = true;
-      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + myRank.monthly, last_monthly: Date.now() }, window.authToken);
-      await window.refreshMyProfile();
-      window.notify(`Claimed +${myRank.monthly} ${myRank.name} Rank Z-Credits!`);
-    };
-
-    const wrap = document.getElementById('ranks-cards-wrap');
-    window.RANKS.forEach((r, idx) => {
-      const owned = p && myRankIdx >= idx;
-      const isCreditRank = r.cost >= 0;
-      const payUrl = stripeLinks[r.name] || '';
-      const card = document.createElement('div');
-      card.className = 'glass-card';
-      card.innerHTML = `<span class="rarity-tag" style="color:${r.color}">${r.priceLabel}</span><h3>${r.name}</h3><p class="sub-text" style="margin:8px 0 14px;">${r.perks}</p><button class="${owned ? 'btn-outline' : 'btn-neon'}" style="width:100%" ${owned ? 'disabled' : ''}>${owned ? '✓ Active / Unlocked' : isCreditRank ? `Unlock (${r.cost} Z-Credits)` : `💳 Upgrade (${r.priceLabel})`}</button>`;
-      const btn = card.querySelector('button');
-      btn.onclick = async () => {
-        if (!p) return window.notify('Sign in first!', true);
-        if (!isCreditRank) {
-          if (payUrl) return window.open(payUrl, '_blank');
-          return window.notify(`${r.name} (${r.priceLabel}) Stripe checkout link is not configured yet.`, true);
-        }
-        if (p.credits < r.cost) return window.notify('Not enough Z-Credits!', true);
-        btn.disabled = true;
-        await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits - r.cost, rank_index: idx }, window.authToken);
-        await window.refreshMyProfile();
-        window.notify(`Unlocked ${r.name} Rank!`);
-      };
-      wrap.appendChild(card);
-    });
-  }
-
-  const sGrid = document.getElementById('store-grid');
-  if (sGrid && window.sbRest) {
-    const items = await window.sbRest('store_items?order=id.asc').catch(() => []);
-    const rarityColors = { COMMON: '#94a3b8', RARE: '#06b6d4', EPIC: '#a855f7', LEGENDARY: '#f59e0b' };
-    const myRank = window.RANKS.at(p?.rank_index || 0) || window.RANKS.at(0);
-    const rankDisc = myRank.discount || 0;
-
-    const cats = [
-      { id: 'ALL', label: '✨ All Gear' },
-      { id: 'DEALS', label: '🔥 Daily Deals (10% Off)' },
-      { id: 'avatar', label: '🖼 Avatars' },
-      { id: 'frame', label: '💠 Avatar Frames' },
-      { id: 'theme', label: '🌌 Banners & Themes' },
-      { id: 'cosmetic', label: '⚡ Colors & Badges' },
-      { id: 'REQUEST', label: '💡 Request Item' }
-    ];
-
-    sGrid.innerHTML = `
-      <div class="store-layout">
-        <div class="glass-card" style="padding:14px;">
-          <div class="mono-dim" style="margin-bottom:8px;font-weight:700;">CATEGORIES</div>
-          <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;">
-            ${cats.map(c => `<button class="${activeShopFilter === c.id ? 'btn-neon' : 'btn-outline'}" style="text-align:left;width:100%;" data-sfilt="${c.id}">${c.label}</button>`).join('')}
-          </div>
-          <div class="mono-dim" style="margin-bottom:6px;font-weight:700;">SORT BY</div>
-          <select id="shop-sort-sel" class="tool-input" style="margin-bottom:0;">
-            <option value="DEFAULT">Featured Order</option>
-            <option value="LOW">Price: Low to High</option>
-            <option value="HIGH">Price: High to Low</option>
-          </select>
-        </div>
-        <div id="shop-body-area"></div>
-      </div>`;
-
-    const sortSel = document.getElementById('shop-sort-sel');
-    sortSel.value = activeShopSort;
-    sortSel.onchange = () => { activeShopSort = sortSel.value; renderRanksAndStore(); };
-    sGrid.querySelectorAll('[data-sfilt]').forEach(b => (b.onclick = () => { activeShopFilter = b.dataset.sfilt; renderRanksAndStore(); }));
-    const area = document.getElementById('shop-body-area');
     if (activeShopFilter === 'REQUEST') {
       area.innerHTML = `
         <div class="glass-card" style="max-width:480px;">
@@ -280,5 +187,18 @@ async function renderRanksAndStore() {
   }
 }
 
-window.addEventListener('zynk-profile-updated', renderRanksAndStore);
+window.addEventListener('zynk-profile-updated', async () => {
+  renderRanksAndStore();
+  const params = new URLSearchParams(window.location.search);
+  const paidIdx = parseInt(params.get('paid_rank'), 10);
+  const p = window.userProfile;
+  if (p &&.includes(paidIdx)) {
+    window.history.replaceState({}, '', window.location.pathname);
+    const rankName = window.RANKS.at(paidIdx)?.name || 'Paid';
+    const baseTime = (p.rank_index === paidIdx && (p.rank_expires_at || 0) > Date.now()) ? p.rank_expires_at : Date.now();
+    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { rank_index: paidIdx, rank_expires_at: baseTime + TWO_MONTHS_MS }, window.authToken);
+    await window.refreshMyProfile();
+    window.notify?.(`🎉 Payment confirmed! ${rankName} Rank active for +60 days!`);
+  }
+});
 window.addEventListener('DOMContentLoaded', renderRanksAndStore);
