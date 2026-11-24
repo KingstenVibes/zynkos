@@ -101,6 +101,7 @@ const SLASH_CMDS = [
   { cmd: '/help', desc: 'Show all available commands', staff: false },
   { cmd: '/credits', desc: 'Check your Z-Credits & Level', staff: false },
   { cmd: '/pay @user 50', desc: 'Send Z-Credits to another member', staff: false },
+  { cmd: '/purge 10', desc: 'Delete the last N messages in this channel', staff: true },
   { cmd: '/warn @user reason', desc: 'Warn a member in chat', staff: true },
   { cmd: '/mute @user 10m reason', desc: 'Mute a member (10m, 1h, 1d)', staff: true },
   { cmd: '/unmute @user', desc: 'Unmute a member', staff: true },
@@ -273,8 +274,12 @@ window.toggleReaction = async function(msgId, emoji) {
 
 window.deleteChatMsg = async function(msgId) {
   document.querySelector(`[data-mid="${msgId}"]`)?.remove();
-  await window.sbRest(`messages?id=eq.${msgId}`, 'DELETE', null, window.authToken);
-  lastChatHash = '';
+  try {
+    await window.sbRest(`messages?id=eq.${msgId}`, 'DELETE', null, window.authToken);
+    lastChatHash = '';
+  } catch (err) {
+    window.notify?.('Delete failed: ' + err.message, true);
+  }
 };
 
 window.editChatMsg = async function(msgId, oldText) {
@@ -302,7 +307,6 @@ window.clearChatReply = function() {
   activeReply = null;
   document.getElementById('reply-preview-bar')?.remove();
 };
-
 function buildMsgEl(m) {
   const me = window.userProfile;
   const isPinged = me && m.content && new RegExp(`@${me.username}\\b`, 'i').test(m.content) && m.username !== me.username;
@@ -358,6 +362,7 @@ function renderMessages(msgs) {
   msgs.forEach(m => msgBox.appendChild(buildMsgEl(m)));
   if (wasAtBottom || !initialChatLoaded) msgBox.scrollTop = msgBox.scrollHeight;
 }
+
 async function pollChatAndMembers() {
   if (!window.sbRest) return;
   try {
@@ -413,7 +418,6 @@ async function pollChatAndMembers() {
     }
   }
 }
-
 chatInput?.addEventListener('input', () => {
   const p = window.userProfile;
   if (p && chatInput.value.trim() && Date.now() - lastTypingPing > 2500) {
@@ -452,6 +456,7 @@ chatInput?.addEventListener('input', () => {
   }
   acBox.classList.add('hidden');
 });
+
 async function botPost(text) {
   if (!window.sbRest) return;
   await window.sbRest('messages', 'POST', { username: 'ZynkBot', avatar: 'logo.png', role: 'SYSTEM', color: '#06b6d4', content: text, channel: activeChannel }, window.authToken);
@@ -486,8 +491,20 @@ chatForm?.addEventListener('submit', async (e) => {
       const cmd = parts.at(0).toLowerCase();
       const targetName = parts.at(1)?.replace(/^@/, '');
 
-      if (cmd === '/help') return botPost('Commands: /help, /credits, /pay @user <amt>' + (isStaff ? ' | Staff: /warn @user <reason>, /mute @user <10m/1h/1d> <reason>, /unmute @user, /ban @user <10m/1h/1d> <reason>, /unban @user, /clear' : '') + (isFounder ? ' | Founder: /give @user <amt>, /announce <msg>' : ''));
+      if (cmd === '/help') return botPost('Commands: /help, /credits, /pay @user <amt>' + (isStaff ? ' | Staff: /purge <1-100>, /warn @user <reason>, /mute @user <10m/1h/1d> <reason>, /unmute @user, /ban @user <10m/1h/1d> <reason>, /unban @user, /clear' : '') + (isFounder ? ' | Founder: /give @user <amt>, /announce <msg>' : ''));
       if (cmd === '/credits') return botPost(`@${p.username}: ${p.credits} Z-Credits (Level ${Math.floor((p.xp || 0) / 1000) + 1})`);
+      if (cmd === '/purge' && isStaff) {
+        const count = Math.min(100, Math.max(1, parseInt(parts.at(1), 10) || 10));
+        const filter = activeChannel === 'global' ? 'or=(channel.eq.global,channel.is.null)' : `channel=eq.${encodeURIComponent(activeChannel)}`;
+        const recent = await window.sbRest(`messages?select=id&${filter}&order=id.desc&limit=${count}`);
+        const ids = Array.isArray(recent) ? recent.map(r => r.id) : [];
+        if (ids.length) {
+          ids.forEach(id => document.querySelector(`[data-mid="${id}"]`)?.remove());
+          await window.sbRest(`messages?id=in.(${ids.join(',')})`, 'DELETE', null, window.authToken);
+        }
+        lastChatHash = '';
+        return botPost(`Purged ${ids.length} message(s) by @${p.username}.`);
+      }
       if (cmd === '/clear' && isStaff) {
         await window.sbRest('messages?id=gt.0', 'DELETE', null, window.authToken);
         lastChatHash = '';
