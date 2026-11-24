@@ -137,16 +137,15 @@ const main = mk('main', 'main-viewport', `
     <aside class="members-panel"><div class="members-head">ONLINE MEMBERS</div><div id="online-members-list"></div></aside>
   </section>
 
-  <section id="vortex-view" class="tab-view padded-view">
-    <div class="glass-card" style="max-width:560px;margin:auto;text-align:center;padding:32px;">
-      <span class="rarity-tag">PARTNER NETWORK • VORTEXOS</span>
-      <h2 style="margin:6px 0 10px;">Vortex Guild & Community Chat</h2>
-      <p class="sub-text" style="margin-bottom:20px;">VortexOS blocks direct iframe embedding in browsers—launch the live Vortex Guild chat directly in a dedicated tab.</p>
-      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-        <button class="btn-neon" onclick="window.open('https://vortexos.net')">Open Vortex Guild Chat ↗</button>
-        <button class="btn-outline" onclick="window.open('https://vortexos.net','_blank')">Visit VortexOS.net</button>
+  <section id="vortex-view" class="tab-view full-embed" style="flex-direction:column;">
+    <div class="view-topbar" style="padding:10px 20px;border-bottom:1px solid var(--border-glass);background:rgba(4,7,11,0.85);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="status-pill"><span class="pulse-dot"></span> Vortex Guild Live</span>
+        <span class="mono-dim">Powered by <a href="https://vortexos.net" target="_blank" rel="noopener" style="color:var(--neon-emerald);text-decoration:none;font-weight:700;">VortexOS.net ↗</a></span>
       </div>
+      <button type="button" class="btn-outline" style="padding:5px 12px;font-size:0.8rem;" onclick="window.open('https://vortexos.net')">Open Fullscreen ↗</button>
     </div>
+    <iframe src="https://vortexos.net" title="VortexOS Guild Chat" allow="clipboard-read; clipboard-write" style="flex:1;width:100%;height:100%;border:none;background:#04070b;"></iframe>
   </section>
 
   <section id="arcade-view" class="tab-view full-embed"><div id="custom-game-container" style="width:100%;height:100%;display:flex;"></div></section>
