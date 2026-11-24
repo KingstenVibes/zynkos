@@ -60,10 +60,12 @@ const dock = mk('aside', 'left-dock', `
     <button type="button" class="dock-btn" data-tab="store-view" onclick="openTab('store-view')"><span class="sym">${ic.store || '🛒'}</span><span class="lbl">Zynk Store</span></button>
   </div>
   <div class="dock-section">
-    <button type="button" class="dock-btn" data-tab="profile-view" onclick="openTab('profile-view')"><span class="sym">${ic.profile || '👤'}</span><span class="lbl">My Profile</span></button>
+    <button type="button" class="dock-btn" data-tab="profile-view" onclick="openTab('profile-view')"><span class="sym">${ic.profile || '👤'}</span><span class="lbl">My Profile & Vault</span></button>
     <button type="button" class="dock-btn" data-tab="achieve-view" onclick="openTab('achieve-view')"><span class="sym">${ic.quests || '🏆'}</span><span class="lbl">Quests</span></button>
     <button type="button" class="dock-btn" data-tab="leader-view" onclick="openTab('leader-view')"><span class="sym">${ic.leader || '📊'}</span><span class="lbl">Leaderboards</span></button>
     <button type="button" class="dock-btn" data-tab="tools-view" onclick="openTab('tools-view')"><span class="sym">${ic.tools || '⌘'}</span><span class="lbl">Utility Tools</span></button>
+    <button type="button" class="dock-btn" data-tab="partners-view" onclick="openTab('partners-view')"><span class="sym">${ic.vortex || '🤝'}</span><span class="lbl">Partners</span></button>
+    <button type="button" class="dock-btn" data-tab="credits-view" onclick="openTab('credits-view')"><span class="sym">${ic.ranks || '◈'}</span><span class="lbl">Credits & Team</span></button>
     <button type="button" class="dock-btn hidden" id="nav-beta-btn" style="display:none;" data-tab="beta-view" onclick="openTab('beta-view')"><span class="sym">${ic.beta || '⚛'}</span><span class="lbl">Beta Lab</span></button>
     <button type="button" class="dock-btn hidden" id="nav-admin-btn" style="display:none;" data-tab="admin-view" onclick="openTab('admin-view')"><span class="sym">${ic.admin || '⚡'}</span><span class="lbl">Founder Panel</span></button>
     <button type="button" class="dock-btn" data-tab="settings-view" onclick="openTab('settings-view')"><span class="sym">${ic.settings || '⚙'}</span><span class="lbl">Settings</span></button>
@@ -113,7 +115,7 @@ const main = mk('main', 'main-viewport', `
       <div class="glass-card" style="display:flex;flex-direction:column;justify-content:space-between;">
         <div>
           <div class="card-head"><span>🎁 Daily Member Stipend</span><span class="mono-dim">+150 Z-CREDITS</span></div>
-          <p class="sub-text" style="margin-bottom:14px;">Claim your daily Z-Credit bonus every 24 hours to unlock Store items.</p>
+          <p class="sub-text" style="margin-bottom:14px;">Claim your daily Z-Credit bonus every 24 hours to unlock Store gear.</p>
         </div>
         <button class="btn-neon" id="dash-daily-btn" style="width:100%;">Claim +150 Daily Z-Credits</button>
       </div>
@@ -148,21 +150,17 @@ const main = mk('main', 'main-viewport', `
   </section>
 
   <section id="arcade-view" class="tab-view full-embed"><div id="custom-game-container" style="width:100%;height:100%;display:flex;"></div></section>
-  <section id="ranks-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Ranks</h2><span class="sub-text">Unlock Pulse with Z-Credits or upgrade to higher tiers</span></div></div><div id="ranks-grid"></div></section>
+  <section id="ranks-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Ranks</h2><span class="sub-text">Member ranks & perks</span></div></div><div id="ranks-grid"></div></section>
   <section id="store-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Zynk Store</h2><span class="sub-text">Daily deals, avatars, frames, themes & gifting</span></div><span class="pill" id="store-credits">0 Z-Credits</span></div><div id="store-grid"></div></section>
   <section id="profile-view" class="tab-view padded-view"><div id="my-profile-container"></div></section>
   <section id="achieve-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Quests & Daily Rewards</h2><span class="sub-text">Daily, Weekly & Secret challenges</span></div></div><div id="achieve-grid"></div></section>
   <section id="leader-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Global Leaderboards</h2><span class="sub-text">Top ZynkOS members ranked by Z-Credits & XP</span></div></div><div class="glass-card" id="leaderboard-list"></div></section>
   <section id="tools-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Utility Tools</h2></div></div><div class="cards-grid" id="tools-grid"></div></section>
+  <section id="partners-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Partners</h2><span class="sub-text">The projects & communities we collaborate with</span></div></div><div id="partners-container"></div></section>
+  <section id="credits-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Credits & Team</h2><span class="sub-text">Founders, developers, designers & contributors</span></div></div><div id="credits-container"></div></section>
   <section id="beta-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Beta Lab</h2><span class="sub-text">Experimental themes, HUD scale & tester rewards</span></div></div><div class="cards-grid" id="beta-grid"></div></section>
-  <section id="admin-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Founder Command Panel</h2><span class="sub-text">Broadcast announcements, upload shop items, secret quest guide & roles</span></div></div><div id="admin-panel-container"></div></section>
-  <section id="settings-view" class="tab-view padded-view">
-    <div class="glass-card settings-box">
-      <h2>System Settings</h2>
-      <div id="settings-controls"></div>
-      <div class="settings-actions"><button class="btn-neon" id="save-settings-btn">Save Preferences</button><button class="btn-outline" id="about-blank-btn">Open in about:blank</button></div>
-    </div>
-  </section>
+  <section id="admin-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Founder Command Panel</h2><span class="sub-text">Broadcasts, store items, partners, team credits & roles</span></div></div><div id="admin-panel-container"></div></section>
+  <section id="settings-view" class="tab-view padded-view"><div id="settings-shell"></div></section>
 `);
 
 shell.append(dock, main);
