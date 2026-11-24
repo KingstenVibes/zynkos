@@ -47,49 +47,142 @@ async function renderMyProfileTab() {
 
   const allItems = await window.sbRest('store_items?order=id.asc').catch(() => []);
   const ownedList = (allItems || []).filter(it => (p.owned_items || []).includes(it.id));
-  const ownedAvatars = ownedList.filter(it => it.item_type === 'avatar');
-  const ownedBanners = ownedList.filter(it => it.item_type === 'banner');
-  const ownedFrames = ownedList.filter(it => it.item_type === 'frame');
-
   const frameGlow = p.avatar_frame && p.avatar_frame !== 'none' ? `box-shadow:0 0 0 3px ${p.avatar_frame},0 0 18px ${p.avatar_frame};` : '';
   const bannerBg = p.banner && (p.banner.startsWith('http') || p.banner.startsWith('data:')) ? `url('${p.banner}') center/cover` : (p.banner || 'linear-gradient(135deg,#064e3b,#0f172a)');
 
   box.innerHTML = `
-    <div class="glass-card" style="padding:0;overflow:hidden;max-width:720px;margin:auto;">
-      <div class="banner-hero" style="background:${bannerBg}">
-        <img class="banner-avatar" style="border-color:${p.equipped_color};${frameGlow}" src="${safeAvatar(p.avatar)}" />
+    <div style="max-width:860px;margin:auto;display:flex;flex-direction:column;gap:20px;">
+      <div class="glass-card" style="padding:0;overflow:hidden;">
+        <div class="banner-hero" style="background:${bannerBg}">
+          <img class="banner-avatar" style="border-color:${p.equipped_color};${frameGlow}" src="${safeAvatar(p.avatar)}" />
+        </div>
+        <div class="profile-body">
+          <h2 style="color:${p.equipped_color}">${p.username}</h2>
+          <div class="badges-row" style="margin:6px 0 14px;">${window.renderRoleChips ? window.renderRoleChips(p) : ''}</div>
+          <div class="setting-group"><label>About Me / Bio</label><input id="edit-bio" class="tool-input" value="${p.bio || ''}" /></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button id="save-my-profile" class="btn-neon">Save Bio</button>
+            <button id="reset-my-gear" class="btn-outline">Reset Avatar & Banner to Default</button>
+          </div>
+        </div>
       </div>
-      <div class="profile-body">
-        <h2 style="color:${p.equipped_color}">${p.username}</h2>
-        <div class="badges-row" style="margin:6px 0 14px;">${window.renderRoleChips ? window.renderRoleChips(p) : ''}</div>
-        <div class="setting-group"><label>Equipped Avatar</label><select id="edit-avatar" class="tool-input"><option value="logo.png">ZynkOS Default Logo</option>${ownedAvatars.map(a => `<option value="${a.image_url || a.item_value}">${a.name}</option>`).join('')}</select></div>
-        <div class="setting-group"><label>Equipped Banner</label><select id="edit-banner" class="tool-input"><option value="linear-gradient(135deg,#064e3b,#0f172a)">Default Emerald Gradient</option>${ownedBanners.map(b => `<option value="${b.image_url || b.item_value}">${b.name}</option>`).join('')}</select></div>
-        <div class="setting-group"><label>Avatar Frame Color</label><select id="edit-frame" class="tool-input"><option value="none">None</option><option value="#10b981">Emerald Pulse</option><option value="#06b6d4">Cyber Cyan</option><option value="#f59e0b">Solar Gold</option><option value="#a855f7">Violet Neon</option>${ownedFrames.map(f => `<option value="${f.item_value}">${f.name}</option>`).join('')}</select></div>
-        <div class="setting-group"><label>Steady Page Theme</label><select id="edit-theme" class="tool-input"><option value="default">Default Emerald</option><option value="theme-cyber">Cyber Cyan</option><option value="theme-crimson">Crimson Ops</option><option value="theme-gold">Solar Gold</option><option value="theme-violet">Violet Pulse</option></select></div>
-        <div class="setting-group"><label>About Me / Bio</label><input id="edit-bio" class="tool-input" value="${p.bio || ''}" /></div>
-        <button id="save-my-profile" class="btn-neon">Save Profile, Avatar & Theme</button>
+
+      <div class="glass-card">
+        <h3>🎒 My Visual Inventory (${ownedList.length} Items Owned)</h3>
+        <p class="sub-text" style="margin:4px 0 14px;">Everything you own from Zynk Store—click Equip or Unequip with live image previews:</p>
+        <div class="cards-grid" id="inv-visual-grid"></div>
       </div>
     </div>`;
 
-  document.getElementById('edit-avatar').value = safeAvatar(p.avatar);
-  document.getElementById('edit-banner').value = p.banner || 'linear-gradient(135deg,#064e3b,#0f172a)';
-  document.getElementById('edit-frame').value = p.avatar_frame || 'none';
-  document.getElementById('edit-theme').value = localStorage.getItem('zynk_theme') || p.profile_theme || 'default';
-
   document.getElementById('save-my-profile').onclick = async () => {
-    const th = document.getElementById('edit-theme').value;
-    localStorage.setItem('zynk_theme', th);
-    document.body.className = th === 'default' ? '' : th;
-    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', {
-      avatar: document.getElementById('edit-avatar').value,
-      banner: document.getElementById('edit-banner').value,
-      avatar_frame: document.getElementById('edit-frame').value,
-      profile_theme: th,
-      bio: document.getElementById('edit-bio').value.trim()
-    }, window.authToken);
+    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { bio: document.getElementById('edit-bio').value.trim() }, window.authToken);
     await window.refreshMyProfile();
-    window.notify('Profile, avatar & theme saved!');
+    window.notify('Profile bio saved!');
   };
+
+  document.getElementById('reset-my-gear').onclick = async () => {
+    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { avatar: 'logo.png', banner: 'linear-gradient(135deg,#064e3b,#0f172a)', avatar_frame: 'none' }, window.authToken);
+    await window.refreshMyProfile();
+    window.notify('Reset avatar, banner & frame to defaults.');
+  };
+
+  const invGrid = document.getElementById('inv-visual-grid');
+  if (!ownedList.length) {
+    invGrid.innerHTML = '<p class="sub-text">No store items owned yet—visit Zynk Store to unlock avatars, frames & banners!</p>';
+  } else {
+    ownedList.forEach(it => {
+      const imgSrc = it.image_url || (String(it.item_value || '').startsWith('data:image') || String(it.item_value || '').startsWith('http') ? it.item_value : '');
+      const isEq = (it.item_type === 'avatar' && p.avatar === imgSrc) || (it.item_type === 'banner' && p.banner === imgSrc) || (it.item_type === 'frame' && p.avatar_frame === it.item_value) || (it.item_type === 'theme' && document.body.className === it.item_value) || (it.item_type === 'color' && p.equipped_color === it.item_value);
+      const vis = imgSrc ? `<div style="height:120px;border-radius:10px;overflow:hidden;margin-bottom:8px;background:#04070b;"><img src="${imgSrc}" style="width:100%;height:100%;object-fit:cover;" /></div>` : `<div style="height:120px;border-radius:10px;margin-bottom:8px;background:#04070b;display:flex;align-items:center;justify-content:center;"><span class="pill" style="border-color:${it.item_value || '#10b981'}">${it.name}</span></div>`;
+      const card = document.createElement('div');
+      card.className = 'glass-card';
+      card.style.padding = '12px';
+      card.innerHTML = `${vis}<div class="mono-dim">${it.item_type.toUpperCase()}</div><h4 style="margin:2px 0 8px;">${it.name}</h4><button class="${isEq ? 'btn-outline' : 'btn-neon'}" style="width:100%">${isEq ? 'Unequip' : 'Equip'}</button>`;
+      card.querySelector('button').onclick = async () => {
+        const up = {};
+        if (it.item_type === 'avatar') up.avatar = isEq ? 'logo.png' : imgSrc;
+        if (it.item_type === 'banner') up.banner = isEq ? 'linear-gradient(135deg,#064e3b,#0f172a)' : imgSrc;
+        if (it.item_type === 'frame') up.avatar_frame = isEq ? 'none' : it.item_value;
+        if (it.item_type === 'theme') { const nextTh = isEq ? 'default' : it.item_value; up.profile_theme = nextTh; localStorage.setItem('zynk_theme', nextTh); }
+        if (it.item_type === 'color') up.equipped_color = isEq ? '#10b981' : it.item_value;
+        await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', up, window.authToken);
+        await window.refreshMyProfile();
+        window.notify(isEq ? `Unequipped ${it.name}` : `Equipped ${it.name}!`);
+      };
+      invGrid.appendChild(card);
+    });
+  }
+}
+async function renderPartnersAndCredits() {
+  if (!window.sbRest) return;
+
+  const pBox = document.getElementById('partners-container');
+  if (pBox) {
+    const partners = await window.sbRest('zynk_partners?order=id.asc').catch(() => []);
+    const defaults = [
+      { name: 'VortexOS', tag: 'PARTNER NETWORK', description: 'Vortex is a next-gen community and messaging platform built for instant collaboration.', url: 'https://vortexos.net', image_url: 'logo.png' }
+    ];
+    const list = (partners && partners.length) ? partners : defaults;
+
+    pBox.innerHTML = `
+      <div class="cards-grid" style="margin-bottom:22px;">
+        ${list.map(pt => `
+          <div class="glass-card" style="display:flex;flex-direction:column;justify-content:space-between;">
+            <div>
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+                <img src="${safeAvatar(pt.image_url)}" style="width:48px;height:48px;border-radius:12px;object-fit:cover;border:1px solid var(--neon-emerald);" />
+                <div>
+                  <span class="rarity-tag">${pt.tag || 'PARTNER'}</span>
+                  <h3>${pt.name}</h3>
+                </div>
+              </div>
+              <p class="sub-text" style="margin-bottom:14px;">${pt.description || 'Official ZynkOS Partner.'}</p>
+            </div>
+            ${pt.url ? `<button class="btn-neon" style="width:100%" onclick="window.open('${pt.url}','_blank')">Visit ${pt.name} ↗</button>` : ''}
+          </div>`).join('')}
+      </div>
+      <div class="glass-card" style="max-width:520px;">
+        <h3>📋 Partner Requirements</h3>
+        <ul style="margin:10px 0 0 18px;color:var(--text-dim);line-height:1.8;font-size:0.88rem;">
+          <li>Active ZynkOS Account & verified community presence</li>
+          <li>Active website, web app, or community server</li>
+          <li>Mutual link or banner placement with ZynkOS</li>
+        </ul>
+      </div>`;
+  }
+
+  const cBox = document.getElementById('credits-container');
+  if (cBox) {
+    const team = await window.sbRest('zynk_credits?order=id.asc').catch(() => []);
+    const ownerRow = await window.sbRest('users?username=ilike.KingstenVibes&select=id,username,avatar,bio').catch(() => []);
+    const owner = Array.isArray(ownerRow) ? ownerRow.at(0) : null;
+
+    const ownerCard = `
+      <div class="glass-card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;border-color:rgba(245,158,11,0.45);">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <img src="${safeAvatar(owner?.avatar)}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid #f59e0b;" />
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;"><strong style="font-size:1.1rem;color:#f59e0b;">KingstenVibes</strong><span class="role-chip"><span class="role-dot" style="background:#f59e0b"></span>Owner & Founder</span></div>
+            <p class="sub-text" style="margin-top:4px;">${owner?.bio || 'Creator, Lead Architect & Founder of ZynkOS.'}</p>
+          </div>
+        </div>
+        ${owner ? `<button class="btn-outline" onclick="openUserModal('${owner.id}')">View Profile</button>` : ''}
+      </div>`;
+
+    const extraCards = (team || []).map(m => `
+      <div class="glass-card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <img src="${safeAvatar(m.image_url)}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--neon-emerald);" />
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;"><strong style="font-size:1.05rem;">${m.name}</strong><span class="role-chip"><span class="role-dot" style="background:#10b981"></span>${m.role_label || 'Contributor'}</span></div>
+            <p class="sub-text" style="margin-top:4px;">${m.description || 'ZynkOS Contributor'}</p>
+          </div>
+        </div>
+        ${m.user_uid ? `<button class="btn-outline" onclick="openUserModal('${m.user_uid}')">View Profile</button>` : ''}
+      </div>`).join('');
+
+    cBox.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px;max-width:780px;">${ownerCard}${extraCards}</div>`;
+  }
 }
 async function renderLeaderboardQuestsAndAnnouncements() {
   if (!window.sbRest) return;
@@ -110,7 +203,7 @@ async function renderLeaderboardQuestsAndAnnouncements() {
 
   const lb = document.getElementById('leaderboard-list');
   if (lb) {
-    const users = await window.sbRest('users?role=neq.FOUNDER&order=credits.desc,xp.desc&limit=30').catch(() => []);
+    const users = await window.sbRest('users?role=neq.FOUNDER&hide_leaderboard=neq.true&order=credits.desc,xp.desc&limit=30').catch(() => []);
     lb.innerHTML = (users || []).length ? users.map((u, idx) => `
       <div onclick="openUserModal('${u.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;">
         <div style="display:flex;align-items:center;gap:12px;">
@@ -143,7 +236,6 @@ async function renderLeaderboardQuestsAndAnnouncements() {
     { id: 'q_shop2', cat: 'WEEKLY', title: '🛒 Gear Buyer', desc: 'Own 2 items from Zynk Store.', cred: 250, xp: 300, cur: Math.min(2, ownedCnt), max: 2 },
     { id: 'q_shop6', cat: 'WEEKLY', title: '🎒 Vault Collector', desc: 'Own 6 items from Zynk Store.', cred: 750, xp: 900, cur: Math.min(6, ownedCnt), max: 6 },
     { id: 'q_shop15', cat: 'WEEKLY', title: '💎 Royal Armory', desc: 'Own 15 items from Zynk Store.', cred: 2000, xp: 2500, cur: Math.min(15, ownedCnt), max: 15 },
-    { id: 'q_pulse', cat: 'WEEKLY', title: '⚡ Pulse Member', desc: 'Unlock Pulse Rank or higher.', cred: 200, xp: 300, cur: (p?.rank_index || 0) >= 1 ? 1 : 0, max: 1 },
     { id: 'q_lvl5', cat: 'WEEKLY', title: '🧬 Neural Level 5', desc: 'Reach Level 5 (4,000+ XP).', cred: 600, xp: 750, cur: Math.min(5, myLvl), max: 5 },
     { id: 'q_lvl10', cat: 'WEEKLY', title: '🚀 Neural Level 10', desc: 'Reach Level 10 (9,000+ XP).', cred: 1500, xp: 2000, cur: Math.min(10, myLvl), max: 10 },
     { id: 'q_rich5k', cat: 'WEEKLY', title: '💰 Credit Hoarder', desc: 'Hold 5,000+ Z-Credits at once.', cred: 600, xp: 750, cur: Math.min(5000, creds), max: 5000 },
@@ -239,5 +331,5 @@ setInterval(() => {
   });
 }, 1000);
 
-window.addEventListener('zynk-profile-updated', () => { renderMyProfileTab(); renderLeaderboardQuestsAndAnnouncements(); });
-window.addEventListener('DOMContentLoaded', () => { renderMyProfileTab(); renderLeaderboardQuestsAndAnnouncements(); });
+window.addEventListener('zynk-profile-updated', () => { renderMyProfileTab(); renderLeaderboardQuestsAndAnnouncements(); renderPartnersAndCredits(); });
+window.addEventListener('DOMContentLoaded', () => { renderMyProfileTab(); renderLeaderboardQuestsAndAnnouncements(); renderPartnersAndCredits(); });
