@@ -66,6 +66,7 @@ const dock = mk('aside', 'left-dock', `
     <button type="button" class="dock-btn" data-tab="tools-view" onclick="openTab('tools-view')"><span class="sym">${ic.tools || '⌘'}</span><span class="lbl">Utility Tools</span></button>
     <button type="button" class="dock-btn" data-tab="partners-view" onclick="openTab('partners-view')"><span class="sym">${ic.vortex || '🤝'}</span><span class="lbl">Partners</span></button>
     <button type="button" class="dock-btn" data-tab="credits-view" onclick="openTab('credits-view')"><span class="sym">${ic.ranks || '◈'}</span><span class="lbl">Credits & Team</span></button>
+    <button type="button" class="dock-btn" data-tab="rules-view" onclick="openTab('rules-view')"><span class="sym">📜</span><span class="lbl">Rules & Terms</span></button>
     <button type="button" class="dock-btn hidden" id="nav-beta-btn" style="display:none;" data-tab="beta-view" onclick="openTab('beta-view')"><span class="sym">${ic.beta || '⚛'}</span><span class="lbl">Beta Lab</span></button>
     <button type="button" class="dock-btn hidden" id="nav-admin-btn" style="display:none;" data-tab="admin-view" onclick="openTab('admin-view')"><span class="sym">${ic.admin || '⚡'}</span><span class="lbl">Founder Panel</span></button>
     <button type="button" class="dock-btn" data-tab="settings-view" onclick="openTab('settings-view')"><span class="sym">${ic.settings || '⚙'}</span><span class="lbl">Settings</span></button>
@@ -157,6 +158,7 @@ const main = mk('main', 'main-viewport', `
   <section id="tools-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Utility Tools</h2></div></div><div class="cards-grid" id="tools-grid"></div></section>
   <section id="partners-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Partners</h2><span class="sub-text">The projects & communities we collaborate with</span></div></div><div id="partners-container"></div></section>
   <section id="credits-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Credits & Team</h2><span class="sub-text">Founders, developers, designers & contributors</span></div></div><div id="credits-container"></div></section>
+  <section id="rules-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Rules, Privacy Policy & Terms</h2><span class="sub-text">Community guidelines, 13+ age requirement & platform policies</span></div></div><div id="rules-container"></div></section>
   <section id="beta-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Beta Lab</h2><span class="sub-text">Experimental themes, HUD scale & tester rewards</span></div></div><div class="cards-grid" id="beta-grid"></div></section>
   <section id="admin-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Founder Command Panel</h2><span class="sub-text">Broadcasts, store items, partners, team credits & roles</span></div></div><div id="admin-panel-container"></div></section>
   <section id="settings-view" class="tab-view padded-view"><div id="settings-shell"></div></section>
