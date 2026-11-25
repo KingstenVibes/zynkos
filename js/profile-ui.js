@@ -247,6 +247,7 @@ async function renderLeaderboardQuestsAndAnnouncements() {
     { id: 'sec_violet', cat: 'SECRET', isSecret: true, title: '🔮 Void Resonance', desc: '??? [Secret Quest — Condition Hidden]', cred: 500, xp: 600, cur: document.body.classList.contains('theme-violet') ? 1 : 0, max: 1 },
     { id: 'sec_zoom', cat: 'SECRET', isSecret: true, title: '🔬 Micro Vision', desc: '??? [Secret Quest — Condition Hidden]', cred: 350, xp: 400, cur: localStorage.getItem('zynk_zoom') === '0.9' ? 1 : 0, max: 1 }
   ];
+
   const customQuests = await window.sbRest('achievements_list?order=id.asc').catch(() => []);
   const allQuests = [
     ...builtInQuests,
@@ -307,6 +308,70 @@ async function renderLeaderboardQuestsAndAnnouncements() {
   secretList.forEach(q => renderCard(q, 'q-sec-secret', false));
   doneList.forEach(q => renderCard(q, 'q-sec-done', true));
 }
+let activeLegalTab = 'RULES';
+
+function renderRulesAndLegal() {
+  const box = document.getElementById('rules-container');
+  if (!box) return;
+
+  const tabs = [
+    { id: 'RULES', label: '🛡️ Community Rules' },
+    { id: 'TOS', label: '📜 Terms of Service' },
+    { id: 'PRIVACY', label: '🔒 Privacy Policy' }
+  ];
+
+  const cardStyle = 'padding:14px 16px;border-radius:12px;background:rgba(4,7,11,0.75);border:1px solid rgba(255,255,255,0.08);margin-bottom:10px;';
+
+  let contentHtml = '';
+  if (activeLegalTab === 'RULES') {
+    const rules = [
+      { num: '01', title: 'Minimum Age Requirement (13+)', desc: 'You must be at least 13 years old to create an account, participate in Zynk Chat, or use ZynkOS services. Underage accounts will be suspended immediately.' },
+      { num: '02', title: 'Be Respectful — Zero Harassment or Hate Speech', desc: 'Treat every member with respect. Harassment, bullying, slurs, discrimination, doxxing, or threats of any kind are strictly prohibited.' },
+      { num: '03', title: 'Keep It Safe for Work (No NSFW or Gore)', desc: 'Do not post, upload, or link sexually explicit content, graphic violence, or disturbing media in Zynk Chat, avatars, banners, or custom stickers.' },
+      { num: '04', title: 'No Spam, Flooding, or Unsolicited Self-Promo', desc: 'Avoid message spamming, copypasta flooding, ping abuse (@mentions), or advertising external servers/links without Founder or Staff approval.' },
+      { num: '05', title: 'No Exploiting, Alt Farming, or Scamming', desc: 'Do not exploit bugs, farm Z-Credits/XP with alternate accounts, or attempt to scam other members during trades or gifts. Report bugs to Staff.' },
+      { num: '06', title: 'Follow Staff Instructions & Channel Topics', desc: 'Listen to Moderators, Admins, and the Founder. Use #updates only for official broadcasts and keep conversations civil.' }
+    ];
+    contentHtml = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <h3>🛡️ ZynkOS Community Guidelines</h3>
+        <span class="pill" style="border-color:#f59e0b;color:#f59e0b;">13+ REQUIRED • ENFORCED BY STAFF</span>
+      </div>
+      ${rules.map(r => `<div style="${cardStyle}"><div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;"><span class="mono-dim" style="color:var(--neon-emerald);font-weight:700;">RULE ${r.num}</span><strong>${r.title}</strong></div><p class="sub-text">${r.desc}</p></div>`).join('')}`;
+  }
+
+  if (activeLegalTab === 'TOS') {
+    contentHtml = `
+      <h3 style="margin-bottom:12px;">📜 Terms of Service</h3>
+      <div style="${cardStyle}"><strong>1. Acceptance of Terms</strong><p class="sub-text" style="margin-top:4px;">By accessing or creating an account on ZynkOS, you confirm that you are at least 13 years of age and agree to abide by these Terms of Service and our Community Rules.</p></div>
+      <div style="${cardStyle}"><strong>2. Accounts & Security</strong><p class="sub-text" style="margin-top:4px;">You are responsible for keeping your login credentials secure and for all activity under your account. Sharing or selling accounts is not permitted.</p></div>
+      <div style="${cardStyle}"><strong>3. Virtual Currency & Store Items (Z-Credits)</strong><p class="sub-text" style="margin-top:4px;">Z-Credits, XP, badges, avatars, and themes are virtual items with no real-world monetary value and cannot be exchanged for cash. Staff may adjust balances if obtained through exploits.</p></div>
+      <div style="${cardStyle}"><strong>4. User-Generated Content</strong><p class="sub-text" style="margin-top:4px;">You retain ownership of content you upload, but grant ZynkOS permission to display it within the platform. Staff reserve the right to remove content or mute/ban accounts that violate our rules.</p></div>
+      <div style="${cardStyle}"><strong>5. Service Availability</strong><p class="sub-text" style="margin-top:4px;">ZynkOS is provided "as is" and may be updated, modified, or temporarily offline for maintenance at any time.</p></div>`;
+  }
+
+  if (activeLegalTab === 'PRIVACY') {
+    contentHtml = `
+      <h3 style="margin-bottom:12px;">🔒 Privacy Policy</h3>
+      <div style="${cardStyle}"><strong>1. Information We Collect</strong><p class="sub-text" style="margin-top:4px;">We store your chosen username, email address (for authentication), encrypted password hash, profile customizations, and chat messages needed to operate ZynkOS.</p></div>
+      <div style="${cardStyle}"><strong>2. How We Use Your Data</strong><p class="sub-text" style="margin-top:4px;">Your data is used strictly to run platform features such as Zynk Chat, Private DMs, Quests, Leaderboards, and Store Inventory. We never sell your personal information to third parties.</p></div>
+      <div style="${cardStyle}"><strong>3. Private Direct Messages & Controls</strong><p class="sub-text" style="margin-top:4px;">Private DMs are restricted via database security policies so only participants can access them. You can hide yourself from the Global Leaderboard anytime in Settings -> Privacy & Safety.</p></div>
+      <div style="${cardStyle}"><strong>4. Local Storage & Preferences</strong><p class="sub-text" style="margin-top:4px;">ZynkOS uses browser local storage to remember your active session, steady page theme, clock format, and tab cloaking settings.</p></div>`;
+  }
+
+  box.innerHTML = `
+    <div style="max-width:840px;margin:auto;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+        ${tabs.map(t => `<button type="button" class="${activeLegalTab === t.id ? 'btn-neon' : 'btn-outline'}" data-ltab="${t.id}">${t.label}</button>`).join('')}
+      </div>
+      <div class="glass-card">${contentHtml}</div>
+    </div>`;
+
+  box.querySelectorAll('[data-ltab]').forEach(b => (b.onclick = () => {
+    activeLegalTab = b.dataset.ltab;
+    renderRulesAndLegal();
+  }));
+}
 
 document.addEventListener('click', async (e) => {
   if (e.target.id === 'dash-daily-btn') {
@@ -332,4 +397,4 @@ setInterval(() => {
 }, 1000);
 
 window.addEventListener('zynk-profile-updated', () => { renderMyProfileTab(); renderLeaderboardQuestsAndAnnouncements(); renderPartnersAndCredits(); });
-window.addEventListener('DOMContentLoaded', () => { renderMyProfileTab(); renderLeaderboardQuestsAndAnnouncements(); renderPartnersAndCredits(); });
+window.addEventListener('DOMContentLoaded', () => { renderMyProfileTab(); renderLeaderboardQuestsAndAnnouncements(); renderPartnersAndCredits(); renderRulesAndLegal(); });
