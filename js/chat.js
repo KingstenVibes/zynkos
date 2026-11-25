@@ -10,6 +10,9 @@ let lastChatHash = '';
 let lastNotifiedMsgId = 0;
 let lastTypingPing = 0;
 let activeChannel = 'global';
+window.activeChatLabel = '#zynk-global';
+let channelUnread = { global: false, updates: false, beta: false };
+let channelPings = { global: 0, updates: 0, beta: 0 };
 
 const CHAT_SVG = {
   react: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
@@ -26,6 +29,13 @@ const ALL_EMOJIS = [
   '💚','💙','💜','🧡','🖤','🤍','💔','💥','💫','💤','✅','❌','⚠️','🛡️','🔮','🛸'
 ];
 
+function renderChanBadge(ch) {
+  const pings = channelPings[ch] || 0;
+  if (pings > 0) return `<span style="background:#f43f5e;color:#fff;font-size:0.68rem;font-weight:800;padding:1px 6px;border-radius:999px;margin-left:5px;">${pings}</span>`;
+  if (channelUnread[ch]) return `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#fff;margin-left:6px;"></span>`;
+  return '';
+}
+
 function buildChannelBar() {
   const chatHeader = document.querySelector('#chat-view .view-topbar');
   if (!chatHeader) return;
@@ -39,27 +49,36 @@ function buildChannelBar() {
   const p = window.userProfile;
   const isBeta = p && (p.role === 'FOUNDER' || p.role === 'BETA' || p.is_beta || (p.extra_roles || []).includes('BETA'));
   bar.innerHTML = `
-    <button type="button" class="${activeChannel === 'global' ? 'btn-neon' : 'btn-outline'}" data-ch="global" style="padding:5px 11px;font-size:0.8rem;"># zynk-global</button>
-    <button type="button" class="${activeChannel === 'updates' ? 'btn-neon' : 'btn-outline'}" data-ch="updates" style="padding:5px 11px;font-size:0.8rem;">📢 updates</button>
-    ${isBeta ? `<button type="button" class="${activeChannel === 'beta' ? 'btn-neon' : 'btn-outline'}" data-ch="beta" style="padding:5px 11px;font-size:0.8rem;">⚛ beta-lab</button>` : ''}
-    <button type="button" class="btn-outline" id="new-dm-btn" style="padding:5px 11px;font-size:0.8rem;">✉️ Private DM</button>`;
+    <button type="button" class="${activeChannel === 'global' ? 'btn-neon' : 'btn-outline'}" data-ch="global" style="padding:5px 11px;font-size:0.8rem;"># zynk-global${renderChanBadge('global')}</button>
+    <button type="button" class="${activeChannel === 'updates' ? 'btn-neon' : 'btn-outline'}" data-ch="updates" style="padding:5px 11px;font-size:0.8rem;"># updates${renderChanBadge('updates')}</button>
+    ${isBeta ? `<button type="button" class="${activeChannel === 'beta' ? 'btn-neon' : 'btn-outline'}" data-ch="beta" style="padding:5px 11px;font-size:0.8rem;"># beta-lab${renderChanBadge('beta')}</button>` : ''}
+    <button type="button" class="btn-outline" id="new-dm-btn" style="padding:5px 11px;font-size:0.8rem;">Private DM</button>`;
 
   bar.querySelectorAll('[data-ch]').forEach(b => (b.onclick = () => {
-    window.switchChatChannel(b.dataset.ch, b.textContent);
+    window.switchChatChannel(b.dataset.ch, b.dataset.ch === 'global' ? '#zynk-global' : `#${b.dataset.ch}`);
   }));
   document.getElementById('new-dm-btn').onclick = () => window.openNewDmModal();
+
+  const totalPings = Object.values(channelPings).reduce((a, b) => a + b, 0);
+  const dockBadge = document.getElementById('dock-chat-badge');
+  if (dockBadge) {
+    dockBadge.textContent = totalPings;
+    dockBadge.classList.toggle('hidden', totalPings === 0);
+  }
 }
 
 window.switchChatChannel = function(chId, label) {
   activeChannel = chId;
+  window.activeChatLabel = label || (chId === 'global' ? '#zynk-global' : `#${chId}`);
+  channelUnread[chId] = false;
+  channelPings[chId] = 0;
   lastChatHash = '';
   const h2 = document.querySelector('#chat-view .view-topbar h2');
-  if (h2) h2.textContent = label || (chId === 'global' ? '# zynk-global' : chId);
+  if (h2) h2.textContent = window.activeChatLabel;
   buildChannelBar();
-  if (chatInput) chatInput.placeholder = `Message ${label || chId}... (Type / or @)`;
+  if (chatInput) chatInput.placeholder = `Message ${window.activeChatLabel}... (Type / or @)`;
   pollChatAndMembers();
 };
-
 if (chatForm && !document.getElementById('chat-file-inp')) {
   const fileInp = document.createElement('input');
   fileInp.type = 'file';
@@ -102,6 +121,7 @@ if (!typingBar && chatForm) {
   chatForm.before(typingBar);
 }
 buildChannelBar();
+
 const ROLE_POWER = { FOUNDER: 100, ADMIN: 80, MODERATOR: 60, BETA: 30, UPLOADER: 25, DESIGNER: 25, VIP: 20, SUPPORTER: 15, MEMBER: 10, SYSTEM: 90 };
 
 const SLASH_CMDS = [
@@ -150,17 +170,17 @@ function getStickerLimit(p) {
   if (p.role !== 'MEMBER' || (p.rank_index || 0) >= 1 || (p.extra_roles || []).length > 0) return 10;
   return 2;
 }
-
 window.openNewDmModal = function() {
   const p = window.userProfile;
   if (!p) return window.notify?.('Sign in to start a Private DM!', true);
   const modal = document.getElementById('user-modal');
   const box = document.getElementById('user-modal-content');
   const others = cachedUsers.filter(u => String(u.id) !== String(p.id));
+  box.style.maxWidth = '420px';
   box.innerHTML = `
     <div style="padding:20px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <h3>✉️ Start Private DM</h3>
+        <h3>Start Private DM</h3>
         <button class="btn-ghost" onclick="document.getElementById('user-modal').classList.add('hidden')">✕</button>
       </div>
       <p class="sub-text" style="margin-bottom:10px;">Select a member to open your private 1-on-1 channel:</p>
@@ -383,8 +403,17 @@ function renderMessages(msgs) {
   msgs.forEach(m => msgBox.appendChild(buildMsgEl(m)));
   if (wasAtBottom || !initialChatLoaded) msgBox.scrollTop = msgBox.scrollHeight;
 }
+function formatLastSeen(ts) {
+  if (!ts) return '';
+  const mins = Math.max(1, Math.floor((Date.now() - ts) / 60000));
+  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1440) return `${Math.floor(mins / 60)}h ago`;
+  return `${Math.floor(mins / 1440)}d ago`;
+}
+
 async function pollChatAndMembers() {
   if (!window.sbRest) return;
+  const me = window.userProfile;
   try {
     const cols = 'id,user_id,username,role,color,content,reply_to,edited,reactions,is_beta,created_at,image_url,channel';
     const filter = activeChannel === 'global' ? 'or=(channel.eq.global,channel.is.null)' : `channel=eq.${encodeURIComponent(activeChannel)}`;
@@ -393,26 +422,38 @@ async function pollChatAndMembers() {
       msgs.reverse();
       const hash = activeChannel + ':' + JSON.stringify(msgs.map(m => [m.id, m.content, m.edited, m.reactions]));
       if (hash !== lastChatHash) {
-        const newest = msgs.at(-1);
-        const me = window.userProfile;
-        if (initialChatLoaded && newest && newest.id > lastNotifiedMsgId && me && newest.username !== me.username && newest.username !== 'ZynkBot' && new RegExp(`@${me.username}\\b`, 'i').test(newest.content)) {
-          lastNotifiedMsgId = newest.id;
-          window.notify?.(`@${newest.username} pinged you: "${newest.content}"`, false, () => window.openTab('chat-view'));
-        }
-        if (newest && newest.id > lastNotifiedMsgId) lastNotifiedMsgId = newest.id;
         lastChatHash = hash;
         renderMessages(msgs);
       }
+    }
+
+    const recentAll = await window.sbRest(`messages?select=id,username,content,channel&id=gt.${lastNotifiedMsgId}&order=id.asc&limit=20`).catch(() => []);
+    if (Array.isArray(recentAll) && recentAll.length) {
+      recentAll.forEach(m => {
+        if (m.id > lastNotifiedMsgId) lastNotifiedMsgId = m.id;
+        if (!initialChatLoaded || !me || m.username === me.username || m.username === 'ZynkBot') return;
+        const ch = m.channel || 'global';
+        if (ch !== activeChannel || !document.getElementById('chat-view')?.classList.contains('active')) {
+          channelUnread[ch] = true;
+        }
+        if (new RegExp(`@${me.username}\\b`, 'i').test(m.content || '')) {
+          channelPings[ch] = (channelPings[ch] || 0) + 1;
+          window.notify?.(`@${m.username} pinged you in #${ch}: "${m.content}"`, false, () => {
+            window.openTab('chat-view');
+            window.switchChatChannel(ch, ch === 'global' ? '#zynk-global' : `#${ch}`);
+          });
+        }
+      });
+      buildChannelBar();
     }
   } catch (err) {
     console.warn('Chat sync:', err.message);
   }
   initialChatLoaded = true;
 
-  const users = await window.sbRest('users?select=id,username,role,extra_roles,avatar,equipped_color,online,typing_until,activity_text&order=online.desc,xp.desc&limit=60').catch(() => []);
+  const users = await window.sbRest('users?select=id,username,role,extra_roles,avatar,equipped_color,online,typing_until,activity_text,last_channel,last_seen&order=online.desc,xp.desc&limit=60').catch(() => []);
   if (Array.isArray(users)) {
     cachedUsers = users;
-    const me = window.userProfile;
     const typers = users.filter(u => u.typing_until && u.typing_until > Date.now() && (!me || u.id !== me.id));
     if (typingBar) {
       if (typers.length) {
@@ -427,8 +468,8 @@ async function pollChatAndMembers() {
       const offline = users.filter(u => !u.online);
       const renderMem = (u, isOn) => {
         const av = u.avatar && !u.avatar.includes('dicebear') ? u.avatar : 'logo.png';
-        const sub = isOn ? (u.activity_text || u.role) : u.role;
-        return `<div class="member-item" style="opacity:${isOn ? '1' : '0.55'}" onclick="openUserModal('${u.id}')">
+        const sub = isOn ? (u.activity_text || u.role) : `${u.last_channel || u.role}${u.last_seen ? ` • ${formatLastSeen(u.last_seen)}` : ''}`;
+        return `<div class="member-item" style="opacity:${isOn ? '1' : '0.6'}" onclick="openUserModal('${u.id}')">
           <div class="mem-av-wrap"><img src="${av}" /><span class="mem-dot" style="background:${isOn ? '#10b981' : '#64748b'}"></span></div>
           <div style="min-width:0;"><div style="color:${u.equipped_color || '#f8fafc'};font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.username}</div><div class="mono-dim" style="font-size:0.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sub}</div></div>
         </div>`;
@@ -441,7 +482,6 @@ async function pollChatAndMembers() {
     }
   }
 }
-
 chatInput?.addEventListener('input', () => {
   const p = window.userProfile;
   if (p && chatInput.value.trim() && Date.now() - lastTypingPing > 2500) {
@@ -483,6 +523,7 @@ chatInput?.addEventListener('input', () => {
   }
   acBox.classList.add('hidden');
 });
+
 async function botPost(text) {
   if (!window.sbRest) return;
   await window.sbRest('messages', 'POST', { username: 'ZynkBot', avatar: 'logo.png', role: 'SYSTEM', color: '#06b6d4', content: text, channel: activeChannel }, window.authToken);
@@ -497,9 +538,7 @@ chatForm?.addEventListener('submit', async (e) => {
   if (!raw) return;
   const p = window.userProfile;
   if (!p) return window.notify?.('Sign in to send messages in Zynk Chat!', true);
-  if (activeChannel === 'updates' && p.role !== 'FOUNDER') {
-    return window.notify?.('Only Founder can post in #updates.', true);
-  }
+  if (activeChannel === 'updates' && p.role !== 'FOUNDER') return window.notify?.('Only Founder can post in #updates.', true);
   if (p.is_muted || (p.mute_until && p.mute_until > Date.now())) {
     const mins = p.mute_until > Date.now() ? Math.ceil((p.mute_until - Date.now()) / 60000) + 'm left' : 'Active';
     return window.notify?.(`You are muted (${mins}). Reason: ${p.mute_reason || 'Staff action'}`, true);
@@ -590,7 +629,7 @@ chatForm?.addEventListener('submit', async (e) => {
     appendSingleMsg({ id: Date.now(), user_id: p.id, username: p.username, avatar: p.avatar, role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: raw, reply_to: replyText, created_at: new Date().toISOString() });
     await window.sbRest('messages', 'POST', { user_id: p.id, username: p.username, avatar: 'logo.png', role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: raw, reply_to: replyText, channel: activeChannel }, window.authToken);
     lastChatHash = '';
-    window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + 5, xp: (p.xp || 0) + 25, msg_count: (p.msg_count || 0) + 1, typing_until: 0 }, window.authToken).then(() => window.refreshMyProfile()).catch(() => {});
+    window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + 5, xp: (p.xp || 0) + 25, msg_count: (p.msg_count || 0) + 1, typing_until: 0, last_channel: window.activeChatLabel, last_seen: Date.now() }, window.authToken).then(() => window.refreshMyProfile()).catch(() => {});
   } catch (err) {
     window.notify('Chat error: ' + err.message, true);
   }
