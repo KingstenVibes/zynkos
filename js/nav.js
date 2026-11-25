@@ -61,7 +61,6 @@ window.applyLiveWallpaper = function(wp) {
     layer.style.animation = 'none';
   }
 };
-
 window.zynkPanic = function() {
   window.location.replace(localStorage.getItem('zynk_panic_url') || 'https://google.com');
 };
@@ -100,6 +99,112 @@ function updateClock() {
 
 setInterval(updateClock, 1000);
 updateClock();
+
+let vortexMode = 'guild';
+window.setVortexMode = function(mode) {
+  vortexMode = mode;
+  const gBtn = document.getElementById('vtx-mode-guild');
+  const glBtn = document.getElementById('vtx-mode-global');
+  if (gBtn) gBtn.className = mode === 'guild' ? 'btn-neon' : 'btn-outline';
+  if (glBtn) glBtn.className = mode === 'global' ? 'btn-neon' : 'btn-outline';
+};
+
+document.addEventListener('click', (e) => {
+  if (e.target.id === 'vtx-launch-btn') {
+    if (!document.getElementById('vtx-rules-ok')?.checked) {
+      return window.notify?.('Please check the box to accept Vortex & ZynkOS Rules first!', true);
+    }
+    const url = vortexMode === 'global' ? 'https://vortexos.net' : 'https://vortexos.net';
+    window.open(url, '_blank', 'noopener');
+  }
+});
+const searchInp = document.getElementById('global-search-inp');
+const searchPop = document.getElementById('global-search-pop');
+
+searchInp?.addEventListener('input', async () => {
+  const q = searchInp.value.trim().toLowerCase();
+  if (!q || !searchPop || !window.sbRest) return searchPop?.classList.add('hidden');
+
+  const [users, items, msgs] = await Promise.all([
+    window.sbRest(`users?username=ilike.*${encodeURIComponent(q)}*&select=id,username,role,equipped_color&limit=5`).catch(() => []),
+    window.sbRest(`store_items?name=ilike.*${encodeURIComponent(q)}*&select=id,name,cost,item_type&limit=4`).catch(() => []),
+    window.sbRest(`messages?content=ilike.*${encodeURIComponent(q)}*&select=id,username,content,channel&order=id.desc&limit=4`).catch(() => [])
+  ]);
+
+  let html = '';
+  if (Array.isArray(users) && users.length) {
+    html += `<div class="mono-dim" style="padding:4px 10px;font-weight:700;">MEMBERS</div>` + users.map(u => `<div class="ac-item" data-suid="${u.id}"><strong style="color:${u.equipped_color || '#10b981'}">@${u.username}</strong><span class="mono-dim">[${u.role}]</span></div>`).join('');
+  }
+  if (Array.isArray(items) && items.length) {
+    html += `<div class="mono-dim" style="padding:4px 10px;font-weight:700;">ZYNK STORE</div>` + items.map(it => `<div class="ac-item" data-stab="store-view"><span>${it.name}</span><span class="mono-dim">${it.cost} Z</span></div>`).join('');
+  }
+  if (Array.isArray(msgs) && msgs.length) {
+    html += `<div class="mono-dim" style="padding:4px 10px;font-weight:700;">MESSAGES</div>` + msgs.map(m => `<div class="ac-item" data-stab="chat-view"><span><strong>@${m.username}:</strong> ${String(m.content).slice(0, 38)}</span><span class="mono-dim">#${m.channel || 'global'}</span></div>`).join('');
+  }
+
+  if (!html) html = `<div style="padding:10px;" class="mono-dim">No results for "${q}"</div>`;
+  searchPop.innerHTML = html;
+  searchPop.classList.remove('hidden');
+
+  searchPop.querySelectorAll('[data-suid]').forEach(el => (el.onclick = () => {
+    searchPop.classList.add('hidden');
+    window.openUserModal?.(el.dataset.suid);
+  }));
+  searchPop.querySelectorAll('[data-stab]').forEach(el => (el.onclick = () => {
+    searchPop.classList.add('hidden');
+    window.openTab?.(el.dataset.stab);
+  }));
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#global-search-inp') && !e.target.closest('#global-search-pop')) {
+    searchPop?.classList.add('hidden');
+  }
+});
+
+window.openInboxModal = async function() {
+  const modal = document.getElementById('user-modal');
+  const box = document.getElementById('user-modal-content');
+  const p = window.userProfile;
+  if (!modal || !box || !window.sbRest) return;
+
+  const [anns, pings] = await Promise.all([
+    window.sbRest('announcements?order=id.desc&limit=8').catch(() => []),
+    p ? window.sbRest(`messages?content=ilike.*@${encodeURIComponent(p.username)}*&order=id.desc&limit=10`).catch(() => []) : []
+  ]);
+
+  const reqIds = Array.isArray(p?.friend_requests) ? p.friend_requests : [];
+  const reqUsers = reqIds.length ? await window.sbRest(`users?id=in.(${reqIds.join(',')})&select=id,username`).catch(() => []) : [];
+
+  box.style.maxWidth = '500px';
+  box.innerHTML = `
+    <div style="padding:22px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3>Notification Inbox</h3>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="btn-outline" style="padding:4px 10px;font-size:0.78rem;" id="inbox-read-btn">Mark All Read</button>
+          <button type="button" class="btn-ghost" onclick="document.getElementById('user-modal').classList.add('hidden')">✕</button>
+        </div>
+      </div>
+      <div style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+        ${(reqUsers || []).map(r => `<div style="padding:10px;border-radius:10px;background:#04070b;border:1px solid var(--neon-emerald);display:flex;justify-content:space-between;align-items:center;"><span><strong>@${r.username}</strong> sent you a friend request</span><button class="btn-neon" style="padding:4px 10px;font-size:0.76rem;" onclick="acceptFriendRequest('${r.id}');openInboxModal();">Accept</button></div>`).join('')}
+        ${(pings || []).map(m => `<div style="padding:10px;border-radius:10px;background:#04070b;cursor:pointer;" onclick="document.getElementById('user-modal').classList.add('hidden');openTab('chat-view');"><div class="mono-dim">MENTION BY @${m.username} • #${m.channel || 'global'}</div><div style="margin-top:2px;">${String(m.content).replace(/</g, '&lt;')}</div></div>`).join('')}
+        ${(anns || []).map(a => `<div style="padding:10px;border-radius:10px;background:#04070b;"><div class="mono-dim">ANNOUNCEMENT • by @${a.author || 'Staff'}</div><strong>${a.title}</strong><div class="sub-text">${a.body}</div></div>`).join('')}
+      </div>
+    </div>`;
+  modal.classList.remove('hidden');
+
+  document.getElementById('inbox-read-btn').onclick = () => {
+    localStorage.setItem('zynk_inbox_read', String(Date.now()));
+    const badge = document.getElementById('inbox-badge');
+    if (badge) badge.classList.add('hidden');
+    window.notify('All inbox notifications marked as read.');
+  };
+};
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#open-inbox-btn')) window.openInboxModal();
+});
 let activeSetTab = 'DISPLAY';
 
 function renderSettingsPanel() {
@@ -108,12 +213,12 @@ function renderSettingsPanel() {
   const p = window.userProfile;
 
   const tabs = [
-    { id: 'DISPLAY', label: '🎨 Themes & Wallpapers' },
-    { id: 'ACCOUNT', label: '👤 Account & Danger Zone' },
-    { id: 'NOTIF', label: '🔔 Notifications & App' },
-    { id: 'PRIVACY', label: '🛡️ Privacy & Safety' },
-    { id: 'CLOAK', label: '🕵️ Tab Disguise & Panic' },
-    { id: 'SESSIONS', label: '💻 Active Sessions' }
+    { id: 'DISPLAY', label: 'Themes & Wallpapers' },
+    { id: 'ACCOUNT', label: 'Account & Danger Zone' },
+    { id: 'NOTIF', label: 'Notifications & App' },
+    { id: 'PRIVACY', label: 'Privacy & Safety' },
+    { id: 'CLOAK', label: 'Tab Disguise & Panic' },
+    { id: 'SESSIONS', label: 'Active Sessions' }
   ];
 
   shell.innerHTML = `
@@ -132,7 +237,7 @@ function renderSettingsPanel() {
 
   if (activeSetTab === 'DISPLAY') {
     card.innerHTML = `
-      <h2 style="margin-bottom:14px;">🎨 Themes, Live Wallpapers & Clock</h2>
+      <h2 style="margin-bottom:14px;">Themes, Live Wallpapers & Clock</h2>
       <div class="setting-group"><label>Color Theme</label><select id="set-theme" class="tool-input"><option value="default">Emerald Neural (Default)</option><option value="theme-cyber">Cyber Cyan</option><option value="theme-crimson">Crimson Ops</option><option value="theme-gold">Solar Gold</option><option value="theme-violet">Violet Pulse</option></select></div>
       <div class="setting-group"><label>Animated Live Wallpaper</label><select id="set-wp" class="tool-input"><option value="none">None (Solid Dark)</option><option value="grid">Cyber Matrix Grid (Moving)</option><option value="nebula">Neon Nebula Pulse (Animated)</option><option value="solar">Solar Aura Shift (Animated)</option></select></div>
       <div class="setting-group"><label>TimeZone</label><select id="set-tz" class="tool-input"><option value="auto">Auto-Detect (Local Time)</option><option value="America/New_York">Eastern Time (ET)</option><option value="America/Chicago">Central Time (CT)</option><option value="America/Denver">Mountain Time (MT)</option><option value="America/Los_Angeles">Pacific Time (PT)</option><option value="UTC">UTC</option></select></div>
@@ -166,13 +271,13 @@ function renderSettingsPanel() {
 
   if (activeSetTab === 'ACCOUNT') {
     card.innerHTML = `
-      <h2 style="margin-bottom:14px;">👤 Account & Danger Zone</h2>
+      <h2 style="margin-bottom:14px;">Account & Danger Zone</h2>
       <div class="setting-group"><label>Username</label><input class="tool-input" value="${p?.username || 'Guest'}" disabled /></div>
       <div class="setting-group"><label>Linked Email Address</label><input class="tool-input" value="${p?.email || 'Not signed in'}" disabled /></div>
       <div class="setting-group"><label>Change Password (New Password)</label><input id="new-pass-inp" type="password" class="tool-input" placeholder="Enter new password (6+ chars)" /></div>
       <button class="btn-neon" id="update-pass-btn">Update Password</button>
       <div style="margin-top:24px;padding:16px;border-radius:12px;border:1px solid #f43f5e;background:rgba(244,63,94,0.08);">
-        <h3 style="color:#f43f5e;margin-bottom:6px;">⚠️ Danger Zone</h3>
+        <h3 style="color:#f43f5e;margin-bottom:6px;">Danger Zone</h3>
         <p class="sub-text" style="margin-bottom:12px;">Permanently delete your ZynkOS profile, Z-Credits, XP, and inventory. This cannot be undone.</p>
         <button class="btn-outline" id="delete-acc-btn" style="color:#f43f5e;border-color:#f43f5e;">Delete My Account</button>
       </div>`;
@@ -202,14 +307,13 @@ function renderSettingsPanel() {
   }
   if (activeSetTab === 'NOTIF') {
     card.innerHTML = `
-      <h2 style="margin-bottom:14px;">🔔 Notifications & Install ZynkOS App</h2>
-      <p class="sub-text" style="margin-bottom:12px;">Enable desktop notifications for @mentions & announcements, or install ZynkOS directly onto your device as a standalone app:</p>
+      <h2 style="margin-bottom:14px;">Notifications & Install ZynkOS App</h2>
+      <p class="sub-text" style="margin-bottom:12px;">Enable desktop notifications or install ZynkOS directly onto your device:</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
         <button class="btn-neon" id="enable-notif-btn">Enable Browser Notifications</button>
-        <button class="btn-outline" id="install-pwa-btn">📲 Install ZynkOS App</button>
+        <button class="btn-outline" id="install-pwa-btn">Install ZynkOS App</button>
       </div>
-      <label class="remember-row"><input type="checkbox" id="notif-mentions" checked /><span>Notify me when someone @mentions me in Zynk Chat</span></label>
-      <label class="remember-row"><input type="checkbox" id="notif-ann" checked /><span>Notify me when a new System Announcement is posted</span></label>`;
+      <label class="remember-row"><input type="checkbox" id="notif-mentions" checked /><span>Notify me when someone @mentions me in Zynk Chat</span></label>`;
 
     document.getElementById('enable-notif-btn').onclick = async () => {
       if (!('Notification' in window)) return window.notify('Browser notifications not supported here.', true);
@@ -223,23 +327,21 @@ function renderSettingsPanel() {
         await deferredInstallPrompt.userChoice;
         deferredInstallPrompt = null;
       } else {
-        window.notify('Click the Install icon (⊕) in your address bar or Browser Menu -> Install ZynkOS!');
+        window.notify('Click the Install icon in your browser address bar or Browser Menu -> Install ZynkOS!');
       }
     };
   }
 
   if (activeSetTab === 'PRIVACY') {
     card.innerHTML = `
-      <h2 style="margin-bottom:14px;">🛡️ Privacy & Safety</h2>
+      <h2 style="margin-bottom:14px;">Privacy & Safety</h2>
       <label class="remember-row"><input type="checkbox" id="priv-show-lb" ${p?.hide_leaderboard ? '' : 'checked'} /><span>Show me on the Global Leaderboard</span></label>
       <label class="remember-row"><input type="checkbox" id="priv-show-on" ${p?.online === false ? '' : 'checked'} /><span>Show my Online status & live activity in Zynk Chat</span></label>
       <button class="btn-neon" id="save-priv-btn" style="margin-top:8px;">Save Privacy Settings</button>`;
 
     document.getElementById('save-priv-btn').onclick = async () => {
       if (!p) return window.notify('Sign in first!', true);
-      const showLb = document.getElementById('priv-show-lb').checked;
-      const showOn = document.getElementById('priv-show-on').checked;
-      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { hide_leaderboard: !showLb, online: showOn }, window.authToken);
+      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { hide_leaderboard: !document.getElementById('priv-show-lb').checked, online: document.getElementById('priv-show-on').checked }, window.authToken);
       await window.refreshMyProfile();
       window.notify('Privacy settings saved!');
     };
@@ -247,7 +349,7 @@ function renderSettingsPanel() {
 
   if (activeSetTab === 'CLOAK') {
     card.innerHTML = `
-      <h2 style="margin-bottom:14px;">🕵️ Tab Disguise & Instant Panic Key</h2>
+      <h2 style="margin-bottom:14px;">Tab Disguise & Instant Panic Key</h2>
       <div class="setting-group"><label>Tab Disguise</label><select id="set-cloak" class="tool-input"><option value="none">None (ZynkOS Default)</option><option value="clever">Clever Portal</option><option value="classroom">Google Classroom</option><option value="drive">Google Drive</option><option value="docs">Google Docs</option></select></div>
       <div class="setting-group"><label>Panic Redirect URL</label><input id="set-panic" class="tool-input" value="${localStorage.getItem('zynk_panic_url') || 'https://google.com'}" /></div>
       <label class="remember-row"><input type="checkbox" id="set-esc" ${localStorage.getItem('zynk_esc_panic') === '1' ? 'checked' : ''} /><span>Press ESC key anytime to trigger instant Panic Redirect</span></label>
@@ -278,7 +380,7 @@ function renderSettingsPanel() {
   if (activeSetTab === 'SESSIONS') {
     const remembered = Boolean(localStorage.getItem('zynk_session'));
     card.innerHTML = `
-      <h2 style="margin-bottom:14px;">💻 Active Sessions</h2>
+      <h2 style="margin-bottom:14px;">Active Sessions</h2>
       <div style="padding:14px;border-radius:12px;background:#04070b;border:1px solid var(--neon-emerald);display:flex;justify-content:space-between;align-items:center;">
         <div>
           <strong>Current Browser Session <span class="pill" style="margin-left:6px;color:#10b981;">This Device</span></strong>
