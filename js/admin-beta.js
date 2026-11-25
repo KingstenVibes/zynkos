@@ -21,6 +21,79 @@ function compressImageFile(file, maxDim = 320) {
   });
 }
 
+async function renderStaffReports() {
+  const box = document.getElementById('reports-container');
+  const p = window.userProfile;
+  const isStaff = p && (['FOUNDER', 'ADMIN', 'MODERATOR'].includes(p.role) || (p.extra_roles || []).some(r => ['ADMIN', 'MODERATOR'].includes(r)));
+  if (!box || !isStaff || !window.sbRest) return;
+
+  const reports = await window.sbRest('zynk_reports?order=id.desc&limit=50').catch(() => []);
+  const stipendBanner = `
+    <div class="glass-card" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;border-color:rgba(6,182,212,0.35);">
+      <div>
+        <span class="rarity-tag" style="color:#06b6d4;">STAFF PERK • COMING SOON</span>
+        <h3>Daily Staff Stipend</h3>
+        <p class="sub-text">Daily Z-Credits bonus for active Moderators, Admins & Staff will unlock here soon.</p>
+      </div>
+      <button type="button" class="btn-outline" disabled>Coming Soon</button>
+    </div>`;
+
+  const listHtml = (reports || []).map(r => `
+    <div class="glass-card" id="rep-${r.id}" style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:8px;">
+        <div><strong>Reported: <span style="color:#f43f5e">@${r.target_user}</span></strong> <span class="mono-dim">• by @${r.reporter} in #${r.channel || 'global'}</span></div>
+        <span class="pill" style="color:#f59e0b;border-color:#f59e0b;">${r.reason}</span>
+      </div>
+      <div style="padding:10px;border-radius:8px;background:#04070b;margin-bottom:10px;font-size:0.86rem;">"${String(r.message_text || '').replace(/</g, '&lt;')}"</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" class="btn-outline" data-act="ghost" data-id="${r.id}">Ghost (Dismiss)</button>
+        <button type="button" class="btn-outline" style="color:#f59e0b;border-color:#f59e0b;" data-act="mute" data-id="${r.id}" data-u="${r.target_user}" data-r="${r.reason}">Mute (Choose Time)</button>
+        <button type="button" class="btn-outline" style="color:#f43f5e;border-color:#f43f5e;" data-act="ban" data-id="${r.id}" data-u="${r.target_user}" data-r="${r.reason}">Ban (Choose Time)</button>
+        <button type="button" class="btn-neon" style="background:#f43f5e;color:#fff;" data-act="term" data-id="${r.id}" data-u="${r.target_user}" data-r="${r.reason}">Terminate Account</button>
+      </div>
+    </div>`).join('') || '<div class="glass-card"><p class="sub-text">No reports in the moderation queue. All clear!</p></div>';
+
+  box.innerHTML = stipendBanner + listHtml;
+
+  box.querySelectorAll('[data-act]').forEach(btn => (btn.onclick = async () => {
+    const act = btn.dataset.act;
+    const id = btn.dataset.id;
+    const target = btn.dataset.u;
+    const reason = btn.dataset.r || 'Rule violation';
+    if (act === 'ghost') {
+      await window.sbRest(`zynk_reports?id=eq.${id}`, 'DELETE', null, window.authToken);
+      document.getElementById(`rep-${id}`)?.remove();
+      return window.notify?.('Report ghosted & dismissed.');
+    }
+    if (act === 'mute') {
+      const dur = prompt(`Mute @${target} for how long? (e.g. 10m, 1h, 1d):`, '10m');
+      if (!dur) return;
+      const m = dur.match(/^(\d+)([mhd])$/i);
+      const ms = m ? parseInt(m.at(1), 10) * (m.at(2).toLowerCase() === 'd' ? 86400000 : m.at(2).toLowerCase() === 'h' ? 3600000 : 60000) : 600000;
+      await window.sbRest(`users?username=ilike.${encodeURIComponent(target)}`, 'PATCH', { is_muted: true, mute_until: Date.now() + ms, mute_reason: reason }, window.authToken);
+      await window.sbRest(`zynk_reports?id=eq.${id}`, 'DELETE', null, window.authToken);
+      document.getElementById(`rep-${id}`)?.remove();
+      return window.notify?.(`Muted @${target} for ${dur}.`);
+    }
+    if (act === 'ban') {
+      const dur = prompt(`Ban @${target} for how long? (e.g. 1h, 1d, 7d):`, '1d');
+      if (!dur) return;
+      const m = dur.match(/^(\d+)([mhd])$/i);
+      const ms = m ? parseInt(m.at(1), 10) * (m.at(2).toLowerCase() === 'd' ? 86400000 : m.at(2).toLowerCase() === 'h' ? 3600000 : 60000) : 86400000;
+      await window.sbRest(`users?username=ilike.${encodeURIComponent(target)}`, 'PATCH', { ban_until: Date.now() + ms, ban_reason: reason, online: false }, window.authToken);
+      await window.sbRest(`zynk_reports?id=eq.${id}`, 'DELETE', null, window.authToken);
+      document.getElementById(`rep-${id}`)?.remove();
+      return window.notify?.(`Banned @${target} for ${dur}.`);
+    }
+    if (act === 'term') {
+      if (!confirm(`Permanently terminate @${target}'s account?`)) return;
+      await window.sbRest(`users?username=ilike.${encodeURIComponent(target)}`, 'PATCH', { ban_until: 9999999999999, ban_reason: `Terminated: ${reason}`, online: false }, window.authToken);
+      await window.sbRest(`zynk_reports?id=eq.${id}`, 'DELETE', null, window.authToken);
+      document.getElementById(`rep-${id}`)?.remove();
+      return window.notify?.(`Terminated @${target}.`);
+    }
+  }));
+}
 async function renderAdminAndBeta() {
   const p = window.userProfile;
   const adminBox = document.getElementById('admin-panel-container');
@@ -72,6 +145,7 @@ async function renderAdminAndBeta() {
       window.notify('Beta +250 Z-Credits claimed!');
     };
   }
+
   if (!adminBox || !isFounder) return;
 
   const ADM_SVG = {
@@ -132,6 +206,8 @@ async function renderAdminAndBeta() {
       await window.sbRest(`announcements?id=eq.${id}`, 'DELETE', null, window.authToken);
     }));
   }
+
+
   if (activeFounderTab === 'SHOP') {
     const storeItems = await window.sbRest('store_items?order=id.asc').catch(() => []);
     sub.innerHTML = `
@@ -256,7 +332,7 @@ async function renderAdminAndBeta() {
       await window.sbRest(`zynk_credits?id=eq.${id}`, 'DELETE', null, window.authToken);
     }));
   }
-  if (activeFounderTab === 'ROLES') {
+    if (activeFounderTab === 'ROLES') {
     const allMembers = await window.sbRest('users?order=username.asc&limit=200').catch(() => []);
     sub.innerHTML = `
       <div class="bento-grid" style="padding:0;">
@@ -346,7 +422,6 @@ async function renderAdminAndBeta() {
     document.getElementById('adm-search-user').oninput = (e) => renderMatches(e.target.value);
     if (selectedMember) activateMember(selectedMember);
   }
-
   if (activeFounderTab === 'SECRETS') {
     const customQuests = await window.sbRest('achievements_list?order=id.desc').catch(() => []);
     sub.innerHTML = `
@@ -387,5 +462,5 @@ async function renderAdminAndBeta() {
   }
 }
 
-window.addEventListener('zynk-profile-updated', renderAdminAndBeta);
-window.addEventListener('DOMContentLoaded', renderAdminAndBeta);
+window.addEventListener('zynk-profile-updated', () => { renderAdminAndBeta(); renderStaffReports(); });
+window.addEventListener('DOMContentLoaded', () => { renderAdminAndBeta(); renderStaffReports(); });
