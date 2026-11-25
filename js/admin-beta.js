@@ -1,7 +1,6 @@
 let uploadedImg = '';
 let activeFounderTab = 'ANNOUNCE';
 let selectedMember = null;
-let betaChatHash = '';
 
 function compressImageFile(file, maxDim = 320) {
   return new Promise((resolve) => {
@@ -22,36 +21,6 @@ function compressImageFile(file, maxDim = 320) {
   });
 }
 
-async function pollBetaLabChat() {
-  const feed = document.getElementById('beta-lab-feed');
-  if (!feed || !window.sbRest) return;
-  const cols = 'id,user_id,username,role,color,content,created_at,image_url';
-  const msgs = await window.sbRest(`messages?select=${cols}&channel=eq.beta&order=id.desc&limit=35`).catch(() => []);
-  if (!Array.isArray(msgs)) return;
-  msgs.reverse();
-  const hash = JSON.stringify(msgs.map(m => [m.id, m.content]));
-  if (hash === betaChatHash) return;
-  betaChatHash = hash;
-  const me = window.userProfile;
-  feed.innerHTML = msgs.map(m => {
-    const canDel = me && (me.role === 'FOUNDER' || String(m.user_id) === String(me.id));
-    const t = m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-    return `<div style="padding:10px 12px;border-radius:10px;background:rgba(4,7,11,0.75);border:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;gap:10px;">
-      <div>
-        <div><strong style="color:${m.color || '#a855f7'}">${m.username}</strong> <span class="mono-dim">[${m.role}] • ${t}</span></div>
-        <div style="margin-top:3px;word-break:break-word;">${String(m.content || '').replace(/</g, '&lt;')}</div>
-        ${m.image_url ? `<img src="${m.image_url}" style="max-width:220px;border-radius:8px;margin-top:6px;" />` : ''}
-      </div>
-      ${canDel ? `<button type="button" class="btn-ghost" style="color:#f43f5e;" data-bdel="${m.id}">✕</button>` : ''}
-    </div>`;
-  }).join('') || '<p class="sub-text">No Beta Lab messages yet—start the discussion!</p>';
-  feed.scrollTop = feed.scrollHeight;
-  feed.querySelectorAll('[data-bdel]').forEach(b => (b.onclick = async () => {
-    await window.sbRest(`messages?id=eq.${b.dataset.bdel}`, 'DELETE', null, window.authToken);
-    betaChatHash = '';
-    pollBetaLabChat();
-  }));
-}
 async function renderAdminAndBeta() {
   const p = window.userProfile;
   const adminBox = document.getElementById('admin-panel-container');
@@ -61,50 +30,30 @@ async function renderAdminAndBeta() {
 
   if (betaGrid && isBeta) {
     const betaClaimed = Array.isArray(p?.claimed) && p.claimed.includes('beta_stipend_v2');
+    betaGrid.className = 'cards-grid';
     betaGrid.innerHTML = `
-      <div class="bento-grid" style="padding:0;">
-        <div class="glass-card" style="grid-column:span 2;display:flex;flex-direction:column;height:440px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <h3>⚛ #beta-lab — Exclusive Beta Tester Chat</h3>
-            <span class="pill" style="color:#a855f7;border-color:#a855f7;">BETA & FOUNDER ONLY</span>
-          </div>
-          <div id="beta-lab-feed" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px;margin-bottom:10px;"></div>
-          <form id="beta-chat-form" style="display:flex;gap:8px;">
-            <input type="file" id="beta-img-inp" accept="image/*" class="hidden" />
-            <button type="button" class="btn-outline" id="beta-img-btn" title="Attach Image">+</button>
-            <input id="beta-chat-inp" class="tool-input" style="margin:0;flex:1;" placeholder="Message #beta-lab..." autocomplete="off" />
-            <button type="submit" class="btn-neon">Send</button>
-          </form>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:16px;">
-          <div class="glass-card"><span class="rarity-tag" style="color:#06b6d4">BETA PERK 1</span><h3>Tester Stipend</h3><p class="sub-text" style="margin:6px 0 10px;">One-time +250 Z-Credits reward for testing ZynkOS.</p><button class="${betaClaimed ? 'btn-outline' : 'btn-neon'}" style="width:100%" id="beta-bonus-btn" ${betaClaimed ? 'disabled' : ''}>${betaClaimed ? '✓ Claimed' : 'Claim +250 Z-Credits'}</button></div>
-          <div class="glass-card"><span class="rarity-tag" style="color:#06b6d4">BETA PERK 2</span><h3>Quick Theme Preview</h3><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"><button class="btn-outline" data-th="default">Emerald</button><button class="btn-outline" data-th="theme-cyber">Cyan</button><button class="btn-outline" data-th="theme-crimson">Crimson</button><button class="btn-outline" data-th="theme-violet">Violet</button></div></div>
-        </div>
+      <div class="glass-card" style="border-color:rgba(168,85,247,0.45);">
+        <span class="rarity-tag" style="color:#a855f7">BETA EXCLUSIVE CHANNEL</span>
+        <h3>#beta-lab Live Chat</h3>
+        <p class="sub-text" style="margin:6px 0 14px;">Full-featured private Beta channel with Replies, Reactions, Custom Stickers, Image Uploads & @mentions.</p>
+        <button type="button" class="btn-neon" style="width:100%" id="beta-open-chat-btn">Open #beta-lab Chat</button>
+      </div>
+      <div class="glass-card">
+        <span class="rarity-tag" style="color:#06b6d4">BETA PERK 1</span>
+        <h3>Beta Tester Stipend</h3>
+        <p class="sub-text" style="margin:6px 0 14px;">One-time +250 Z-Credits reward for testing ZynkOS builds.</p>
+        <button class="${betaClaimed ? 'btn-outline' : 'btn-neon'}" style="width:100%" id="beta-bonus-btn" ${betaClaimed ? 'disabled' : ''}>${betaClaimed ? 'Claimed' : 'Claim +250 Z-Credits'}</button>
+      </div>
+      <div class="glass-card">
+        <span class="rarity-tag" style="color:#06b6d4">BETA PERK 2</span>
+        <h3>Quick Theme Switcher</h3>
+        <p class="sub-text" style="margin:6px 0 12px;">Preview steady page color themes instantly.</p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn-outline" data-th="default">Emerald</button><button class="btn-outline" data-th="theme-cyber">Cyan</button><button class="btn-outline" data-th="theme-crimson">Crimson</button><button class="btn-outline" data-th="theme-violet">Violet</button></div>
       </div>`;
 
-    betaChatHash = '';
-    pollBetaLabChat();
-
-    document.getElementById('beta-img-btn').onclick = () => document.getElementById('beta-img-inp').click();
-    document.getElementById('beta-img-inp').onchange = async (e) => {
-      const f = e.target.files?.at(0);
-      if (!f) return;
-      const imgUrl = await compressImageFile(f, 360);
-      await window.sbRest('messages', 'POST', { user_id: p.id, username: p.username, avatar: 'logo.png', role: p.role, is_beta: true, color: p.equipped_color, content: f.name, image_url: imgUrl, channel: 'beta' }, window.authToken);
-      e.target.value = '';
-      betaChatHash = '';
-      pollBetaLabChat();
-    };
-
-    document.getElementById('beta-chat-form').onsubmit = async (e) => {
-      e.preventDefault();
-      const inp = document.getElementById('beta-chat-inp');
-      const txt = inp.value.trim();
-      if (!txt) return;
-      inp.value = '';
-      await window.sbRest('messages', 'POST', { user_id: p.id, username: p.username, avatar: 'logo.png', role: p.role, is_beta: true, color: p.equipped_color, content: txt, channel: 'beta' }, window.authToken);
-      betaChatHash = '';
-      pollBetaLabChat();
+    document.getElementById('beta-open-chat-btn').onclick = () => {
+      window.openTab?.('chat-view');
+      window.switchChatChannel?.('beta', '#beta-lab');
     };
 
     betaGrid.querySelectorAll('[data-th]').forEach(b => (b.onclick = async () => {
@@ -123,15 +72,24 @@ async function renderAdminAndBeta() {
       window.notify('Beta +250 Z-Credits claimed!');
     };
   }
-
   if (!adminBox || !isFounder) return;
 
+  const ADM_SVG = {
+    upload: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`,
+    trash: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
+    partner: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>`,
+    team: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+    search: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
+    shield: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+    lock: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`
+  };
+
   const fTabs = [
-    { id: 'ANNOUNCE', label: '📢 Broadcasts' },
-    { id: 'SHOP', label: '🖼 Shop & Deals' },
-    { id: 'PARTNERS', label: '🤝 Partners & Credits' },
-    { id: 'ROLES', label: '⚡ Members & Roles' },
-    { id: 'SECRETS', label: '🔒 Quests & Secrets' }
+    { id: 'ANNOUNCE', label: 'Broadcasts' },
+    { id: 'SHOP', label: 'Shop & Deals' },
+    { id: 'PARTNERS', label: 'Partners & Credits' },
+    { id: 'ROLES', label: 'Members & Roles' },
+    { id: 'SECRETS', label: 'Quests & Secrets' }
   ];
 
   adminBox.innerHTML = `
@@ -148,16 +106,15 @@ async function renderAdminAndBeta() {
     sub.innerHTML = `
       <div class="bento-grid" style="padding:0;">
         <div class="glass-card">
-          <h3>📢 Broadcast System Announcement</h3>
-          <select id="ann-icon" class="tool-input" style="margin-top:8px;"><option value="📢">📢 Megaphone</option><option value="🚀">🚀 Launch / Update</option><option value="🔥">🔥 Hot / Event</option><option value="🎁">🎁 Giveaway / Reward</option><option value="⚡">⚡ System Alert</option><option value="🛠️">🛠️ Maintenance / Fix</option><option value="👑">👑 Founder Note</option></select>
-          <input id="ann-title" class="tool-input" placeholder="Announcement Title" />
+          <h3>Broadcast System Announcement</h3>
+          <input id="ann-title" class="tool-input" style="margin-top:8px;" placeholder="Announcement Title" />
           <textarea id="ann-body" class="tool-input" rows="4" placeholder="Write your announcement message..."></textarea>
           <button id="ann-post-btn" class="btn-neon" style="width:100%">Publish to Home Feed</button>
         </div>
         <div class="glass-card">
           <h3>Past Broadcasts (${(anns || []).length})</h3>
           <div style="max-height:310px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-top:8px;">
-            ${(anns || []).map(a => `<div id="ann-row-${a.id}" style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(4,7,11,0.7);border-radius:8px;"><div><strong>${a.icon} ${a.title}</strong><div class="sub-text">${a.body}</div></div><button class="btn-ghost" data-del-ann="${a.id}">✕</button></div>`).join('') || '<p class="sub-text">No broadcasts yet.</p>'}
+            ${(anns || []).map(a => `<div id="ann-row-${a.id}" style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(4,7,11,0.7);border-radius:8px;"><div><strong>${a.title}</strong><div class="sub-text">${a.body}</div></div><button class="btn-ghost" data-del-ann="${a.id}">✕</button></div>`).join('') || '<p class="sub-text">No broadcasts yet.</p>'}
           </div>
         </div>
       </div>`;
@@ -165,7 +122,7 @@ async function renderAdminAndBeta() {
       const title = document.getElementById('ann-title').value.trim();
       const body = document.getElementById('ann-body').value.trim();
       if (!title || !body) return window.notify('Enter both title and message.', true);
-      await window.sbRest('announcements', 'POST', { icon: document.getElementById('ann-icon').value, title, body, author: p.username }, window.authToken);
+      await window.sbRest('announcements', 'POST', { icon: '', title, body, author: p.username }, window.authToken);
       window.notify('Announcement published!');
       renderAdminAndBeta();
     };
@@ -175,16 +132,6 @@ async function renderAdminAndBeta() {
       await window.sbRest(`announcements?id=eq.${id}`, 'DELETE', null, window.authToken);
     }));
   }
-  const ADM_SVG = {
-    upload: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`,
-    trash: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
-    partner: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>`,
-    team: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
-    search: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
-    shield: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
-    lock: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`
-  };
-
   if (activeFounderTab === 'SHOP') {
     const storeItems = await window.sbRest('store_items?order=id.asc').catch(() => []);
     sub.innerHTML = `
@@ -244,6 +191,7 @@ async function renderAdminAndBeta() {
       window.notify('Deleted item from Store!');
     }));
   }
+
   if (activeFounderTab === 'PARTNERS') {
     const partners = await window.sbRest('zynk_partners?order=id.asc').catch(() => []);
     const credits = await window.sbRest('zynk_credits?order=id.asc').catch(() => []);
@@ -398,6 +346,7 @@ async function renderAdminAndBeta() {
     document.getElementById('adm-search-user').oninput = (e) => renderMatches(e.target.value);
     if (selectedMember) activateMember(selectedMember);
   }
+
   if (activeFounderTab === 'SECRETS') {
     const customQuests = await window.sbRest('achievements_list?order=id.desc').catch(() => []);
     sub.innerHTML = `
@@ -438,8 +387,5 @@ async function renderAdminAndBeta() {
   }
 }
 
-setInterval(() => {
-  if (document.getElementById('beta-view')?.classList.contains('active')) pollBetaLabChat();
-}, 3500);
 window.addEventListener('zynk-profile-updated', renderAdminAndBeta);
 window.addEventListener('DOMContentLoaded', renderAdminAndBeta);
