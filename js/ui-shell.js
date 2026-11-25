@@ -29,7 +29,8 @@ window.openTab = function(tabId) {
   document.querySelectorAll('.tab-view').forEach(v => v.classList.toggle('active', v.id === tabId));
 
   if (p && window.sbRest && TAB_ACTIVITIES[tabId]) {
-    window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { activity_text: TAB_ACTIVITIES[tabId], online: true }, window.authToken).catch(() => {});
+    const chPatch = tabId === 'chat-view' ? { last_channel: window.activeChatLabel || '#zynk-global' } : {};
+    window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { activity_text: TAB_ACTIVITIES[tabId], online: true, last_seen: Date.now(), ...chPatch }, window.authToken).catch(() => {});
   }
 };
 
@@ -48,7 +49,6 @@ document.addEventListener('mousemove', (e) => {
   halo.style.setProperty('--mx', e.clientX + 'px');
   halo.style.setProperty('--my', e.clientY + 'px');
 });
-
 const authModal = mk('div', 'startup-gate', `
   <div class="glass-card startup-box">
     <img src="logo.png" alt="ZynkOS" style="width:54px;height:54px;margin:0 auto 10px;border-radius:12px;object-fit:cover;display:block;" />
@@ -67,6 +67,7 @@ authModal.id = 'auth-modal';
 
 const userModal = mk('div', 'modal-backdrop hidden', `<div class="glass-card profile-modal" id="user-modal-content"></div>`);
 userModal.id = 'user-modal';
+
 const shell = mk('div', 'os-shell');
 const dock = mk('aside', 'left-dock', `
   <div class="dock-top">
@@ -75,33 +76,41 @@ const dock = mk('aside', 'left-dock', `
     <button type="button" class="collapse-btn" id="toggle-dock" onclick="document.getElementById('left-dock').classList.toggle('expanded')" title="Expand / Collapse Sidebar">${ic.arrow || '▶'}</button>
   </div>
   <div class="dock-section">
-    <button type="button" class="dock-btn active" data-tab="dash-view" onclick="openTab('dash-view')"><span class="sym">${ic.home || '⌂'}</span><span class="lbl">Dashboard</span></button>
-    <button type="button" class="dock-btn" data-tab="chat-view" onclick="openTab('chat-view')"><span class="sym">${ic.chat || '💬'}</span><span class="lbl">Zynk Chat</span></button>
-    <button type="button" class="dock-btn" data-tab="vortex-view" onclick="openTab('vortex-view')"><span class="sym">${ic.vortex || '❖'}</span><span class="lbl">Vortex Guild</span></button>
-    <button type="button" class="dock-btn" data-tab="arcade-view" onclick="openTab('arcade-view')"><span class="sym">${ic.arcade || '🎮'}</span><span class="lbl">UGS Arcade</span></button>
-    <button type="button" class="dock-btn" data-tab="ranks-view" onclick="openTab('ranks-view')"><span class="sym">${ic.ranks || '★'}</span><span class="lbl">Ranks</span></button>
-    <button type="button" class="dock-btn" data-tab="store-view" onclick="openTab('store-view')"><span class="sym">${ic.store || '🛒'}</span><span class="lbl">Zynk Store</span></button>
+    <button type="button" class="dock-btn active" data-tab="dash-view" onclick="openTab('dash-view')"><span class="sym">${ic.home || ''}</span><span class="lbl">Dashboard</span></button>
+    <button type="button" class="dock-btn" data-tab="chat-view" onclick="openTab('chat-view')" style="position:relative;"><span class="sym">${ic.chat || ''}</span><span class="lbl">Zynk Chat</span><span id="dock-chat-badge" class="hidden" style="position:absolute;top:6px;right:8px;background:#f43f5e;color:#fff;font-size:0.65rem;font-weight:800;padding:1px 5px;border-radius:999px;">0</span></button>
+    <button type="button" class="dock-btn" data-tab="vortex-view" onclick="openTab('vortex-view')"><span class="sym">${ic.vortex || ''}</span><span class="lbl">Vortex Guild</span></button>
+    <button type="button" class="dock-btn" data-tab="arcade-view" onclick="openTab('arcade-view')"><span class="sym">${ic.arcade || ''}</span><span class="lbl">UGS Arcade</span></button>
+    <button type="button" class="dock-btn" data-tab="ranks-view" onclick="openTab('ranks-view')"><span class="sym">${ic.ranks || ''}</span><span class="lbl">Ranks</span></button>
+    <button type="button" class="dock-btn" data-tab="store-view" onclick="openTab('store-view')"><span class="sym">${ic.store || ''}</span><span class="lbl">Zynk Store</span></button>
   </div>
   <div class="dock-section">
-    <button type="button" class="dock-btn" data-tab="profile-view" onclick="openTab('profile-view')"><span class="sym">${ic.profile || '👤'}</span><span class="lbl">My Profile & Vault</span></button>
-    <button type="button" class="dock-btn" data-tab="achieve-view" onclick="openTab('achieve-view')"><span class="sym">${ic.quests || '🏆'}</span><span class="lbl">Quests</span></button>
-    <button type="button" class="dock-btn" data-tab="leader-view" onclick="openTab('leader-view')"><span class="sym">${ic.leader || '📊'}</span><span class="lbl">Leaderboards</span></button>
-    <button type="button" class="dock-btn" data-tab="tools-view" onclick="openTab('tools-view')"><span class="sym">${ic.tools || '⌘'}</span><span class="lbl">Utility Tools</span></button>
-    <button type="button" class="dock-btn" data-tab="partners-view" onclick="openTab('partners-view')"><span class="sym">${ic.vortex || '🤝'}</span><span class="lbl">Partners</span></button>
-    <button type="button" class="dock-btn" data-tab="credits-view" onclick="openTab('credits-view')"><span class="sym">${ic.ranks || '◈'}</span><span class="lbl">Credits & Team</span></button>
-    <button type="button" class="dock-btn" data-tab="rules-view" onclick="openTab('rules-view')"><span class="sym">📜</span><span class="lbl">Rules & Terms</span></button>
-    <button type="button" class="dock-btn hidden" id="nav-beta-btn" style="display:none;" data-tab="beta-view" onclick="openTab('beta-view')"><span class="sym">${ic.beta || '⚛'}</span><span class="lbl">Beta Lab</span></button>
-    <button type="button" class="dock-btn hidden" id="nav-admin-btn" style="display:none;" data-tab="admin-view" onclick="openTab('admin-view')"><span class="sym">${ic.admin || '⚡'}</span><span class="lbl">Founder Panel</span></button>
-    <button type="button" class="dock-btn" data-tab="settings-view" onclick="openTab('settings-view')"><span class="sym">${ic.settings || '⚙'}</span><span class="lbl">Settings</span></button>
+    <button type="button" class="dock-btn" data-tab="profile-view" onclick="openTab('profile-view')"><span class="sym">${ic.profile || ''}</span><span class="lbl">My Profile & Vault</span></button>
+    <button type="button" class="dock-btn" data-tab="achieve-view" onclick="openTab('achieve-view')"><span class="sym">${ic.quests || ''}</span><span class="lbl">Quests</span></button>
+    <button type="button" class="dock-btn" data-tab="leader-view" onclick="openTab('leader-view')"><span class="sym">${ic.leader || ''}</span><span class="lbl">Leaderboards</span></button>
+    <button type="button" class="dock-btn" data-tab="tools-view" onclick="openTab('tools-view')"><span class="sym">${ic.tools || ''}</span><span class="lbl">Utility Tools</span></button>
+    <button type="button" class="dock-btn" data-tab="partners-view" onclick="openTab('partners-view')"><span class="sym">${ic.vortex || ''}</span><span class="lbl">Partners</span></button>
+    <button type="button" class="dock-btn" data-tab="credits-view" onclick="openTab('credits-view')"><span class="sym">${ic.ranks || ''}</span><span class="lbl">Credits & Team</span></button>
+    <button type="button" class="dock-btn" data-tab="rules-view" onclick="openTab('rules-view')"><span class="sym">${ic.quests || ''}</span><span class="lbl">Rules & Terms</span></button>
+    <button type="button" class="dock-btn hidden" id="nav-beta-btn" style="display:none;" data-tab="beta-view" onclick="openTab('beta-view')"><span class="sym">${ic.beta || ''}</span><span class="lbl">Beta Lab</span></button>
+    <button type="button" class="dock-btn hidden" id="nav-admin-btn" style="display:none;" data-tab="admin-view" onclick="openTab('admin-view')"><span class="sym">${ic.admin || ''}</span><span class="lbl">Founder Panel</span></button>
+    <button type="button" class="dock-btn" data-tab="settings-view" onclick="openTab('settings-view')"><span class="sym">${ic.settings || ''}</span><span class="lbl">Settings</span></button>
   </div>
   <div class="dock-clock"><span id="dock-hr">12</span><span class="dock-sep">:</span><span id="dock-min">00</span></div>
 `);
 dock.id = 'left-dock';
 const main = mk('main', 'main-viewport', `
   <section id="dash-view" class="tab-view active">
-    <div class="dash-topbar">
+    <div class="dash-topbar" style="gap:10px;flex-wrap:wrap;">
       <div class="status-pill"><span class="pulse-dot"></span> ZynkOS Network Live</div>
-      <div class="top-actions"><span class="mono-dim" id="tz-badge">Local Time</span><button class="btn-outline" id="top-auth-btn">Sign Out</button></div>
+      <div style="position:relative;flex:1;max-width:340px;min-width:190px;">
+        <input id="global-search-inp" class="tool-input" style="margin:0;padding:7px 12px;font-size:0.84rem;" placeholder="Search members, messages, store items..." autocomplete="off" />
+        <div id="global-search-pop" class="autocomplete-pop hidden" style="left:0;right:0;top:110%;max-height:280px;overflow-y:auto;"></div>
+      </div>
+      <div class="top-actions">
+        <button type="button" class="btn-outline" id="open-inbox-btn" style="padding:6px 12px;font-size:0.82rem;position:relative;">Inbox <span id="inbox-badge" class="hidden" style="background:#f43f5e;color:#fff;font-size:0.68rem;font-weight:800;padding:1px 6px;border-radius:999px;margin-left:4px;">0</span></button>
+        <span class="mono-dim" id="tz-badge">Local Time</span>
+        <button class="btn-outline" id="top-auth-btn">Sign Out</button>
+      </div>
     </div>
 
     <div class="bento-grid" style="padding-bottom:10px;">
@@ -138,20 +147,19 @@ const main = mk('main', 'main-viewport', `
     <div class="bento-grid" style="padding-top:8px;">
       <div class="glass-card" style="display:flex;flex-direction:column;justify-content:space-between;">
         <div>
-          <div class="card-head"><span>🎁 Daily Mystery Reward</span><span class="mono-dim" id="dash-streak-pill">0 DAY STREAK</span></div>
+          <div class="card-head"><span>Daily Mystery Reward</span><span class="mono-dim" id="dash-streak-pill">0 DAY STREAK</span></div>
           <p class="sub-text" style="margin-bottom:14px;">Pick 1 of 3 mystery cards every 24 hours for Common, Uncommon, or Epic Z-Credits & XP!</p>
         </div>
-        <button class="btn-neon" id="dash-daily-btn" style="width:100%;">🎁 Pick Daily Mystery Card</button>
+        <button class="btn-neon" id="dash-daily-btn" style="width:100%;">Pick Daily Mystery Card</button>
       </div>
 
       <div class="glass-card" style="grid-column:span 2;">
-        <div class="card-head"><span>📢 System Announcements</span><span class="mono-dim">BROADCAST FEED</span></div>
+        <div class="card-head"><span>System Announcements</span><span class="mono-dim">BROADCAST FEED</span></div>
         <div id="dash-announcements-list" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-right:4px;"></div>
       </div>
     </div>
     <div style="text-align:center;padding:12px 0 24px;color:var(--text-dim);font-size:0.78rem;">© 2026 ZynkOS • All Rights Reserved • Powered by ZynkOS Network</div>
   </section>
-
   <section id="chat-view" class="tab-view chat-layout">
     <div class="chat-main">
       <div class="view-topbar"><div><h2># zynk-global</h2><span class="sub-text">Type / for commands or @ to mention & ping a member</span></div><span class="pill" id="chat-credits">0 Z-Credits</span></div>
@@ -163,17 +171,23 @@ const main = mk('main', 'main-viewport', `
   </section>
 
   <section id="vortex-view" class="tab-view padded-view">
-    <div class="glass-card" style="max-width:600px;margin:20px auto;padding:30px;text-align:center;">
+    <div class="glass-card" style="max-width:620px;margin:20px auto;padding:30px;text-align:center;">
       <span class="rarity-tag">OFFICIAL PARTNER INTEGRATION • VORTEXOS</span>
-      <h2 style="margin:8px 0 10px;">Vortex Guild & Community Hub</h2>
-      <p class="sub-text" style="margin-bottom:16px;">Connect with the official ZynkOS Guild on Vortex. By launching Vortex, you agree to follow Vortex's Community Guidelines and ZynkOS Rules.</p>
-      <div style="padding:12px;border-radius:10px;background:rgba(4,7,11,0.75);border:1px solid rgba(255,255,255,0.08);margin-bottom:18px;font-size:0.84rem;color:var(--text-dim);">
-        Powered by <a href="https://vortexos.net" target="_blank" rel="noopener" style="color:var(--neon-emerald);font-weight:700;text-decoration:none;">VortexOS.net ↗</a> • External Guild Window
+      <h2 style="margin:8px 0 10px;">Vortex Guild & Global Network</h2>
+      <p class="sub-text" style="margin-bottom:14px;">Choose whether to enter the ZynkOS Guild channel only or browse Vortex Global. Follow all Vortex Community Rules & Partner Guidelines.</p>
+      <div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px;">
+        <button type="button" class="btn-neon" id="vtx-mode-guild" onclick="window.setVortexMode('guild')">ZynkOS Guild Only</button>
+        <button type="button" class="btn-outline" id="vtx-mode-global" onclick="window.setVortexMode('global')">Vortex Global</button>
       </div>
+      <label class="remember-row" style="justify-content:center;margin-bottom:16px;">
+        <input type="checkbox" id="vtx-rules-ok" checked />
+        <span>I agree to follow Vortex Rules, Partner Policy & ZynkOS Guidelines</span>
+      </label>
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-        <button type="button" class="btn-neon" onclick="window.open('https://vortexos.net')">❖ Log in with Vortex & Open Guild ↗</button>
+        <button type="button" class="btn-neon" id="vtx-launch-btn">Log in with Vortex & Open ↗</button>
         <button type="button" class="btn-outline" onclick="window.open('https://vortexos.net')">Vortex Partner Policy ↗</button>
       </div>
+      <div style="margin-top:14px;font-size:0.8rem;color:var(--text-dim);">Powered by <a href="https://vortexos.net" target="_blank" rel="noopener" style="color:var(--neon-emerald);font-weight:700;text-decoration:none;">VortexOS.net ↗</a></div>
     </div>
   </section>
 
