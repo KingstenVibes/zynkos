@@ -156,3 +156,43 @@ body { background: radial-gradient(circle at top right, color-mix(in srgb, var(-
 .zynk-toast-box { position: fixed; bottom: 18px; right: 18px; display: flex; flex-direction: column; gap: 8px; z-index: 9999; }
 .zynk-toast { background: #0b121c; border: 1px solid var(--neon-emerald); color: var(--text-main); padding: 10px 16px; border-radius: 10px; font-size: 0.85rem; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); }
 .zynk-toast.err { border-color: #f43f5e; color: #fda4af; }
+
+@keyframes zynkConfettiFall {
+  0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+.zynk-confetti {
+  position: fixed;
+  top: -10px;
+  width: 9px;
+  height: 14px;
+  z-index: 999999;
+  pointer-events: none;
+  border-radius: 2px;
+  animation: zynkConfettiFall 2.4s ease-out forwards;
+}
+.typing-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #e2e8f0;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+@media (max-width: 900px) {
+  .bento-grid { grid-template-columns: 1fr !important; }
+  .bento-grid > .glass-card { grid-column: span 1 !important; }
+  .store-layout { grid-template-columns: 1fr !important; }
+  .chat-layout { flex-direction: column; }
+  .members-panel { width: 100% !important; max-height: 180px; border-left: none; border-top: 1px solid var(--border-glass); }
+}
+@media (max-width: 600px) {
+  .left-dock { width: 54px; }
+  .left-dock.expanded { width: 200px; }
+  .dash-topbar { flex-direction: column; align-items: stretch; }
+}
+
