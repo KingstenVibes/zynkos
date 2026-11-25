@@ -322,14 +322,39 @@ window.deleteChatMsg = async function(msgId) {
   }
 };
 
-window.editChatMsg = async function(msgId, oldText) {
-  const next = prompt('Edit your message:', oldText);
-  if (!next || !next.trim() || next.trim() === oldText) return;
-  await window.sbRest(`messages?id=eq.${msgId}`, 'PATCH', { content: next.trim(), edited: true }, window.authToken);
-  lastChatHash = '';
-  pollChatAndMembers();
-};
+window.editChatMsg = function(msgId, oldText) {
+  const row = document.querySelector(`[data-mid="${msgId}"]`);
+  const textEl = row?.querySelector('.msg-text-body');
+  if (!textEl || row.querySelector('.inline-edit-wrap')) return;
 
+  const prevHtml = textEl.innerHTML;
+  textEl.innerHTML = `
+    <div class="inline-edit-wrap" style="margin-top:4px;">
+      <input type="text" class="tool-input inline-edit-inp" style="margin:0;padding:7px 10px;font-size:0.9rem;" value="${oldText.replace(/"/g, '&quot;')}" />
+      <div class="mono-dim" style="font-size:0.72rem;margin-top:4px;">escape to <span class="inline-cancel" style="color:#06b6d4;cursor:pointer;text-decoration:underline;">cancel</span> • enter to <span class="inline-save" style="color:#10b981;cursor:pointer;text-decoration:underline;">save</span></div>
+    </div>`;
+
+  const inp = textEl.querySelector('.inline-edit-inp');
+  inp.focus();
+  inp.setSelectionRange(inp.value.length, inp.value.length);
+
+  const cancel = () => { textEl.innerHTML = prevHtml; };
+  const save = async () => {
+    const next = inp.value.trim();
+    if (!next || next === oldText) return cancel();
+    textEl.innerHTML = `${next.replace(/</g, '&lt;')} <span class="mono-dim">(edited)</span>`;
+    await window.sbRest(`messages?id=eq.${msgId}`, 'PATCH', { content: next, edited: true }, window.authToken);
+    lastChatHash = '';
+    pollChatAndMembers();
+  };
+
+  textEl.querySelector('.inline-cancel').onclick = cancel;
+  textEl.querySelector('.inline-save').onclick = save;
+  inp.onkeydown = (ev) => {
+    if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
+    if (ev.key === 'Enter') { ev.preventDefault(); save(); }
+  };
+};
 window.setChatReply = function(username, text) {
   activeReply = `@${username}: ${text.slice(0, 65)}`;
   let bar = document.getElementById('reply-preview-bar');
@@ -380,7 +405,7 @@ function buildMsgEl(m) {
     <div style="flex:1;min-width:0;">
       ${m.reply_to ? `<div class="reply-quote">${CHAT_SVG.reply} <span>${String(m.reply_to).replace(/</g, '&lt;')}</span></div>` : ''}
       <div><strong style="color:${m.color || '#10b981'};cursor:pointer;" class="msg-author">${m.username}</strong> <span class="mono-dim">[${m.role || 'MEMBER'}]${m.is_beta ? ' [BETA]' : ''} • ${timeStr}</span></div>
-      ${m.content !== '[Sticker]' ? `<div style="margin-top:3px;word-break:break-word;">${safeText}${m.edited ? ' <span class="mono-dim">(edited)</span>' : ''}</div>` : ''}
+      ${m.content !== '[Sticker]' ? `<div class="msg-text-body" style="margin-top:3px;word-break:break-word;">${safeText}${m.edited ? ' <span class="mono-dim">(edited)</span>' : ''}</div>` : ''}
       ${m.image_url ? `<img src="${m.image_url}" class="chat-img-attach" style="${m.content === '[Sticker]' ? 'width:110px;height:110px;border:none;' : ''}" />` : ''}
       ${reactHtml ? `<div class="react-row">${reactHtml}</div>` : ''}
     </div>`;
@@ -403,6 +428,7 @@ function renderMessages(msgs) {
   msgs.forEach(m => msgBox.appendChild(buildMsgEl(m)));
   if (wasAtBottom || !initialChatLoaded) msgBox.scrollTop = msgBox.scrollHeight;
 }
+
 function formatLastSeen(ts) {
   if (!ts) return '';
   const mins = Math.max(1, Math.floor((Date.now() - ts) / 60000));
@@ -410,7 +436,6 @@ function formatLastSeen(ts) {
   if (mins < 1440) return `${Math.floor(mins / 60)}h ago`;
   return `${Math.floor(mins / 1440)}d ago`;
 }
-
 async function pollChatAndMembers() {
   if (!window.sbRest) return;
   const me = window.userProfile;
@@ -482,6 +507,7 @@ async function pollChatAndMembers() {
     }
   }
 }
+
 chatInput?.addEventListener('input', () => {
   const p = window.userProfile;
   if (p && chatInput.value.trim() && Date.now() - lastTypingPing > 2500) {
@@ -523,7 +549,6 @@ chatInput?.addEventListener('input', () => {
   }
   acBox.classList.add('hidden');
 });
-
 async function botPost(text) {
   if (!window.sbRest) return;
   await window.sbRest('messages', 'POST', { username: 'ZynkBot', avatar: 'logo.png', role: 'SYSTEM', color: '#06b6d4', content: text, channel: activeChannel }, window.authToken);
