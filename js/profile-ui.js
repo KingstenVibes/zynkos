@@ -22,7 +22,7 @@ window.openUserModal = async function(uid) {
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <div>
           <h2 style="color:${u.equipped_color};font-size:1.35rem;">${u.username}</h2>
-          <div class="mono-dim" style="margin-top:2px;">${u.online ? '🟢 Online • Active in ZynkOS' : '⚫ Offline'} • Level ${Math.floor((u.xp || 0) / 1000) + 1}</div>
+          <div class="mono-dim" style="margin-top:2px;">${u.online ? `🟢 Online • ${u.activity_text || 'Active in ZynkOS'}` : '⚫ Offline'} • Level ${Math.floor((u.xp || 0) / 1000) + 1}</div>
         </div>
         <span class="pill" style="border-color:#10b981;color:#10b981;">${u.credits} Z</span>
       </div>
@@ -50,6 +50,12 @@ async function renderMyProfileTab() {
   const frameGlow = p.avatar_frame && p.avatar_frame !== 'none' ? `box-shadow:0 0 0 3px ${p.avatar_frame},0 0 18px ${p.avatar_frame};` : '';
   const bannerBg = p.banner && (p.banner.startsWith('http') || p.banner.startsWith('data:')) ? `url('${p.banner}') center/cover` : (p.banner || 'linear-gradient(135deg,#064e3b,#0f172a)');
 
+  const infList = Array.isArray(p.infractions) ? p.infractions : [];
+  const isMutedNow = p.is_muted || (p.mute_until && p.mute_until > Date.now());
+  const isBannedNow = p.ban_until && p.ban_until > Date.now();
+  const standingLabel = isBannedNow ? 'Suspended' : isMutedNow ? 'Limited (Muted)' : infList.length ? 'Good (Past Warnings)' : 'All Good';
+  const standingCol = isBannedNow ? '#f43f5e' : isMutedNow ? '#f59e0b' : '#10b981';
+
   box.innerHTML = `
     <div style="max-width:860px;margin:auto;display:flex;flex-direction:column;gap:20px;">
       <div class="glass-card" style="padding:0;overflow:hidden;">
@@ -64,6 +70,17 @@ async function renderMyProfileTab() {
             <button id="save-my-profile" class="btn-neon">Save Bio</button>
             <button id="reset-my-gear" class="btn-outline">Reset Avatar & Banner to Default</button>
           </div>
+        </div>
+      </div>
+
+      <div class="glass-card" style="border-color:${standingCol}55;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <h3>🛡️ Your Account Standing: <span style="color:${standingCol}">${standingLabel}</span></h3>
+          <span class="pill" style="border-color:${standingCol};color:${standingCol};">${infList.length} Record(s)</span>
+        </div>
+        <p class="sub-text" style="margin-bottom:10px;">Thanks for upholding our Community Rules & Terms of Service. Any staff warnings or timeouts appear below:</p>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          ${infList.map(x => `<div style="padding:8px 12px;border-radius:8px;background:#04070b;display:flex;justify-content:space-between;"><span><strong style="color:#f59e0b">${x.type}:</strong> ${x.reason}</span><span class="mono-dim">by @${x.by} • ${x.at}</span></div>`).join('') || '<div class="mono-dim">No active or expired infractions on your account.</div>'}
         </div>
       </div>
 
@@ -225,7 +242,7 @@ async function renderLeaderboardQuestsAndAnnouncements() {
   const creds = p?.credits || 0;
 
   const builtInQuests = [
-    { id: 'q_daily', cat: 'DAILY', title: '🎁 Daily Member Stipend', desc: 'Claim +150 Z-Credits every 24 hours.', cred: 150, xp: 100, cur: Date.now() - (p?.last_daily || 0) >= 86400000 ? 1 : 0, max: 1, isDaily: true },
+    { id: 'q_daily', cat: 'DAILY', title: '🎁 Daily Mystery Card', desc: 'Pick 1 of 3 mystery cards every 24 hours & build your streak.', cred: 150, xp: 100, cur: Date.now() - (p?.last_daily || 0) >= 86400000 ? 1 : 0, max: 1, isDaily: true },
     { id: 'q_msg1', cat: 'DAILY', title: '💬 First Transmission', desc: 'Send at least 1 message in Zynk Chat.', cred: 75, xp: 100, cur: Math.min(1, msgs), max: 1 },
     { id: 'q_msg15', cat: 'DAILY', title: '🗨️ Daily Chatter', desc: 'Send 15 messages in Zynk Chat.', cred: 200, xp: 250, cur: Math.min(15, msgs), max: 15 },
     { id: 'q_bio', cat: 'DAILY', title: '🪪 Identity Configured', desc: 'Customize your About Me bio on My Profile.', cred: 100, xp: 150, cur: p?.bio && !p.bio.startsWith('New ZynkOS') ? 1 : 0, max: 1 },
@@ -286,16 +303,15 @@ async function renderLeaderboardQuestsAndAnnouncements() {
       <h3>${q.title}</h3>
       <p class="sub-text" style="margin:6px 0 10px;">${q.desc}</p>
       ${!q.isSecret ? `<div class="xp-labels"><span>Progress</span><span>${q.cur} / ${q.max}</span></div><div class="xp-track" style="margin-bottom:12px;"><div class="xp-fill" style="width:${pct}%"></div></div>` : ''}
-      <button class="${canClaim ? 'btn-neon' : 'btn-outline'}" style="width:100%" ${q.isDaily ? 'id="daily-quest-btn"' : ''} ${canClaim ? '' : 'disabled'}>${isDone ? '✓ Completed' : canClaim ? 'Claim Reward' : q.isSecret ? '🔒 Discover Secret' : 'In Progress'}</button>`;
+      <button class="${canClaim ? 'btn-neon' : 'btn-outline'}" style="width:100%" ${q.isDaily ? 'id="daily-quest-btn"' : ''} ${canClaim ? '' : 'disabled'}>${isDone ? '✓ Completed' : canClaim ? (q.isDaily ? '🎁 Pick Daily Mystery Card' : 'Claim Reward') : q.isSecret ? '🔒 Discover Secret' : 'In Progress'}</button>`;
 
     const btn = card.querySelector('button');
     btn.onclick = async () => {
+      if (q.isDaily) return window.openDailyPickerModal();
       if (!p || !canClaim || btn.disabled) return;
       btn.disabled = true;
       btn.textContent = 'Claiming...';
-      const patch = { credits: p.credits + q.cred, xp: (p.xp || 0) + q.xp };
-      if (q.isDaily) patch.last_daily = Date.now();
-      else patch.claimed = [...new Set([...(p.claimed || []), q.id])];
+      const patch = { credits: p.credits + q.cred, xp: (p.xp || 0) + q.xp, claimed: [...new Set([...(p.claimed || []), q.id])] };
       await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', patch, window.authToken);
       await window.refreshMyProfile();
       window.notify(`Quest Complete! +${q.cred} Z-Credits & +${q.xp} XP`);
@@ -306,8 +322,6 @@ async function renderLeaderboardQuestsAndAnnouncements() {
   dailyList.forEach(q => renderCard(q, 'q-sec-daily', false));
   weeklyList.forEach(q => renderCard(q, 'q-sec-weekly', false));
   secretList.forEach(q => renderCard(q, 'q-sec-secret', false));
-  doneList.forEach(q => renderCard(q, 'q-sec-done', true));
-}
 let activeLegalTab = 'RULES';
 
 function renderRulesAndLegal() {
@@ -372,24 +386,77 @@ function renderRulesAndLegal() {
     renderRulesAndLegal();
   }));
 }
+window.openDailyPickerModal = function() {
+  const p = window.userProfile;
+  if (!p) return window.notify('Sign in to claim your Daily Reward!', true);
+  if (Date.now() - (p.last_daily || 0) < 86400000) return window.notify('Daily reward is still on cooldown!', true);
 
-document.addEventListener('click', async (e) => {
-  if (e.target.id === 'dash-daily-btn') {
-    const p = window.userProfile;
-    if (!p) return window.notify('Sign in to claim daily Z-Credits!', true);
-    if (Date.now() - (p.last_daily || 0) < 86400000) return window.notify('Daily reward is still on cooldown!', true);
-    e.target.disabled = true;
-    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + 150, xp: (p.xp || 0) + 100, last_daily: Date.now() }, window.authToken);
+  const modal = document.getElementById('user-modal');
+  const box = document.getElementById('user-modal-content');
+  const nextStreak = (p.daily_streak || 0) + 1;
+  const streakBonus = nextStreak % 30 === 0 ? 3000 : nextStreak % 14 === 0 ? 1250 : nextStreak % 7 === 0 ? 500 : 0;
+
+  const pool = [
+    { tier: 'COMMON', color: '#94a3b8', cred: 150, xp: 100 },
+    { tier: 'UNCOMMON', color: '#10b981', cred: 300, xp: 200 },
+    { tier: 'EPIC', color: '#a855f7', cred: 600, xp: 400 }
+  ].sort(() => Math.random() - 0.5);
+
+  box.innerHTML = `
+    <div style="padding:24px;text-align:center;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span class="pill" style="color:#f59e0b;border-color:#f59e0b;">🔥 Day ${nextStreak} Streak</span>
+        <button class="btn-ghost" onclick="document.getElementById('user-modal').classList.add('hidden')">✕</button>
+      </div>
+      <h2 style="margin-bottom:4px;">Pick a Daily Mystery Card!</h2>
+      <p class="sub-text" style="margin-bottom:16px;">Choose 1 of the 3 mystery cards below to reveal today's Z-Credits & XP:</p>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+        ${pool.map((c, i) => `
+          <div class="glass-card" data-pick-card="${i}" style="padding:18px 10px;cursor:pointer;border-color:rgba(255,255,255,0.18);transition:0.2s;">
+            <div style="font-size:1.8rem;margin-bottom:6px;">🎁</div>
+            <strong style="font-size:0.85rem;">Mystery #${i + 1}</strong>
+            <div class="mono-dim" style="margin-top:4px;">Click to Reveal</div>
+          </div>`).join('')}
+      </div>
+      <div style="padding:10px;border-radius:10px;background:#04070b;font-size:0.8rem;color:var(--text-dim);">
+        <strong>Streak Milestones:</strong> Day 7 (+500 Z) • Day 14 (+1,250 Z) • Day 30 (+3,000 Z)
+      </div>
+    </div>`;
+  modal.classList.remove('hidden');
+
+  let picked = false;
+  box.querySelectorAll('[data-pick-card]').forEach(cardEl => (cardEl.onclick = async () => {
+    if (picked) return;
+    picked = true;
+    const chosen = pool[parseInt(cardEl.dataset.pickCard, 10)];
+    box.querySelectorAll('[data-pick-card]').forEach((el, idx) => {
+      const item = pool[idx];
+      el.style.borderColor = item.color;
+      el.style.opacity = idx === parseInt(cardEl.dataset.pickCard, 10) ? '1' : '0.45';
+      el.innerHTML = `<span class="rarity-tag" style="color:${item.color}">${item.tier}</span><h3 style="margin:6px 0 2px;">+${item.cred} Z</h3><div class="mono-dim">+${item.xp} XP</div>`;
+    });
+
+    const totalCred = chosen.cred + streakBonus;
+    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', {
+      credits: p.credits + totalCred,
+      xp: (p.xp || 0) + chosen.xp,
+      last_daily: Date.now(),
+      daily_streak: nextStreak
+    }, window.authToken);
     await window.refreshMyProfile();
-    window.notify('Claimed +150 Daily Z-Credits!');
-  }
+    window.notify(`🎉 ${chosen.tier}! +${totalCred} Z-Credits${streakBonus ? ` (Includes +${streakBonus} Z Streak Milestone!)` : ''}`);
+  }));
+};
+
+document.addEventListener('click', (e) => {
+  if (e.target.id === 'dash-daily-btn') window.openDailyPickerModal();
 });
 
 setInterval(() => {
   const p = window.userProfile;
   if (!p) return;
   const rem = 86400000 - (Date.now() - (p.last_daily || 0));
-  const label = rem <= 0 ? 'Claim +150 Daily Z-Credits' : `⏳ Next Claim in ${String(Math.floor(rem / 3600000)).padStart(2, '0')}:${String(Math.floor((rem % 3600000) / 60000)).padStart(2, '0')}:${String(Math.floor((rem % 60000) / 1000)).padStart(2, '0')}`;
+  const label = rem <= 0 ? '🎁 Pick Daily Mystery Card' : `⏳ Next Card in ${String(Math.floor(rem / 3600000)).padStart(2, '0')}:${String(Math.floor((rem % 3600000) / 60000)).padStart(2, '0')}:${String(Math.floor((rem % 60000) / 1000)).padStart(2, '0')}`;
   ['daily-quest-btn', 'dash-daily-btn'].forEach(id => {
     const b = document.getElementById(id);
     if (b) { b.disabled = rem > 0; b.className = rem <= 0 ? 'btn-neon' : 'btn-outline'; b.textContent = label; }
