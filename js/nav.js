@@ -27,6 +27,41 @@ function applyCloak(key) {
   link.href = c.icon;
 }
 
+window.applyLiveWallpaper = function(wp) {
+  let layer = document.getElementById('zynk-live-wp');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.id = 'zynk-live-wp';
+    layer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;transition:opacity 0.3s;';
+    document.body.prepend(layer);
+  }
+  if (!document.getElementById('zynk-wp-keyframes')) {
+    const st = document.createElement('style');
+    st.id = 'zynk-wp-keyframes';
+    st.textContent = `
+      @keyframes zynkGridMove { 0% { background-position: 0 0; } 100% { background-position: 48px 48px; } }
+      @keyframes zynkPulseBg { 0%, 100% { filter: hue-rotate(0deg) brightness(1); } 50% { filter: hue-rotate(35deg) brightness(1.25); } }
+    `;
+    document.head.appendChild(st);
+  }
+  if (wp === 'grid') {
+    layer.style.background = 'linear-gradient(rgba(16,185,129,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(16,185,129,0.18) 1px, transparent 1px)';
+    layer.style.backgroundSize = '48px 48px';
+    layer.style.animation = 'zynkGridMove 4s linear infinite';
+  } else if (wp === 'nebula') {
+    layer.style.background = 'radial-gradient(circle at 20% 30%, rgba(6,182,212,0.35), transparent 55%), radial-gradient(circle at 80% 70%, rgba(168,85,247,0.35), transparent 55%)';
+    layer.style.backgroundSize = '100% 100%';
+    layer.style.animation = 'zynkPulseBg 8s ease-in-out infinite';
+  } else if (wp === 'solar') {
+    layer.style.background = 'radial-gradient(circle at 50% 20%, rgba(245,158,11,0.32), transparent 60%), radial-gradient(circle at 20% 80%, rgba(244,63,94,0.25), transparent 55%)';
+    layer.style.backgroundSize = '100% 100%';
+    layer.style.animation = 'zynkPulseBg 7s ease-in-out infinite';
+  } else {
+    layer.style.background = 'none';
+    layer.style.animation = 'none';
+  }
+};
+
 window.zynkPanic = function() {
   window.location.replace(localStorage.getItem('zynk_panic_url') || 'https://google.com');
 };
@@ -73,11 +108,11 @@ function renderSettingsPanel() {
   const p = window.userProfile;
 
   const tabs = [
-    { id: 'DISPLAY', label: '🎨 Display & Theme' },
-    { id: 'ACCOUNT', label: '👤 Account & Password' },
+    { id: 'DISPLAY', label: '🎨 Themes & Wallpapers' },
+    { id: 'ACCOUNT', label: '👤 Account & Danger Zone' },
     { id: 'NOTIF', label: '🔔 Notifications & App' },
     { id: 'PRIVACY', label: '🛡️ Privacy & Safety' },
-    { id: 'CLOAK', label: '🕵️ Tab Cloaking & Panic' },
+    { id: 'CLOAK', label: '🕵️ Tab Disguise & Panic' },
     { id: 'SESSIONS', label: '💻 Active Sessions' }
   ];
 
@@ -97,41 +132,50 @@ function renderSettingsPanel() {
 
   if (activeSetTab === 'DISPLAY') {
     card.innerHTML = `
-      <h2 style="margin-bottom:14px;">🎨 Display & Clock Preferences</h2>
-      <div class="setting-group"><label>Steady Page Theme</label><select id="set-theme" class="tool-input"><option value="default">Emerald Neural (Default)</option><option value="theme-cyber">Cyber Cyan</option><option value="theme-crimson">Crimson Ops</option><option value="theme-gold">Solar Gold</option><option value="theme-violet">Violet Pulse</option></select></div>
+      <h2 style="margin-bottom:14px;">🎨 Themes, Live Wallpapers & Clock</h2>
+      <div class="setting-group"><label>Color Theme</label><select id="set-theme" class="tool-input"><option value="default">Emerald Neural (Default)</option><option value="theme-cyber">Cyber Cyan</option><option value="theme-crimson">Crimson Ops</option><option value="theme-gold">Solar Gold</option><option value="theme-violet">Violet Pulse</option></select></div>
+      <div class="setting-group"><label>Animated Live Wallpaper</label><select id="set-wp" class="tool-input"><option value="none">None (Solid Dark)</option><option value="grid">Cyber Matrix Grid (Moving)</option><option value="nebula">Neon Nebula Pulse (Animated)</option><option value="solar">Solar Aura Shift (Animated)</option></select></div>
       <div class="setting-group"><label>TimeZone</label><select id="set-tz" class="tool-input"><option value="auto">Auto-Detect (Local Time)</option><option value="America/New_York">Eastern Time (ET)</option><option value="America/Chicago">Central Time (CT)</option><option value="America/Denver">Mountain Time (MT)</option><option value="America/Los_Angeles">Pacific Time (PT)</option><option value="UTC">UTC</option></select></div>
       <div class="setting-group"><label>Clock Format</label><select id="set-format" class="tool-input"><option value="12">12-Hour (AM / PM)</option><option value="24">24-Hour (Military)</option></select></div>
       <div class="setting-group"><label>UI Interface Scale</label><select id="set-zoom" class="tool-input"><option value="1">100% (Standard)</option><option value="0.9">90% (Compact)</option><option value="1.1">110% (Large)</option></select></div>
       <button class="btn-neon" id="save-disp-btn">Save Display Preferences</button>`;
 
     document.getElementById('set-theme').value = localStorage.getItem('zynk_theme') || p?.profile_theme || 'default';
+    document.getElementById('set-wp').value = localStorage.getItem('zynk_wp') || 'none';
     document.getElementById('set-tz').value = localStorage.getItem('zynk_tz') || 'auto';
     document.getElementById('set-format').value = localStorage.getItem('zynk_format') === '24' ? '24' : '12';
     document.getElementById('set-zoom').value = localStorage.getItem('zynk_zoom') || '1';
 
     document.getElementById('save-disp-btn').onclick = async () => {
       const th = document.getElementById('set-theme').value;
+      const wp = document.getElementById('set-wp').value;
       const zm = document.getElementById('set-zoom').value;
       localStorage.setItem('zynk_theme', th);
+      localStorage.setItem('zynk_wp', wp);
       localStorage.setItem('zynk_tz', document.getElementById('set-tz').value);
       localStorage.setItem('zynk_format', document.getElementById('set-format').value);
       localStorage.setItem('zynk_zoom', zm);
       document.body.className = th === 'default' ? '' : th;
       document.body.style.zoom = zm;
+      window.applyLiveWallpaper(wp);
       updateClock();
       if (p) await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { profile_theme: th }, window.authToken);
-      window.notify('Display preferences saved!');
+      window.notify('Display & wallpaper preferences saved!');
     };
   }
 
   if (activeSetTab === 'ACCOUNT') {
     card.innerHTML = `
-      <h2 style="margin-bottom:14px;">👤 Account & Security</h2>
+      <h2 style="margin-bottom:14px;">👤 Account & Danger Zone</h2>
       <div class="setting-group"><label>Username</label><input class="tool-input" value="${p?.username || 'Guest'}" disabled /></div>
       <div class="setting-group"><label>Linked Email Address</label><input class="tool-input" value="${p?.email || 'Not signed in'}" disabled /></div>
-      <div class="setting-group"><label>User ID</label><input class="tool-input" value="${p?.id || 'Guest'}" disabled /></div>
       <div class="setting-group"><label>Change Password (New Password)</label><input id="new-pass-inp" type="password" class="tool-input" placeholder="Enter new password (6+ chars)" /></div>
-      <button class="btn-neon" id="update-pass-btn">Update Password</button>`;
+      <button class="btn-neon" id="update-pass-btn">Update Password</button>
+      <div style="margin-top:24px;padding:16px;border-radius:12px;border:1px solid #f43f5e;background:rgba(244,63,94,0.08);">
+        <h3 style="color:#f43f5e;margin-bottom:6px;">⚠️ Danger Zone</h3>
+        <p class="sub-text" style="margin-bottom:12px;">Permanently delete your ZynkOS profile, Z-Credits, XP, and inventory. This cannot be undone.</p>
+        <button class="btn-outline" id="delete-acc-btn" style="color:#f43f5e;border-color:#f43f5e;">Delete My Account</button>
+      </div>`;
 
     document.getElementById('update-pass-btn').onclick = async () => {
       const np = document.getElementById('new-pass-inp').value;
@@ -145,11 +189,21 @@ function renderSettingsPanel() {
       document.getElementById('new-pass-inp').value = '';
       window.notify('Password updated!');
     };
+
+    document.getElementById('delete-acc-btn').onclick = async () => {
+      if (!p) return window.notify('Sign in first!', true);
+      const confirmName = prompt(`Type your username "${p.username}" to permanently delete your account:`);
+      if (confirmName !== p.username) return window.notify('Account deletion cancelled.', true);
+      await window.sbRest(`users?id=eq.${p.id}`, 'DELETE', null, window.authToken);
+      localStorage.removeItem('zynk_session');
+      window.notify('Account deleted. Reloading...');
+      setTimeout(() => window.location.reload(), 1000);
+    };
   }
   if (activeSetTab === 'NOTIF') {
     card.innerHTML = `
       <h2 style="margin-bottom:14px;">🔔 Notifications & Install ZynkOS App</h2>
-      <p class="sub-text" style="margin-bottom:12px;">Enable desktop notifications for @mentions & announcements, or install ZynkOS onto your device as a standalone app:</p>
+      <p class="sub-text" style="margin-bottom:12px;">Enable desktop notifications for @mentions & announcements, or install ZynkOS directly onto your device as a standalone app:</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
         <button class="btn-neon" id="enable-notif-btn">Enable Browser Notifications</button>
         <button class="btn-outline" id="install-pwa-btn">📲 Install ZynkOS App</button>
@@ -178,7 +232,7 @@ function renderSettingsPanel() {
     card.innerHTML = `
       <h2 style="margin-bottom:14px;">🛡️ Privacy & Safety</h2>
       <label class="remember-row"><input type="checkbox" id="priv-show-lb" ${p?.hide_leaderboard ? '' : 'checked'} /><span>Show me on the Global Leaderboard</span></label>
-      <label class="remember-row"><input type="checkbox" id="priv-show-on" ${p?.online === false ? '' : 'checked'} /><span>Show my Online status dot in Zynk Chat</span></label>
+      <label class="remember-row"><input type="checkbox" id="priv-show-on" ${p?.online === false ? '' : 'checked'} /><span>Show my Online status & live activity in Zynk Chat</span></label>
       <button class="btn-neon" id="save-priv-btn" style="margin-top:8px;">Save Privacy Settings</button>`;
 
     document.getElementById('save-priv-btn').onclick = async () => {
@@ -193,13 +247,13 @@ function renderSettingsPanel() {
 
   if (activeSetTab === 'CLOAK') {
     card.innerHTML = `
-      <h2 style="margin-bottom:14px;">🕵️ Tab Cloaking & Instant Panic Key</h2>
+      <h2 style="margin-bottom:14px;">🕵️ Tab Disguise & Instant Panic Key</h2>
       <div class="setting-group"><label>Tab Disguise</label><select id="set-cloak" class="tool-input"><option value="none">None (ZynkOS Default)</option><option value="clever">Clever Portal</option><option value="classroom">Google Classroom</option><option value="drive">Google Drive</option><option value="docs">Google Docs</option></select></div>
       <div class="setting-group"><label>Panic Redirect URL</label><input id="set-panic" class="tool-input" value="${localStorage.getItem('zynk_panic_url') || 'https://google.com'}" /></div>
       <label class="remember-row"><input type="checkbox" id="set-esc" ${localStorage.getItem('zynk_esc_panic') === '1' ? 'checked' : ''} /><span>Press ESC key anytime to trigger instant Panic Redirect</span></label>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
-        <button class="btn-neon" id="save-cloak-btn">Save Cloaking</button>
-        <button class="btn-outline" id="open-ab-btn">Open in about:blank</button>
+        <button class="btn-neon" id="save-cloak-btn">Save Disguise Settings</button>
+        <button class="btn-outline" id="open-inv-btn">Launch Invisible Tab Opener</button>
       </div>`;
 
     document.getElementById('set-cloak').value = localStorage.getItem('zynk_cloak') || 'none';
@@ -209,12 +263,13 @@ function renderSettingsPanel() {
       localStorage.setItem('zynk_panic_url', document.getElementById('set-panic').value.trim() || 'https://google.com');
       localStorage.setItem('zynk_esc_panic', document.getElementById('set-esc').checked ? '1' : '0');
       applyCloak(ck);
-      window.notify('Tab cloak & panic settings saved!');
+      window.notify('Tab disguise & panic settings saved!');
     };
 
-    document.getElementById('open-ab-btn').onclick = () => {
-      const w = window.open('about:blank', '_blank');
-      if (!w) return window.notify('Allow pop-ups to launch about:blank!', true);
+    document.getElementById('open-inv-btn').onclick = () => {
+      const blankUrl = ['about', 'blank'].join(':');
+      const w = window.open(blankUrl, '_blank');
+      if (!w) return window.notify('Allow pop-ups to launch Invisible Tab Opener!', true);
       w.document.write(`<!DOCTYPE html><html><head><title>Home - Classroom</title><style>html,body,iframe{margin:0;padding:0;width:100%;height:100%;border:none;overflow:hidden;background:#04070b;}</style></head><body><iframe src="${window.location.href}"></iframe></body></html>`);
       w.document.close();
     };
@@ -236,6 +291,7 @@ function renderSettingsPanel() {
 
 window.addEventListener('DOMContentLoaded', () => {
   applyCloak(localStorage.getItem('zynk_cloak') || 'none');
+  window.applyLiveWallpaper(localStorage.getItem('zynk_wp') || 'none');
   const zm = localStorage.getItem('zynk_zoom') || '1';
   if (zm !== '1') document.body.style.zoom = zm;
   renderSettingsPanel();
