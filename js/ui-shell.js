@@ -12,6 +12,7 @@ const TAB_ACTIVITIES = {
   'partners-view': 'Viewing Partners',
   'credits-view': 'Viewing Credits & Team',
   'rules-view': 'Reading Rules & Terms',
+  'reports-view': 'Reviewing Staff Reports',
   'beta-view': 'Testing in Beta Lab',
   'admin-view': 'In Founder Panel',
   'settings-view': 'Adjusting Settings'
@@ -22,15 +23,18 @@ const TAB_SLUGS = {
   'arcade-view': 'arcade', 'ranks-view': 'ranks', 'store-view': 'store',
   'profile-view': 'profile', 'achieve-view': 'quests', 'leader-view': 'leaderboards',
   'tools-view': 'tools', 'partners-view': 'partners', 'credits-view': 'credits',
-  'rules-view': 'rules', 'beta-view': 'beta', 'admin-view': 'founder', 'settings-view': 'settings'
+  'rules-view': 'rules', 'reports-view': 'reports', 'beta-view': 'beta',
+  'admin-view': 'founder', 'settings-view': 'settings'
 };
 
 window.openTab = function(tabId, skipHash = false) {
   if (!tabId) return;
   const p = window.userProfile;
   const isFounder = p && p.role === 'FOUNDER';
+  const isStaff = p && (['FOUNDER', 'ADMIN', 'MODERATOR'].includes(p.role) || (p.extra_roles || []).some(r => ['ADMIN', 'MODERATOR'].includes(r)));
   const isBeta = p && (p.role === 'FOUNDER' || p.role === 'BETA' || p.is_beta || (p.extra_roles || []).includes('BETA'));
   if (tabId === 'admin-view' && !isFounder) return;
+  if (tabId === 'reports-view' && !isStaff) return;
   if (tabId === 'beta-view' && !isBeta) return;
 
   document.querySelectorAll('.dock-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
@@ -99,6 +103,7 @@ const dock = mk('aside', 'left-dock', `
     <button type="button" class="dock-btn" data-tab="partners-view" onclick="openTab('partners-view')"><span class="sym">${ic.vortex || ''}</span><span class="lbl">Partners</span></button>
     <button type="button" class="dock-btn" data-tab="credits-view" onclick="openTab('credits-view')"><span class="sym">${ic.ranks || ''}</span><span class="lbl">Credits & Team</span></button>
     <button type="button" class="dock-btn" data-tab="rules-view" onclick="openTab('rules-view')"><span class="sym">${ic.quests || ''}</span><span class="lbl">Rules & Terms</span></button>
+    <button type="button" class="dock-btn hidden" id="nav-reports-btn" style="display:none;" data-tab="reports-view" onclick="openTab('reports-view')"><span class="sym">${ic.admin || ''}</span><span class="lbl">Staff Reports</span></button>
     <button type="button" class="dock-btn hidden" id="nav-beta-btn" style="display:none;" data-tab="beta-view" onclick="openTab('beta-view')"><span class="sym">${ic.beta || ''}</span><span class="lbl">Beta Lab</span></button>
     <button type="button" class="dock-btn hidden" id="nav-admin-btn" style="display:none;" data-tab="admin-view" onclick="openTab('admin-view')"><span class="sym">${ic.admin || ''}</span><span class="lbl">Founder Panel</span></button>
     <button type="button" class="dock-btn" data-tab="settings-view" onclick="openTab('settings-view')"><span class="sym">${ic.settings || ''}</span><span class="lbl">Settings</span></button>
@@ -173,19 +178,7 @@ const main = mk('main', 'main-viewport', `
     </div>
     <aside class="members-panel"><div class="members-head">ONLINE MEMBERS</div><div id="online-members-list"></div></aside>
   </section>
-  <section id="vortex-view" class="tab-view full-embed" style="flex-direction:column;">
-    <div class="view-topbar" style="padding:10px 20px;border-bottom:1px solid var(--border-glass);background:rgba(4,7,11,0.9);flex-wrap:wrap;gap:8px;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span class="status-pill"><span class="pulse-dot"></span> ZynkOS Vortex Guild</span>
-        <span class="mono-dim">Powered by <a href="https://vortexos.net" target="_blank" rel="noopener" style="color:var(--neon-emerald);font-weight:700;text-decoration:none;">VortexOS.net ↗</a></span>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button type="button" class="btn-outline" style="padding:5px 11px;font-size:0.8rem;" onclick="window.open('https://vortexos.net')">Vortex Global ↗</button>
-        <button type="button" class="btn-outline" style="padding:5px 11px;font-size:0.8rem;" onclick="window.open('https://vortexos.net')">Open Fullscreen ↗</button>
-      </div>
-    </div>
-    <iframe src="https://vortexos.net" title="chat" referrerpolicy="no-referrer-when-downgrade" allow="clipboard-read; clipboard-write" style="flex:1;width:100%;height:100%;border:none;background:#04070b;"></iframe>
-  </section>
+  <section id="vortex-view" class="tab-view chat-layout"></section>
   <section id="arcade-view" class="tab-view full-embed"><div id="custom-game-container" style="width:100%;height:100%;display:flex;"></div></section>
   <section id="ranks-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Ranks</h2><span class="sub-text">Member ranks & perks</span></div></div><div id="ranks-grid"></div></section>
   <section id="store-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Zynk Store</h2><span class="sub-text">Daily deals, avatars, frames, themes & gifting</span></div><span class="pill" id="store-credits">0 Z-Credits</span></div><div id="store-grid"></div></section>
@@ -196,6 +189,7 @@ const main = mk('main', 'main-viewport', `
   <section id="partners-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Partners</h2><span class="sub-text">The projects & communities we collaborate with</span></div></div><div id="partners-container"></div></section>
   <section id="credits-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Credits & Team</h2><span class="sub-text">Founders, developers, designers & contributors</span></div></div><div id="credits-container"></div></section>
   <section id="rules-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Rules, Privacy Policy & Terms</h2><span class="sub-text">Community guidelines, 13+ age requirement & platform policies</span></div></div><div id="rules-container"></div></section>
+  <section id="reports-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Staff Reports Queue</h2><span class="sub-text">Review reported messages & users (Moderators, Admins & Founder only)</span></div></div><div id="reports-container"></div></section>
   <section id="beta-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Beta Lab</h2><span class="sub-text">Exclusive Beta Tester chat, themes & rewards</span></div></div><div id="beta-grid"></div></section>
   <section id="admin-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Founder Command Panel</h2><span class="sub-text">Broadcasts, store items, partners, team credits & roles</span></div></div><div id="admin-panel-container"></div></section>
   <section id="settings-view" class="tab-view padded-view"><div id="settings-shell"></div></section>
