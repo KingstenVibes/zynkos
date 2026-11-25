@@ -1,45 +1,5 @@
 const SB_URL = 'https://api.ZynkOS.linkpc.net';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBnbGJtc3pweXV3emdrYXVmc2x2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2ODUyNjcsImV4cCI6MjA4ODI2MTI2N30.869lF266kQ6gL3uV296597R8z2q8V_z3tH330000000';
-
-window.authToken = null;
-window.userProfile = null;
-let isSignUpMode = false;
-
-window.notify = function(msg, isErr = false, onClick = null) {
-  let box = document.getElementById('zynk-toast-box');
-  if (!box) {
-    box = document.createElement('div');
-    box.id = 'zynk-toast-box';
-    box.style.cssText = 'position:fixed;bottom:18px;right:18px;z-index:99999;display:flex;flex-direction:column;gap:8px;';
-    document.body.appendChild(box);
-  }
-  const t = document.createElement('div');
-  t.className = 'glass-card';
-  t.style.cssText = `padding:12px 16px;border-color:${isErr ? '#f43f5e' : '#10b981'};background:rgba(4,7,11,0.95);font-size:0.86rem;max-width:340px;cursor:${onClick ? 'pointer' : 'default'};box-shadow:0 8px 24px rgba(0,0,0,0.6);`;
-  t.textContent = msg;
-  if (onClick) t.onclick = () => { onClick(); t.remove(); };
-  box.appendChild(t);
-  setTimeout(() => t.remove(), 4500);
-};
-
-window.sbRest = async function(path, method = 'GET', body = null, token = null) {
-  const headers = { 'apikey': SB_KEY, 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  else headers['Authorization'] = `Bearer ${SB_KEY}`;
-  if (method === 'POST' || method === 'PATCH') headers['Prefer'] = 'return=representation';
-  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : null
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || `HTTP ${res.status}`);
-  }
-  if (res.status === 204) return [];
-  return res.json().catch(() => []);
-};
-
 function applyNavPermissions() {
   const p = window.userProfile;
   const isFounder = p && p.role === 'FOUNDER';
@@ -124,7 +84,6 @@ document.addEventListener('click', async (e) => {
       document.getElementById('auth-modal')?.classList.remove('hidden');
     }
   }
-
   if (id === 'auth-submit-btn') {
     const btn = e.target;
     let loginId = document.getElementById('auth-email').value.trim();
@@ -186,7 +145,6 @@ document.addEventListener('click', async (e) => {
     }
   }
 });
-
 window.addEventListener('DOMContentLoaded', async () => {
   applyNavPermissions();
   const raw = localStorage.getItem('zynk_session');
@@ -229,3 +187,42 @@ window.addEventListener('beforeunload', () => {
     }).catch(() => {});
   }
 });
+
+window.authToken = null;
+window.userProfile = null;
+let isSignUpMode = false;
+
+window.notify = function(msg, isErr = false, onClick = null) {
+  let box = document.getElementById('zynk-toast-box');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'zynk-toast-box';
+    box.style.cssText = 'position:fixed;bottom:18px;right:18px;z-index:99999;display:flex;flex-direction:column;gap:8px;';
+    document.body.appendChild(box);
+  }
+  const t = document.createElement('div');
+  t.className = 'glass-card';
+  t.style.cssText = `padding:12px 16px;border-color:${isErr ? '#f43f5e' : '#10b981'};background:rgba(4,7,11,0.95);font-size:0.86rem;max-width:340px;cursor:${onClick ? 'pointer' : 'default'};box-shadow:0 8px 24px rgba(0,0,0,0.6);`;
+  t.textContent = msg;
+  if (onClick) t.onclick = () => { onClick(); t.remove(); };
+  box.appendChild(t);
+  setTimeout(() => t.remove(), 4500);
+};
+
+window.sbRest = async function(path, method = 'GET', body = null, token = null) {
+  const headers = { 'apikey': SB_KEY, 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  else if (SB_KEY.startsWith('eyJ')) headers['Authorization'] = `Bearer ${SB_KEY}`;
+  if (method === 'POST' || method === 'PATCH') headers['Prefer'] = 'return=representation';
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : null
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `HTTP ${res.status}`);
+  }
+  if (res.status === 204) return [];
+  return res.json().catch(() => []);
+};
