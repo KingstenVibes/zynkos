@@ -100,24 +100,25 @@ function updateClock() {
 setInterval(updateClock, 1000);
 updateClock();
 
-let vortexMode = 'guild';
-window.setVortexMode = function(mode) {
-  vortexMode = mode;
-  const gBtn = document.getElementById('vtx-mode-guild');
-  const glBtn = document.getElementById('vtx-mode-global');
-  if (gBtn) gBtn.className = mode === 'guild' ? 'btn-neon' : 'btn-outline';
-  if (glBtn) glBtn.className = mode === 'global' ? 'btn-neon' : 'btn-outline';
+const HASH_ROUTES = {
+  dashboard: 'dash-view', chat: 'chat-view', vortex: 'vortex-view',
+  arcade: 'arcade-view', ranks: 'ranks-view', store: 'store-view',
+  profile: 'profile-view', quests: 'achieve-view', leaderboards: 'leader-view',
+  tools: 'tools-view', partners: 'partners-view', credits: 'credits-view',
+  rules: 'rules-view', privacy: 'rules-view', tos: 'rules-view',
+  beta: 'beta-view', founder: 'admin-view', settings: 'settings-view'
 };
 
-document.addEventListener('click', (e) => {
-  if (e.target.id === 'vtx-launch-btn') {
-    if (!document.getElementById('vtx-rules-ok')?.checked) {
-      return window.notify?.('Please check the box to accept Vortex & ZynkOS Rules first!', true);
-    }
-    const url = vortexMode === 'global' ? 'https://vortexos.net' : 'https://vortexos.net';
-    window.open(url, '_blank', 'noopener');
+function syncRouteFromHash() {
+  const slug = window.location.hash.replace(/^#/, '').toLowerCase();
+  if (!slug || !HASH_ROUTES[slug]) return;
+  if (slug === 'privacy' || slug === 'tos') {
+    window.activeLegalTabOverride = slug.toUpperCase();
   }
-});
+  window.openTab?.(HASH_ROUTES[slug], true);
+}
+
+window.addEventListener('hashchange', syncRouteFromHash);
 const searchInp = document.getElementById('global-search-inp');
 const searchPop = document.getElementById('global-search-pop');
 
@@ -285,7 +286,7 @@ function renderSettingsPanel() {
     document.getElementById('update-pass-btn').onclick = async () => {
       const np = document.getElementById('new-pass-inp').value;
       if (!window.authToken || np.length < 6) return window.notify('Sign in and enter a 6+ character password.', true);
-      const res = await fetch('https://linkpc.net', {
+      const res = await fetch(`${SB_URL}/auth/v1/user`, {
         method: 'PUT',
         headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + window.authToken, 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: np })
@@ -397,5 +398,9 @@ window.addEventListener('DOMContentLoaded', () => {
   const zm = localStorage.getItem('zynk_zoom') || '1';
   if (zm !== '1') document.body.style.zoom = zm;
   renderSettingsPanel();
+  syncRouteFromHash();
 });
-window.addEventListener('zynk-profile-updated', renderSettingsPanel);
+window.addEventListener('zynk-profile-updated', () => {
+  renderSettingsPanel();
+  syncRouteFromHash();
+});
