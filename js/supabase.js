@@ -1,5 +1,5 @@
 const SB_URL = 'https://api.ZynkOS.linkpc.net';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBnbGJtc3pweXV3emdrYXVmc2x2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2ODUyNjcsImV4cCI6MjA4ODI2MTI2N30.869lF266kQ6gL3uV296597R8z2q8V_z3tH330000000';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nbHlibW56c3B2eXJ1end3Z2RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUyOTkzMDQsImV4cCI6MjExMDg3NTMwNH0.E2pZaS0OGtkEk6hfsMSOJ2MUu8i-iZyAHnEKg-RhnH0';
 function applyNavPermissions() {
   const p = window.userProfile;
   const isFounder = p && p.role === 'FOUNDER';
