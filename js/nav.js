@@ -106,7 +106,7 @@ const HASH_ROUTES = {
   profile: 'profile-view', quests: 'achieve-view', leaderboards: 'leader-view',
   tools: 'tools-view', partners: 'partners-view', credits: 'credits-view',
   rules: 'rules-view', privacy: 'rules-view', tos: 'rules-view',
-  beta: 'beta-view', founder: 'admin-view', settings: 'settings-view'
+  reports: 'reports-view', beta: 'beta-view', founder: 'admin-view', settings: 'settings-view'
 };
 
 function syncRouteFromHash() {
@@ -309,7 +309,6 @@ function renderSettingsPanel() {
   if (activeSetTab === 'NOTIF') {
     card.innerHTML = `
       <h2 style="margin-bottom:14px;">Notifications & Install ZynkOS App</h2>
-      <p class="sub-text" style="margin-bottom:12px;">Enable desktop notifications or install ZynkOS directly onto your device:</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
         <button class="btn-neon" id="enable-notif-btn">Enable Browser Notifications</button>
         <button class="btn-outline" id="install-pwa-btn">Install ZynkOS App</button>
@@ -391,20 +390,6 @@ function renderSettingsPanel() {
       </div>`;
   }
 }
-
-window.addEventListener('DOMContentLoaded', () => {
-  applyCloak(localStorage.getItem('zynk_cloak') || 'none');
-  window.applyLiveWallpaper(localStorage.getItem('zynk_wp') || 'none');
-  const zm = localStorage.getItem('zynk_zoom') || '1';
-  if (zm !== '1') document.body.style.zoom = zm;
-  renderSettingsPanel();
-  syncRouteFromHash();
-});
-window.addEventListener('zynk-profile-updated', () => {
-  renderSettingsPanel();
-  syncRouteFromHash();
-});
-
 let vtxClient = null;
 let vtxReplyId = null;
 
@@ -565,7 +550,7 @@ async function initVortexGuildClient() {
     loadChannelHistory(channels.find(x => x.id === b.dataset.vch));
   }));
 
-  const initialCh = channels.find(c => c.id === vtxClient.channel) || channels.at(0);
+  const initialCh = channels.find(c => c.id === vtxClient.channel) || channels[0];
   if (initialCh) {
     await vtxClient.join(initialCh.id).catch(() => {});
     await loadChannelHistory(initialCh);
@@ -602,4 +587,16 @@ async function initVortexGuildClient() {
   };
 }
 
-window.addEventListener('DOMContentLoaded', initVortexGuildClient);
+window.addEventListener('DOMContentLoaded', () => {
+  applyCloak(localStorage.getItem('zynk_cloak') || 'none');
+  window.applyLiveWallpaper(localStorage.getItem('zynk_wp') || 'none');
+  const zm = localStorage.getItem('zynk_zoom') || '1';
+  if (zm !== '1') document.body.style.zoom = zm;
+  renderSettingsPanel();
+  syncRouteFromHash();
+  initVortexGuildClient();
+});
+window.addEventListener('zynk-profile-updated', () => {
+  renderSettingsPanel();
+  syncRouteFromHash();
+});
