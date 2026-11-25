@@ -6,8 +6,7 @@ const PROF_SVG = {
   shield: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
   gift: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>`,
   bag: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>`,
-  scroll: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
-  lock: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`
+  scroll: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`
 };
 
 function safeAvatar(url) {
@@ -51,6 +50,93 @@ window.acceptFriendRequest = async function(fromUid) {
   }
   await window.refreshMyProfile();
   window.notify(`You are now friends with @${other?.username || 'member'}!`);
+};
+window.removeFriend = async function(targetUid) {
+  const me = window.userProfile;
+  if (!me) return;
+  const myFriends = (Array.isArray(me.friends) ? me.friends : []).filter(id => String(id) !== String(targetUid));
+  await window.sbRest(`users?id=eq.${me.id}`, 'PATCH', { friends: myFriends }, window.authToken);
+  const rows = await window.sbRest(`users?id=eq.${targetUid}&select=id,friends`).catch(() => []);
+  const other = Array.isArray(rows) ? rows.at(0) : null;
+  if (other) {
+    const otherFriends = (Array.isArray(other.friends) ? other.friends : []).filter(id => String(id) !== String(me.id));
+    await window.sbRest(`users?id=eq.${other.id}`, 'PATCH', { friends: otherFriends }, window.authToken);
+  }
+  await window.refreshMyProfile();
+  window.notify('Friend removed.');
+};
+
+window.openUserModal = async function(uid, fullMode = false) {
+  const modal = document.getElementById('user-modal');
+  const box = document.getElementById('user-modal-content');
+  if (!modal || !box || !window.sbRest) return;
+  const rows = await window.sbRest(`users?id=eq.${uid}`);
+  const u = Array.isArray(rows) ? rows.at(0) : null;
+  if (!u) return;
+
+  const me = window.userProfile;
+  const myFriends = Array.isArray(me?.friends) ? me.friends : [];
+  const theirReqs = Array.isArray(u.friend_requests) ? u.friend_requests : [];
+  const myReqs = Array.isArray(me?.friend_requests) ? me.friend_requests : [];
+  const isSelf = me && String(me.id) === String(u.id);
+  const isFriend = myFriends.includes(u.id);
+  const isPending = theirReqs.includes(me?.id);
+  const hasIncoming = myReqs.includes(u.id);
+
+  let friendBtn = '';
+  if (me && !isSelf) {
+    if (isFriend) friendBtn = `<button type="button" class="btn-outline" style="color:#f43f5e;border-color:#f43f5e;display:inline-flex;align-items:center;gap:6px;" onclick="removeFriend('${u.id}');document.getElementById('user-modal').classList.add('hidden');">${PROF_SVG.userMinus} Unfriend</button>`;
+    else if (hasIncoming) friendBtn = `<button type="button" class="btn-neon" style="display:inline-flex;align-items:center;gap:6px;" onclick="acceptFriendRequest('${u.id}');openUserModal('${u.id}');">${PROF_SVG.userCheck} Accept Request</button>`;
+    else if (isPending) friendBtn = `<button type="button" class="btn-outline" disabled>Request Pending</button>`;
+    else friendBtn = `<button type="button" class="btn-neon" style="display:inline-flex;align-items:center;gap:6px;" onclick="sendFriendRequest('${u.id}')">${PROF_SVG.userPlus} Add Friend</button>`;
+  }
+
+  const dmBtn = (me && !isSelf) ? `<button type="button" class="btn-outline" style="display:inline-flex;align-items:center;gap:6px;" onclick="document.getElementById('user-modal').classList.add('hidden');openTab('chat-view');window.switchChatChannel('dm_${[String(me.id), String(u.id)].sort().join('_')}','@${u.username}');">${PROF_SVG.msg} Message</button>` : '';
+  const frameGlow = u.avatar_frame && u.avatar_frame !== 'none' ? `box-shadow:0 0 0 3px ${u.avatar_frame},0 0 18px ${u.avatar_frame};` : '';
+  const bannerBg = u.banner && (u.banner.startsWith('http') || String(u.banner).startsWith('data:')) ? `url('${u.banner}') center/cover` : (u.banner || 'linear-gradient(135deg,#064e3b,#0f172a)');
+  const chipsHtml = window.renderRoleChips ? window.renderRoleChips(u) : `<span class="role-chip">${u.role}</span>`;
+  const statusLine = u.online ? `Online • ${u.activity_text || 'Active in ZynkOS'}` : `Offline${u.last_channel ? ` • Last chatted in ${u.last_channel}` : ''}${u.last_seen ? ` (${formatAgo(u.last_seen)})` : ''}`;
+
+  const mutualCount = isSelf ? 0 : myFriends.filter(id => (Array.isArray(u.friends) ? u.friends : []).includes(id)).length;
+  const fullStatsHtml = fullMode ? `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px;">
+      <div style="padding:10px;border-radius:10px;background:#04070b;text-align:center;"><div class="mono-dim">CREDITS</div><strong>${u.credits}</strong></div>
+      <div style="padding:10px;border-radius:10px;background:#04070b;text-align:center;"><div class="mono-dim">MESSAGES</div><strong>${u.msg_count || 0}</strong></div>
+      <div style="padding:10px;border-radius:10px;background:#04070b;text-align:center;"><div class="mono-dim">FRIENDS</div><strong>${(u.friends || []).length}</strong></div>
+      <div style="padding:10px;border-radius:10px;background:#04070b;text-align:center;"><div class="mono-dim">STREAK</div><strong>${u.daily_streak || 0}d</strong></div>
+    </div>` : '';
+
+  box.style.maxWidth = fullMode ? '540px' : '420px';
+  box.innerHTML = `
+    <div class="banner-hero" style="background:${bannerBg}">
+      <button class="btn-outline" id="close-user-modal" style="position:absolute;top:10px;right:10px;background:rgba(4,7,11,0.75);padding:5px 10px;">✕</button>
+      <img class="banner-avatar" style="border-color:${u.equipped_color};${frameGlow}" src="${safeAvatar(u.avatar)}" />
+    </div>
+    <div class="profile-body">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+        <div>
+          <h2 style="color:${u.equipped_color};font-size:1.35rem;">${u.username}</h2>
+          <div class="mono-dim" style="margin-top:2px;">${statusLine}</div>
+        </div>
+        <span class="pill" style="border-color:#10b981;color:#10b981;">LVL ${Math.floor((u.xp || 0) / 1000) + 1}</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+        ${friendBtn}
+        ${dmBtn}
+        ${!fullMode ? `<button type="button" class="btn-outline" onclick="openUserModal('${u.id}', true)">View Full Profile</button>` : ''}
+      </div>
+      ${fullStatsHtml}
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08);">
+        <div class="mono-dim" style="font-weight:700;margin-bottom:4px;">ABOUT ME</div>
+        <p class="sub-text">${u.bio || 'New ZynkOS Member.'}</p>
+      </div>
+      <div style="margin-top:12px;">
+        <div class="mono-dim" style="font-weight:700;margin-bottom:6px;">ROLES ${!isSelf && mutualCount ? `• ${mutualCount} MUTUAL FRIEND(S)` : ''}</div>
+        <div class="badges-row">${chipsHtml}</div>
+      </div>
+    </div>`;
+  modal.classList.remove('hidden');
+  document.getElementById('close-user-modal').onclick = () => modal.classList.add('hidden');
 };
 async function renderMyProfileTab() {
   const box = document.getElementById('my-profile-container');
@@ -264,18 +350,26 @@ async function renderLeaderboardQuestsAndAnnouncements() {
   const msgs = p?.msg_count || 0;
   const ownedCnt = (p?.owned_items || []).length;
   const stkCnt = Array.isArray(p?.stickers) ? p.stickers.length : 0;
+  const friendCnt = Array.isArray(p?.friends) ? p.friends.length : 0;
+  const streakCnt = p?.daily_streak || 0;
   const myLvl = Math.floor((p?.xp || 0) / 1000) + 1;
   const creds = p?.credits || 0;
+  const hasCustomAv = p?.avatar && p.avatar !== 'logo.png' && !p.avatar.includes('dicebear') ? 1 : 0;
+  const equippedCnt = (hasCustomAv ? 1 : 0) + (p?.avatar_frame && p.avatar_frame !== 'none' ? 1 : 0) + (p?.banner && !p.banner.startsWith('linear-gradient') ? 1 : 0);
 
   const builtInQuests = [
     { id: 'q_daily', cat: 'DAILY', title: 'Daily Mystery Card', desc: 'Pick 1 of 3 mystery cards every 24 hours & build your streak.', cred: 150, xp: 100, cur: Date.now() - (p?.last_daily || 0) >= 86400000 ? 1 : 0, max: 1, isDaily: true },
     { id: 'q_msg1', cat: 'DAILY', title: 'First Transmission', desc: 'Send at least 1 message in Zynk Chat.', cred: 75, xp: 100, cur: Math.min(1, msgs), max: 1 },
     { id: 'q_msg15', cat: 'DAILY', title: 'Daily Chatter', desc: 'Send 15 messages in Zynk Chat.', cred: 200, xp: 250, cur: Math.min(15, msgs), max: 15 },
     { id: 'q_bio', cat: 'DAILY', title: 'Identity Configured', desc: 'Customize your About Me bio on My Profile.', cred: 100, xp: 150, cur: p?.bio && !p.bio.startsWith('New ZynkOS') ? 1 : 0, max: 1 },
+    { id: 'q_av', cat: 'DAILY', title: 'New Look', desc: 'Equip a custom avatar from Zynk Store.', cred: 125, xp: 150, cur: hasCustomAv, max: 1 },
     { id: 'q_stk1', cat: 'DAILY', title: 'Sticker Creator', desc: 'Upload 1 custom sticker in Zynk Chat.', cred: 150, xp: 200, cur: Math.min(1, stkCnt), max: 1 },
     { id: 'q_msg50', cat: 'WEEKLY', title: 'Signal Regular', desc: 'Send 50 messages in Zynk Chat.', cred: 500, xp: 600, cur: Math.min(50, msgs), max: 50 },
     { id: 'q_msg150', cat: 'WEEKLY', title: 'Network Veteran', desc: 'Send 150 messages in Zynk Chat.', cred: 1200, xp: 1500, cur: Math.min(150, msgs), max: 150 },
     { id: 'q_msg500', cat: 'WEEKLY', title: 'Chat Legend', desc: 'Send 500 messages in Zynk Chat.', cred: 3500, xp: 4000, cur: Math.min(500, msgs), max: 500 },
+    { id: 'q_dressed', cat: 'WEEKLY', title: 'Dressed Up', desc: 'Equip 2 cosmetic items (avatar, frame, or banner).', cred: 300, xp: 350, cur: Math.min(2, equippedCnt), max: 2 },
+    { id: 'q_friends3', cat: 'WEEKLY', title: 'Social Butterfly', desc: 'Add 3 friends on ZynkOS.', cred: 450, xp: 500, cur: Math.min(3, friendCnt), max: 3 },
+    { id: 'q_streak7', cat: 'WEEKLY', title: 'Daily Grind', desc: 'Reach a 7-day Daily Mystery Card streak.', cred: 700, xp: 800, cur: Math.min(7, streakCnt), max: 7 },
     { id: 'q_shop2', cat: 'WEEKLY', title: 'Gear Buyer', desc: 'Own 2 items from Zynk Store.', cred: 250, xp: 300, cur: Math.min(2, ownedCnt), max: 2 },
     { id: 'q_shop6', cat: 'WEEKLY', title: 'Vault Collector', desc: 'Own 6 items from Zynk Store.', cred: 750, xp: 900, cur: Math.min(6, ownedCnt), max: 6 },
     { id: 'q_shop15', cat: 'WEEKLY', title: 'Royal Armory', desc: 'Own 15 items from Zynk Store.', cred: 2000, xp: 2500, cur: Math.min(15, ownedCnt), max: 15 },
@@ -283,6 +377,7 @@ async function renderLeaderboardQuestsAndAnnouncements() {
     { id: 'q_lvl10', cat: 'WEEKLY', title: 'Neural Level 10', desc: 'Reach Level 10 (9,000+ XP).', cred: 1500, xp: 2000, cur: Math.min(10, myLvl), max: 10 },
     { id: 'q_rich5k', cat: 'WEEKLY', title: 'Credit Hoarder', desc: 'Hold 5,000+ Z-Credits at once.', cred: 600, xp: 750, cur: Math.min(5000, creds), max: 5000 },
     { id: 'q_rich25k', cat: 'WEEKLY', title: 'Zynk Tycoon', desc: 'Hold 25,000+ Z-Credits at once.', cred: 2500, xp: 3000, cur: Math.min(25000, creds), max: 25000 },
+    { id: 'q_rich50k', cat: 'WEEKLY', title: 'High Roller', desc: 'Hold 50,000+ Z-Credits at once.', cred: 5000, xp: 6000, cur: Math.min(50000, creds), max: 50000 },
     { id: 'sec_night', cat: 'SECRET', isSecret: true, title: 'Midnight Operator', desc: '??? [Secret Quest — Condition Hidden]', cred: 650, xp: 750, cur: new Date().getHours() <= 3 ? 1 : 0, max: 1 },
     { id: 'sec_cyber', cat: 'SECRET', isSecret: true, title: 'Cyan Overclock', desc: '??? [Secret Quest — Condition Hidden]', cred: 450, xp: 500, cur: document.body.classList.contains('theme-cyber') ? 1 : 0, max: 1 },
     { id: 'sec_24h', cat: 'SECRET', isSecret: true, title: 'Military Precision', desc: '??? [Secret Quest — Condition Hidden]', cred: 400, xp: 450, cur: localStorage.getItem('zynk_format') === '24' ? 1 : 0, max: 1 },
@@ -349,6 +444,7 @@ async function renderLeaderboardQuestsAndAnnouncements() {
   secretList.forEach(q => renderCard(q, 'q-sec-secret', false));
   doneList.forEach(q => renderCard(q, 'q-sec-done', true));
 }
+
 let activeLegalTab = 'RULES';
 
 function renderRulesAndLegal() {
@@ -413,6 +509,26 @@ function renderRulesAndLegal() {
     renderRulesAndLegal();
   }));
 }
+window.launchConfetti = function() {
+  const colors = ['#10b981', '#06b6d4', '#a855f7', '#f59e0b', '#f43f5e'];
+  for (let i = 0; i < 42; i++) {
+    const c = document.createElement('div');
+    c.className = 'zynk-confetti';
+    c.style.left = Math.random() * 100 + 'vw';
+    c.style.background = colors[i % colors.length];
+    c.style.animationDelay = (Math.random() * 0.4) + 's';
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 2900);
+  }
+};
+
+const STREAK_LADDER = [
+  { day: 1, bonus: 50 }, { day: 2, bonus: 75 }, { day: 3, bonus: 100 },
+  { day: 5, bonus: 175 }, { day: 7, bonus: 300 }, { day: 10, bonus: 500 },
+  { day: 14, bonus: 800 }, { day: 15, bonus: 1000 }, { day: 20, bonus: 1500 },
+  { day: 30, bonus: 3000 }
+];
+
 window.openDailyPickerModal = function() {
   const p = window.userProfile;
   if (!p) return window.notify('Sign in to claim your Daily Reward!', true);
@@ -421,7 +537,8 @@ window.openDailyPickerModal = function() {
   const modal = document.getElementById('user-modal');
   const box = document.getElementById('user-modal-content');
   const nextStreak = (p.daily_streak || 0) + 1;
-  const streakBonus = nextStreak % 30 === 0 ? 3000 : nextStreak % 14 === 0 ? 1250 : nextStreak % 7 === 0 ? 500 : 0;
+  const hit = STREAK_LADDER.find(s => s.day === nextStreak) || (nextStreak > 30 ? { day: nextStreak, bonus: 3000 } : null);
+  const streakBonus = hit ? hit.bonus : 0;
 
   const pool = [
     { tier: 'COMMON', color: '#94a3b8', cred: 150, xp: 100 },
@@ -429,7 +546,7 @@ window.openDailyPickerModal = function() {
     { tier: 'EPIC', color: '#a855f7', cred: 600, xp: 400 }
   ].sort(() => Math.random() - 0.5);
 
-  box.style.maxWidth = '460px';
+  box.style.maxWidth = '500px';
   box.innerHTML = `
     <div style="padding:24px;text-align:center;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
@@ -437,7 +554,7 @@ window.openDailyPickerModal = function() {
         <button class="btn-ghost" onclick="document.getElementById('user-modal').classList.add('hidden')">✕</button>
       </div>
       <h2 style="margin-bottom:4px;">Pick a Daily Mystery Card!</h2>
-      <p class="sub-text" style="margin-bottom:16px;">Choose 1 of the 3 mystery cards below to reveal today's Z-Credits & XP:</p>
+      <p class="sub-text" style="margin-bottom:14px;">Choose 1 of the 3 mystery cards below to reveal today's Z-Credits & XP:</p>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
         ${pool.map((c, i) => `
           <div class="glass-card" data-pick-card="${i}" style="padding:18px 10px;cursor:pointer;border-color:rgba(255,255,255,0.18);transition:0.2s;">
@@ -446,8 +563,14 @@ window.openDailyPickerModal = function() {
             <div class="mono-dim" style="margin-top:4px;">Click to Reveal</div>
           </div>`).join('')}
       </div>
-      <div style="padding:10px;border-radius:10px;background:#04070b;font-size:0.8rem;color:var(--text-dim);">
-        <strong>Streak Milestones:</strong> Day 7 (+500 Z) • Day 14 (+1,250 Z) • Day 30 (+3,000 Z)
+      <div class="mono-dim" style="text-align:left;font-weight:700;margin-bottom:6px;">STREAK MILESTONE LADDER</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;">
+        ${STREAK_LADDER.map(s => {
+          const done = nextStreak >= s.day;
+          return `<div style="padding:6px 4px;border-radius:8px;background:${done ? 'rgba(16,185,129,0.18)' : '#04070b'};border:1px solid ${done ? '#10b981' : 'rgba(255,255,255,0.08)'};font-size:0.72rem;">
+            <strong style="color:${done ? '#10b981' : '#f8fafc'}">Day ${s.day}</strong><div class="mono-dim">+${s.bonus} Z</div>
+          </div>`;
+        }).join('')}
       </div>
     </div>`;
   modal.classList.remove('hidden');
@@ -456,6 +579,7 @@ window.openDailyPickerModal = function() {
   box.querySelectorAll('[data-pick-card]').forEach(cardEl => (cardEl.onclick = async () => {
     if (picked) return;
     picked = true;
+    window.launchConfetti();
     const chosen = pool[parseInt(cardEl.dataset.pickCard, 10)];
     box.querySelectorAll('[data-pick-card]').forEach((el, idx) => {
       const item = pool[idx];
@@ -472,9 +596,34 @@ window.openDailyPickerModal = function() {
       daily_streak: nextStreak
     }, window.authToken);
     await window.refreshMyProfile();
-    window.notify(`${chosen.tier}! +${totalCred} Z-Credits${streakBonus ? ` (Includes +${streakBonus} Z Streak Milestone!)` : ''}`);
+    window.notify(`${chosen.tier}! +${totalCred} Z-Credits${streakBonus ? ` (Includes +${streakBonus} Z Day ${nextStreak} Milestone!)` : ''}`);
   }));
 };
+
+function checkLevelUpCelebration() {
+  const p = window.userProfile;
+  if (!p) return;
+  const curLvl = Math.floor((p.xp || 0) / 1000) + 1;
+  const key = `zynk_lvl_${p.id}`;
+  const prevLvl = parseInt(localStorage.getItem(key) || String(curLvl), 10);
+  localStorage.setItem(key, String(curLvl));
+  if (curLvl > prevLvl) {
+    window.launchConfetti();
+    const modal = document.getElementById('user-modal');
+    const box = document.getElementById('user-modal-content');
+    if (modal && box) {
+      box.style.maxWidth = '420px';
+      box.innerHTML = `
+        <div style="padding:28px;text-align:center;">
+          <span class="rarity-tag" style="color:#f59e0b">NEURAL RANK ASCENSION</span>
+          <h2 style="font-size:1.8rem;margin:8px 0;color:#10b981;">LEVEL UP!</h2>
+          <p class="sub-text" style="margin-bottom:16px;">Congratulations <strong>@${p.username}</strong> — you reached <strong>Level ${curLvl}</strong>!</p>
+          <button type="button" class="btn-neon" style="width:100%" onclick="document.getElementById('user-modal').classList.add('hidden')">Awesome!</button>
+        </div>`;
+      modal.classList.remove('hidden');
+    }
+  }
+}
 
 document.addEventListener('click', (e) => {
   if (e.target.id === 'dash-daily-btn') window.openDailyPickerModal();
@@ -491,5 +640,16 @@ setInterval(() => {
   });
 }, 1000);
 
-window.addEventListener('zynk-profile-updated', () => { renderMyProfileTab(); renderLeaderboardQuestsAndAnnouncements(); renderPartnersAndCredits(); });
-window.addEventListener('DOMContentLoaded', () => { renderMyProfileTab(); renderLeaderboardQuestsAndAnnouncements(); renderPartnersAndCredits(); renderRulesAndLegal(); });
+window.addEventListener('zynk-profile-updated', () => {
+  checkLevelUpCelebration();
+  renderMyProfileTab();
+  renderLeaderboardQuestsAndAnnouncements();
+  renderPartnersAndCredits();
+});
+window.addEventListener('DOMContentLoaded', () => {
+  if (window.activeLegalTabOverride) activeLegalTab = window.activeLegalTabOverride;
+  renderMyProfileTab();
+  renderLeaderboardQuestsAndAnnouncements();
+  renderPartnersAndCredits();
+  renderRulesAndLegal();
+});
