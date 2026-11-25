@@ -51,6 +51,7 @@ window.acceptFriendRequest = async function(fromUid) {
   await window.refreshMyProfile();
   window.notify(`You are now friends with @${other?.username || 'member'}!`);
 };
+
 window.removeFriend = async function(targetUid) {
   const me = window.userProfile;
   if (!me) return;
@@ -65,7 +66,6 @@ window.removeFriend = async function(targetUid) {
   await window.refreshMyProfile();
   window.notify('Friend removed.');
 };
-
 window.openUserModal = async function(uid, fullMode = false) {
   const modal = document.getElementById('user-modal');
   const box = document.getElementById('user-modal-content');
@@ -96,6 +96,7 @@ window.openUserModal = async function(uid, fullMode = false) {
   const bannerBg = u.banner && (u.banner.startsWith('http') || String(u.banner).startsWith('data:')) ? `url('${u.banner}') center/cover` : (u.banner || 'linear-gradient(135deg,#064e3b,#0f172a)');
   const chipsHtml = window.renderRoleChips ? window.renderRoleChips(u) : `<span class="role-chip">${u.role}</span>`;
   const statusLine = u.online ? `Online • ${u.activity_text || 'Active in ZynkOS'}` : `Offline${u.last_channel ? ` • Last chatted in ${u.last_channel}` : ''}${u.last_seen ? ` (${formatAgo(u.last_seen)})` : ''}`;
+  const safeBio = String(u.bio || 'New ZynkOS Member.').replace(/</g, '&lt;').replace(/\n/g, '<br>');
 
   const mutualCount = isSelf ? 0 : myFriends.filter(id => (Array.isArray(u.friends) ? u.friends : []).includes(id)).length;
   const fullStatsHtml = fullMode ? `
@@ -128,7 +129,7 @@ window.openUserModal = async function(uid, fullMode = false) {
       ${fullStatsHtml}
       <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08);">
         <div class="mono-dim" style="font-weight:700;margin-bottom:4px;">ABOUT ME</div>
-        <p class="sub-text">${u.bio || 'New ZynkOS Member.'}</p>
+        <p class="sub-text">${safeBio}</p>
       </div>
       <div style="margin-top:12px;">
         <div class="mono-dim" style="font-weight:700;margin-bottom:6px;">ROLES ${!isSelf && mutualCount ? `• ${mutualCount} MUTUAL FRIEND(S)` : ''}</div>
@@ -147,7 +148,11 @@ async function renderMyProfileTab() {
   const allItems = await window.sbRest('store_items?order=id.asc').catch(() => []);
   const ownedList = (allItems || []).filter(it => (p.owned_items || []).includes(it.id));
   const frameGlow = p.avatar_frame && p.avatar_frame !== 'none' ? `box-shadow:0 0 0 3px ${p.avatar_frame},0 0 18px ${p.avatar_frame};` : '';
-  const bannerBg = p.banner && (p.banner.startsWith('http') || p.banner.startsWith('data:')) ? `url('${p.banner}') center/cover` : (p.banner || 'linear-gradient(135deg,#064e3b,#0f172a)');
+  const bannerBg = p.banner && (p.banner.startsWith('http') || String(p.banner).startsWith('data:')) ? `url('${p.banner}') center/cover` : (p.banner || 'linear-gradient(135deg,#064e3b,#0f172a)');
+
+  const isPrivileged = ['FOUNDER', 'HEAD DEV', 'DEVELOPER', 'ADMIN', 'MODERATOR'].includes((p.role || '').toUpperCase());
+  const canUploadPfp = isPrivileged || (p.owned_items || []).includes('pwr_pfp');
+  const canUploadBanner = isPrivileged || (p.owned_items || []).includes('pwr_ban');
 
   const infList = Array.isArray(p.infractions) ? p.infractions : [];
   const isMutedNow = p.is_muted || (p.mute_until && p.mute_until > Date.now());
@@ -170,10 +175,14 @@ async function renderMyProfileTab() {
         <div class="profile-body">
           <h2 style="color:${p.equipped_color}">${p.username}</h2>
           <div class="badges-row" style="margin:6px 0 14px;">${window.renderRoleChips ? window.renderRoleChips(p) : ''}</div>
-          <div class="setting-group"><label>About Me / Bio</label><input id="edit-bio" class="tool-input" value="${p.bio || ''}" /></div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <div class="setting-group"><label>About Me / Bio (Press Enter for new lines)</label><textarea id="edit-bio" class="tool-input" rows="4" style="resize:vertical;line-height:1.5;">${p.bio || ''}</textarea></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
             <button id="save-my-profile" class="btn-neon">Save Bio</button>
-            <button id="reset-my-gear" class="btn-outline">Reset Avatar & Banner to Default</button>
+            <button id="reset-my-gear" class="btn-outline">Reset Avatar & Banner</button>
+            <input type="file" id="custom-pfp-inp" accept="image/*" style="position:fixed;left:-9999px;opacity:0;" />
+            <input type="file" id="custom-ban-inp" accept="image/*" style="position:fixed;left:-9999px;opacity:0;" />
+            <button id="upload-pfp-btn" class="btn-outline">${canUploadPfp ? 'Upload Custom PFP' : 'Upload Custom PFP (Store Pass)'}</button>
+            <button id="upload-ban-btn" class="btn-outline">${canUploadBanner ? 'Upload Custom Banner' : 'Upload Custom Banner (Store Pass)'}</button>
           </div>
         </div>
       </div>
@@ -204,7 +213,7 @@ async function renderMyProfileTab() {
       </div>
     </div>`;
   document.getElementById('save-my-profile').onclick = async () => {
-    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { bio: document.getElementById('edit-bio').value.trim() }, window.authToken);
+    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { bio: document.getElementById('edit-bio').value }, window.authToken);
     await window.refreshMyProfile();
     window.notify('Profile bio saved!');
   };
@@ -213,6 +222,57 @@ async function renderMyProfileTab() {
     await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { avatar: 'logo.png', banner: 'linear-gradient(135deg,#064e3b,#0f172a)', avatar_frame: 'none' }, window.authToken);
     await window.refreshMyProfile();
     window.notify('Reset avatar, banner & frame to defaults.');
+  };
+
+  document.getElementById('upload-pfp-btn').onclick = () => {
+    if (!canUploadPfp) {
+      window.notify('Unlock "Custom PFP Upload Pass" in Zynk Store first!', true);
+      return window.openTab?.('store-view');
+    }
+    document.getElementById('custom-pfp-inp').click();
+  };
+
+  document.getElementById('upload-ban-btn').onclick = () => {
+    if (!canUploadBanner) {
+      window.notify('Unlock "Custom Banner Upload Pass" in Zynk Store first!', true);
+      return window.openTab?.('store-view');
+    }
+    document.getElementById('custom-ban-inp').click();
+  };
+
+  const compressProfileImg = (file, maxDim) => new Promise((res) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const im = new Image();
+      im.onload = () => {
+        const sc = Math.min(1, maxDim / Math.max(im.width, im.height));
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(im.width * sc);
+        cv.height = Math.round(im.height * sc);
+        cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+        res(cv.toDataURL('image/webp', 0.85));
+      };
+      im.src = r.result;
+    };
+    r.readAsDataURL(file);
+  });
+
+  document.getElementById('custom-pfp-inp').onchange = async (e) => {
+    const f = e.target.files?.at(0);
+    if (!f) return;
+    const dataUrl = await compressProfileImg(f, 256);
+    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { avatar: dataUrl }, window.authToken);
+    await window.refreshMyProfile();
+    window.notify('Custom Profile Picture uploaded! Keep it SFW.');
+  };
+
+  document.getElementById('custom-ban-inp').onchange = async (e) => {
+    const f = e.target.files?.at(0);
+    if (!f) return;
+    const dataUrl = await compressProfileImg(f, 720);
+    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { banner: dataUrl }, window.authToken);
+    await window.refreshMyProfile();
+    window.notify('Custom Profile Banner uploaded! Keep it SFW.');
   };
 
   const invGrid = document.getElementById('inv-visual-grid');
@@ -279,7 +339,6 @@ async function renderPartnersAndCredits() {
         </ul>
       </div>`;
   }
-
   const cBox = document.getElementById('credits-container');
   if (cBox) {
     const team = await window.sbRest('zynk_credits?order=id.asc').catch(() => []);
@@ -444,7 +503,6 @@ async function renderLeaderboardQuestsAndAnnouncements() {
   secretList.forEach(q => renderCard(q, 'q-sec-secret', false));
   doneList.forEach(q => renderCard(q, 'q-sec-done', true));
 }
-
 let activeLegalTab = 'RULES';
 
 function renderRulesAndLegal() {
