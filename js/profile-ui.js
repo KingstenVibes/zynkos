@@ -290,3 +290,206 @@ async function renderLeaderboardQuestsAndAnnouncements() {
     { id: 'sec_violet', cat: 'SECRET', isSecret: true, title: 'Void Resonance', desc: '??? [Secret Quest — Condition Hidden]', cred: 500, xp: 600, cur: document.body.classList.contains('theme-violet') ? 1 : 0, max: 1 },
     { id: 'sec_zoom', cat: 'SECRET', isSecret: true, title: 'Micro Vision', desc: '??? [Secret Quest — Condition Hidden]', cred: 350, xp: 400, cur: localStorage.getItem('zynk_zoom') === '0.9' ? 1 : 0, max: 1 }
   ];
+  const customQuests = await window.sbRest('achievements_list?order=id.asc').catch(() => []);
+  const allQuests = [
+    ...builtInQuests,
+    ...(customQuests || []).map(q => ({ id: `db_${q.id}`, cat: q.is_secret ? 'SECRET' : 'WEEKLY', title: q.title, desc: q.is_secret ? '??? [Secret Quest — Condition Hidden]' : q.description, cred: q.reward_credits, xp: q.reward_xp, isSecret: q.is_secret, cur: 1, max: 1 }))
+  ];
+
+  const isClaimed = (q) => !q.isDaily && (p?.claimed || []).includes(q.id);
+  const dailyList = allQuests.filter(q => q.cat === 'DAILY' && !isClaimed(q));
+  const weeklyList = allQuests.filter(q => q.cat === 'WEEKLY' && !isClaimed(q));
+  const secretList = allQuests.filter(q => q.cat === 'SECRET' && !isClaimed(q));
+  const doneList = allQuests.filter(q => isClaimed(q));
+
+  aGrid.style.display = 'block';
+  aGrid.innerHTML = `
+    <h3 style="color:#10b981;margin-bottom:10px;">Daily Quests (${dailyList.length})</h3>
+    <div class="cards-grid" id="q-sec-daily" style="margin-bottom:24px;"></div>
+    <h3 style="color:#06b6d4;margin-bottom:10px;">Weekly & Milestone Quests (${weeklyList.length})</h3>
+    <div class="cards-grid" id="q-sec-weekly" style="margin-bottom:24px;"></div>
+    <h3 style="color:#a855f7;margin-bottom:10px;">Secret Quests (${secretList.length})</h3>
+    <div class="cards-grid" id="q-sec-secret" style="margin-bottom:24px;"></div>
+    <h3 style="color:#94a3b8;margin-bottom:10px;">Completed Quests (${doneList.length})</h3>
+    <div class="cards-grid" id="q-sec-done"></div>`;
+
+  const renderCard = (q, targetId, isDone) => {
+    const box = document.getElementById(targetId);
+    if (!box) return;
+    const canClaim = Boolean(p) && q.cur >= q.max && !isDone;
+    const pct = Math.min(100, Math.round((q.cur / q.max) * 100));
+    const card = document.createElement('div');
+    card.className = 'glass-card';
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span class="pill" style="padding:3px 9px;font-size:0.74rem;color:#10b981;">+${q.cred} Z-Credits</span>
+        <span class="pill" style="padding:3px 9px;font-size:0.74rem;color:#06b6d4;">+${q.xp} XP</span>
+      </div>
+      <h3>${q.title}</h3>
+      <p class="sub-text" style="margin:6px 0 10px;">${q.desc}</p>
+      ${!q.isSecret ? `<div class="xp-labels"><span>Progress</span><span>${q.cur} / ${q.max}</span></div><div class="xp-track" style="margin-bottom:12px;"><div class="xp-fill" style="width:${pct}%"></div></div>` : ''}
+      <button class="${canClaim ? 'btn-neon' : 'btn-outline'}" style="width:100%" ${q.isDaily ? 'id="daily-quest-btn"' : ''} ${canClaim ? '' : 'disabled'}>${isDone ? 'Completed' : canClaim ? (q.isDaily ? 'Pick Daily Mystery Card' : 'Claim Reward') : q.isSecret ? 'Discover Secret' : 'In Progress'}</button>`;
+
+    const btn = card.querySelector('button');
+    btn.onclick = async () => {
+      if (q.isDaily) return window.openDailyPickerModal();
+      if (!p || !canClaim || btn.disabled) return;
+      btn.disabled = true;
+      btn.textContent = 'Claiming...';
+      const patch = { credits: p.credits + q.cred, xp: (p.xp || 0) + q.xp, claimed: [...new Set([...(p.claimed || []), q.id])] };
+      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', patch, window.authToken);
+      await window.refreshMyProfile();
+      window.notify(`Quest Complete! +${q.cred} Z-Credits & +${q.xp} XP`);
+    };
+    box.appendChild(card);
+  };
+
+  dailyList.forEach(q => renderCard(q, 'q-sec-daily', false));
+  weeklyList.forEach(q => renderCard(q, 'q-sec-weekly', false));
+  secretList.forEach(q => renderCard(q, 'q-sec-secret', false));
+  doneList.forEach(q => renderCard(q, 'q-sec-done', true));
+}
+let activeLegalTab = 'RULES';
+
+function renderRulesAndLegal() {
+  const box = document.getElementById('rules-container');
+  if (!box) return;
+
+  const tabs = [
+    { id: 'RULES', label: 'Community Rules' },
+    { id: 'TOS', label: 'Terms of Service' },
+    { id: 'PRIVACY', label: 'Privacy Policy' }
+  ];
+
+  const cardStyle = 'padding:14px 16px;border-radius:12px;background:rgba(4,7,11,0.75);border:1px solid rgba(255,255,255,0.08);margin-bottom:10px;';
+
+  let contentHtml = '';
+  if (activeLegalTab === 'RULES') {
+    const rules = [
+      { num: '01', title: 'Minimum Age Requirement (13+)', desc: 'You must be at least 13 years old to create an account, participate in Zynk Chat, or use ZynkOS services. Underage accounts will be suspended immediately.' },
+      { num: '02', title: 'Be Respectful — Zero Harassment or Hate Speech', desc: 'Treat every member with respect. Harassment, bullying, slurs, discrimination, doxxing, or threats of any kind are strictly prohibited.' },
+      { num: '03', title: 'Keep It Safe for Work (No NSFW or Gore)', desc: 'Do not post, upload, or link sexually explicit content, graphic violence, or disturbing media in Zynk Chat, avatars, banners, or custom stickers.' },
+      { num: '04', title: 'No Spam, Flooding, or Unsolicited Self-Promo', desc: 'Avoid message spamming, copypasta flooding, ping abuse (@mentions), or advertising external servers/links without Founder or Staff approval.' },
+      { num: '05', title: 'No Exploiting, Alt Farming, or Scamming', desc: 'Do not exploit bugs, farm Z-Credits/XP with alternate accounts, or attempt to scam other members during trades or gifts. Report bugs to Staff.' },
+      { num: '06', title: 'Follow Staff Instructions & Channel Topics', desc: 'Listen to Moderators, Admins, and the Founder. Use #updates only for official broadcasts and keep conversations civil.' }
+    ];
+    contentHtml = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <h3 style="display:flex;align-items:center;gap:8px;">${PROF_SVG.shield} ZynkOS Community Guidelines</h3>
+        <span class="pill" style="border-color:#f59e0b;color:#f59e0b;">13+ REQUIRED • ENFORCED BY STAFF</span>
+      </div>
+      ${rules.map(r => `<div style="${cardStyle}"><div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;"><span class="mono-dim" style="color:var(--neon-emerald);font-weight:700;">RULE ${r.num}</span><strong>${r.title}</strong></div><p class="sub-text">${r.desc}</p></div>`).join('')}`;
+  }
+
+  if (activeLegalTab === 'TOS') {
+    contentHtml = `
+      <h3 style="margin-bottom:12px;">Terms of Service</h3>
+      <div style="${cardStyle}"><strong>1. Acceptance of Terms</strong><p class="sub-text" style="margin-top:4px;">By accessing or creating an account on ZynkOS, you confirm that you are at least 13 years of age and agree to abide by these Terms of Service and our Community Rules.</p></div>
+      <div style="${cardStyle}"><strong>2. Accounts & Security</strong><p class="sub-text" style="margin-top:4px;">You are responsible for keeping your login credentials secure and for all activity under your account. Sharing or selling accounts is not permitted.</p></div>
+      <div style="${cardStyle}"><strong>3. Virtual Currency & Store Items (Z-Credits)</strong><p class="sub-text" style="margin-top:4px;">Z-Credits, XP, badges, avatars, and themes are virtual items with no real-world monetary value and cannot be exchanged for cash. Staff may adjust balances if obtained through exploits.</p></div>
+      <div style="${cardStyle}"><strong>4. User-Generated Content</strong><p class="sub-text" style="margin-top:4px;">You retain ownership of content you upload, but grant ZynkOS permission to display it within the platform. Staff reserve the right to remove content or mute/ban accounts that violate our rules.</p></div>
+      <div style="${cardStyle}"><strong>5. Service Availability</strong><p class="sub-text" style="margin-top:4px;">ZynkOS is provided "as is" and may be updated, modified, or temporarily offline for maintenance at any time.</p></div>`;
+  }
+
+  if (activeLegalTab === 'PRIVACY') {
+    contentHtml = `
+      <h3 style="margin-bottom:12px;">Privacy Policy</h3>
+      <div style="${cardStyle}"><strong>1. Information We Collect</strong><p class="sub-text" style="margin-top:4px;">We store your chosen username, email address (for authentication), encrypted password hash, profile customizations, and chat messages needed to operate ZynkOS.</p></div>
+      <div style="${cardStyle}"><strong>2. How We Use Your Data</strong><p class="sub-text" style="margin-top:4px;">Your data is used strictly to run platform features such as Zynk Chat, Private DMs, Quests, Leaderboards, and Store Inventory. We never sell your personal information to third parties.</p></div>
+      <div style="${cardStyle}"><strong>3. Private Direct Messages & Controls</strong><p class="sub-text" style="margin-top:4px;">Private DMs are restricted via database security policies so only participants can access them. You can hide yourself from the Global Leaderboard anytime in Settings -> Privacy & Safety.</p></div>
+      <div style="${cardStyle}"><strong>4. Local Storage & Preferences</strong><p class="sub-text" style="margin-top:4px;">ZynkOS uses browser local storage to remember your active session, steady page theme, clock format, and tab cloaking settings.</p></div>`;
+  }
+
+  box.innerHTML = `
+    <div style="max-width:840px;margin:auto;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+        ${tabs.map(t => `<button type="button" class="${activeLegalTab === t.id ? 'btn-neon' : 'btn-outline'}" data-ltab="${t.id}">${t.label}</button>`).join('')}
+      </div>
+      <div class="glass-card">${contentHtml}</div>
+    </div>`;
+
+  box.querySelectorAll('[data-ltab]').forEach(b => (b.onclick = () => {
+    activeLegalTab = b.dataset.ltab;
+    renderRulesAndLegal();
+  }));
+}
+window.openDailyPickerModal = function() {
+  const p = window.userProfile;
+  if (!p) return window.notify('Sign in to claim your Daily Reward!', true);
+  if (Date.now() - (p.last_daily || 0) < 86400000) return window.notify('Daily reward is still on cooldown!', true);
+
+  const modal = document.getElementById('user-modal');
+  const box = document.getElementById('user-modal-content');
+  const nextStreak = (p.daily_streak || 0) + 1;
+  const streakBonus = nextStreak % 30 === 0 ? 3000 : nextStreak % 14 === 0 ? 1250 : nextStreak % 7 === 0 ? 500 : 0;
+
+  const pool = [
+    { tier: 'COMMON', color: '#94a3b8', cred: 150, xp: 100 },
+    { tier: 'UNCOMMON', color: '#10b981', cred: 300, xp: 200 },
+    { tier: 'EPIC', color: '#a855f7', cred: 600, xp: 400 }
+  ].sort(() => Math.random() - 0.5);
+
+  box.style.maxWidth = '460px';
+  box.innerHTML = `
+    <div style="padding:24px;text-align:center;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span class="pill" style="color:#f59e0b;border-color:#f59e0b;">Day ${nextStreak} Streak</span>
+        <button class="btn-ghost" onclick="document.getElementById('user-modal').classList.add('hidden')">✕</button>
+      </div>
+      <h2 style="margin-bottom:4px;">Pick a Daily Mystery Card!</h2>
+      <p class="sub-text" style="margin-bottom:16px;">Choose 1 of the 3 mystery cards below to reveal today's Z-Credits & XP:</p>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+        ${pool.map((c, i) => `
+          <div class="glass-card" data-pick-card="${i}" style="padding:18px 10px;cursor:pointer;border-color:rgba(255,255,255,0.18);transition:0.2s;">
+            <div style="color:var(--neon-emerald);display:flex;justify-content:center;margin-bottom:6px;">${PROF_SVG.gift}</div>
+            <strong style="font-size:0.85rem;">Mystery #${i + 1}</strong>
+            <div class="mono-dim" style="margin-top:4px;">Click to Reveal</div>
+          </div>`).join('')}
+      </div>
+      <div style="padding:10px;border-radius:10px;background:#04070b;font-size:0.8rem;color:var(--text-dim);">
+        <strong>Streak Milestones:</strong> Day 7 (+500 Z) • Day 14 (+1,250 Z) • Day 30 (+3,000 Z)
+      </div>
+    </div>`;
+  modal.classList.remove('hidden');
+
+  let picked = false;
+  box.querySelectorAll('[data-pick-card]').forEach(cardEl => (cardEl.onclick = async () => {
+    if (picked) return;
+    picked = true;
+    const chosen = pool[parseInt(cardEl.dataset.pickCard, 10)];
+    box.querySelectorAll('[data-pick-card]').forEach((el, idx) => {
+      const item = pool[idx];
+      el.style.borderColor = item.color;
+      el.style.opacity = idx === parseInt(cardEl.dataset.pickCard, 10) ? '1' : '0.45';
+      el.innerHTML = `<span class="rarity-tag" style="color:${item.color}">${item.tier}</span><h3 style="margin:6px 0 2px;">+${item.cred} Z</h3><div class="mono-dim">+${item.xp} XP</div>`;
+    });
+
+    const totalCred = chosen.cred + streakBonus;
+    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', {
+      credits: p.credits + totalCred,
+      xp: (p.xp || 0) + chosen.xp,
+      last_daily: Date.now(),
+      daily_streak: nextStreak
+    }, window.authToken);
+    await window.refreshMyProfile();
+    window.notify(`${chosen.tier}! +${totalCred} Z-Credits${streakBonus ? ` (Includes +${streakBonus} Z Streak Milestone!)` : ''}`);
+  }));
+};
+
+document.addEventListener('click', (e) => {
+  if (e.target.id === 'dash-daily-btn') window.openDailyPickerModal();
+});
+
+setInterval(() => {
+  const p = window.userProfile;
+  if (!p) return;
+  const rem = 86400000 - (Date.now() - (p.last_daily || 0));
+  const label = rem <= 0 ? 'Pick Daily Mystery Card' : `Next Card in ${String(Math.floor(rem / 3600000)).padStart(2, '0')}:${String(Math.floor((rem % 3600000) / 60000)).padStart(2, '0')}:${String(Math.floor((rem % 60000) / 1000)).padStart(2, '0')}`;
+  ['daily-quest-btn', 'dash-daily-btn'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) { b.disabled = rem > 0; b.className = rem <= 0 ? 'btn-neon' : 'btn-outline'; b.textContent = label; }
+  });
+}, 1000);
+
+window.addEventListener('zynk-profile-updated', () => { renderMyProfileTab(); renderLeaderboardQuestsAndAnnouncements(); renderPartnersAndCredits(); });
+window.addEventListener('DOMContentLoaded', () => { renderMyProfileTab(); renderLeaderboardQuestsAndAnnouncements(); renderPartnersAndCredits(); renderRulesAndLegal(); });
