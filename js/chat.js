@@ -6,9 +6,12 @@ const chatForm = document.getElementById('chat-form');
 let cachedUsers = [];
 let initialChatLoaded = false;
 let activeReply = null;
+let pendingAttachment = null;
 let lastChatHash = '';
 let lastNotifiedMsgId = 0;
 let lastTypingPing = 0;
+let lastSentByChannel = {};
+let channelSlowMode = { global: 0, updates: 0, beta: 0 };
 let activeChannel = 'global';
 window.activeChatLabel = '#zynk-global';
 let channelUnread = { global: false, updates: false, beta: false };
@@ -30,7 +33,37 @@ const ALL_EMOJIS = [
   '💚','💙','💜','🧡','🖤','🤍','💔','💥','💫','💤','✅','❌','⚠️','🛡️','🔮','🛸'
 ];
 
-function compressChatImg(file, maxDim = 540) {
+function getUploadLimitInfo(p) {
+  if (!p) return { mb: 50, label: '50 MB' };
+  const roles = [p.role, ...(p.extra_roles || [])].map(r => String(r || '').toUpperCase());
+  if (roles.some(r => ['FOUNDER', 'HEAD DEV', 'HEAD_DEV', 'DEVELOPER', 'DEV'].includes(r))) {
+    return { mb: Infinity, label: 'Unlimited' };
+  }
+  if (roles.some(r => ['ADMIN', 'MODERATOR', 'STAFF'].includes(r))) {
+    return { mb: 52.5, label: '52.5 MB (+5% Staff)' };
+  }
+  return { mb: 50, label: '50 MB' };
+}
+
+function canAccessChannel(p, ch) {
+  if (!ch || ch === 'global' || ch === 'updates') return true;
+  if (!p) return false;
+  if (ch === 'beta') {
+    return p.role === 'FOUNDER' || p.role === 'BETA' || !!p.is_beta || (p.extra_roles || []).includes('BETA');
+  }
+  if (ch.startsWith('dm_')) {
+    const parts = ch.replace(/^dm_/, '').split('_');
+    return parts.includes(String(p.id));
+  }
+  return true;
+}
+
+window.logAudit = async function(action, target, details) {
+  if (!window.sbRest) return;
+  const actor = window.userProfile?.username || 'System';
+  await window.sbRest('zynk_audit_logs', 'POST', { actor, action, target: target || '-', details: details || '' }, window.authToken).catch(() => {});
+};
+function compressChatImg(file, maxDim = 640) {
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -41,7 +74,7 @@ function compressChatImg(file, maxDim = 540) {
         canvas.width = Math.round(img.width * scale);
         canvas.height = Math.round(img.height * scale);
         canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/webp', 0.82));
+        resolve(canvas.toDataURL('image/webp', 0.85));
       };
       img.onerror = () => resolve(reader.result);
       img.src = reader.result;
@@ -56,6 +89,7 @@ function renderChanBadge(ch) {
   if (channelUnread[ch]) return `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#fff;margin-left:6px;"></span>`;
   return '';
 }
+
 function buildChannelBar() {
   const chatHeader = document.querySelector('#chat-view .view-topbar');
   if (!chatHeader) return;
@@ -67,17 +101,26 @@ function buildChannelBar() {
     chatHeader.insertBefore(bar, document.getElementById('chat-credits'));
   }
   const p = window.userProfile;
-  const isBeta = p && (p.role === 'FOUNDER' || p.role === 'BETA' || p.is_beta || (p.extra_roles || []).includes('BETA'));
+  const isBeta = canAccessChannel(p, 'beta');
+  const isStaff = p && ['FOUNDER', 'ADMIN', 'MODERATOR', 'HEAD DEV', 'DEVELOPER'].includes((p.role || '').toUpperCase());
+  const curSlow = channelSlowMode[activeChannel] || 0;
+
   bar.innerHTML = `
     <button type="button" class="${activeChannel === 'global' ? 'btn-neon' : 'btn-outline'}" data-ch="global" style="padding:5px 11px;font-size:0.8rem;"># zynk-global${renderChanBadge('global')}</button>
     <button type="button" class="${activeChannel === 'updates' ? 'btn-neon' : 'btn-outline'}" data-ch="updates" style="padding:5px 11px;font-size:0.8rem;"># updates${renderChanBadge('updates')}</button>
     ${isBeta ? `<button type="button" class="${activeChannel === 'beta' ? 'btn-neon' : 'btn-outline'}" data-ch="beta" style="padding:5px 11px;font-size:0.8rem;"># beta-lab${renderChanBadge('beta')}</button>` : ''}
-    <button type="button" class="btn-outline" id="new-dm-btn" style="padding:5px 11px;font-size:0.8rem;">Private DM</button>`;
+    <button type="button" class="btn-outline" id="new-dm-btn" style="padding:5px 11px;font-size:0.8rem;">Private DM</button>
+    ${isStaff ? `<select id="slowmode-sel" class="tool-input" style="width:auto;margin:0;padding:4px 8px;font-size:0.76rem;" title="Channel Slow Mode"><option value="0" ${curSlow === 0 ? 'selected' : ''}>Slow: Off</option><option value="5" ${curSlow === 5 ? 'selected' : ''}>Slow: 5s</option><option value="15" ${curSlow === 15 ? 'selected' : ''}>Slow: 15s</option><option value="30" ${curSlow === 30 ? 'selected' : ''}>Slow: 30s</option><option value="60" ${curSlow === 60 ? 'selected' : ''}>Slow: 1m</option></select>` : ''}`;
 
   bar.querySelectorAll('[data-ch]').forEach(b => (b.onclick = () => {
     window.switchChatChannel(b.dataset.ch, b.dataset.ch === 'global' ? '#zynk-global' : `#${b.dataset.ch}`);
   }));
   document.getElementById('new-dm-btn').onclick = () => window.openNewDmModal();
+  const smSel = document.getElementById('slowmode-sel');
+  if (smSel) smSel.onchange = () => {
+    channelSlowMode[activeChannel] = parseInt(smSel.value, 10) || 0;
+    window.notify?.(`Slow mode set to ${smSel.value === '0' ? 'Off' : smSel.value + 's'} in ${window.activeChatLabel}`);
+  };
 
   const totalPings = Object.values(channelPings).reduce((a, b) => a + b, 0);
   const dockBadge = document.getElementById('dock-chat-badge');
@@ -88,6 +131,11 @@ function buildChannelBar() {
 }
 
 window.switchChatChannel = function(chId, label) {
+  if (!canAccessChannel(window.userProfile, chId)) {
+    window.notify?.('Access denied: You do not have permission for this channel.', true);
+    chId = 'global';
+    label = '#zynk-global';
+  }
   activeChannel = chId;
   window.activeChatLabel = label || (chId === 'global' ? '#zynk-global' : `#${chId}`);
   channelUnread[chId] = false;
@@ -99,7 +147,6 @@ window.switchChatChannel = function(chId, label) {
   if (chatInput) chatInput.placeholder = `Message ${window.activeChatLabel}... (Type / or @)`;
   pollChatAndMembers();
 };
-
 if (chatForm && !document.getElementById('chat-file-inp')) {
   const fileInp = document.createElement('input');
   fileInp.type = 'file';
@@ -110,7 +157,7 @@ if (chatForm && !document.getElementById('chat-file-inp')) {
   const imgBtn = document.createElement('button');
   imgBtn.type = 'button';
   imgBtn.className = 'chat-tool-btn';
-  imgBtn.title = 'Upload Image';
+  imgBtn.title = 'Attach Image';
   imgBtn.innerHTML = CHAT_SVG.plus;
   imgBtn.onclick = () => fileInp.click();
 
@@ -121,10 +168,18 @@ if (chatForm && !document.getElementById('chat-file-inp')) {
   stkBtn.innerHTML = CHAT_SVG.sticker;
   stkBtn.onclick = () => window.toggleChatDrawer();
 
+  const charCount = document.createElement('span');
+  charCount.id = 'chat-char-count';
+  charCount.className = 'mono-dim';
+  charCount.style.cssText = 'font-size:0.72rem;white-space:nowrap;';
+  charCount.textContent = '0/2000';
+
   chatForm.insertBefore(fileInp, chatInput);
   chatForm.insertBefore(imgBtn, chatInput);
   chatForm.insertBefore(stkBtn, chatInput);
+  chatForm.insertBefore(charCount, chatForm.querySelector('button[type="submit"]'));
 }
+
 let drawerBox = document.getElementById('chat-drawer-box');
 if (!drawerBox && chatForm) {
   drawerBox = document.createElement('div');
@@ -142,7 +197,7 @@ if (!typingBar && chatForm) {
 }
 buildChannelBar();
 
-const ROLE_POWER = { FOUNDER: 100, ADMIN: 80, MODERATOR: 60, BETA: 30, UPLOADER: 25, DESIGNER: 25, VIP: 20, SUPPORTER: 15, MEMBER: 10, SYSTEM: 90 };
+const ROLE_POWER = { FOUNDER: 100, 'HEAD DEV': 95, DEVELOPER: 90, ADMIN: 80, MODERATOR: 60, BETA: 30, UPLOADER: 25, DESIGNER: 25, VIP: 20, SUPPORTER: 15, MEMBER: 10, SYSTEM: 90 };
 
 const SLASH_CMDS = [
   { cmd: '/help', desc: 'Show all available commands', staff: false },
@@ -190,7 +245,6 @@ function getStickerLimit(p) {
   if (p.role !== 'MEMBER' || (p.rank_index || 0) >= 1 || (p.extra_roles || []).length > 0) return 10;
   return 2;
 }
-
 window.openNewDmModal = function() {
   const p = window.userProfile;
   if (!p) return window.notify?.('Sign in to start a Private DM!', true);
@@ -277,33 +331,47 @@ window.sendStickerImg = async function(idx) {
   await window.sbRest('messages', 'POST', { user_id: p.id, username: p.username, avatar: 'logo.png', role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: '[Sticker]', image_url: src, channel: activeChannel }, window.authToken);
   lastChatHash = '';
 };
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.msg-actions')) {
-    document.querySelectorAll('.react-popover').forEach(p => p.remove());
-    document.querySelectorAll('.msg-actions.open').forEach(a => a.classList.remove('open'));
-  }
-});
+
+window.clearPendingAttachment = function() {
+  pendingAttachment = null;
+  document.getElementById('chat-attach-preview')?.remove();
+};
 
 document.getElementById('chat-file-inp')?.addEventListener('change', async (e) => {
   const f = e.target.files?.at(0);
   const p = window.userProfile;
+  e.target.value = '';
   if (!f || !p) return;
   if (activeChannel === 'updates' && p.role !== 'FOUNDER') {
-    e.target.value = '';
     return window.notify?.('Only Founder can post in #updates.', true);
   }
-  const caption = chatInput.value.trim() || f.name;
-  chatInput.value = '';
-  e.target.value = '';
-  window.notify?.('Uploading image...');
-  try {
-    const compressed = await compressChatImg(f, 560);
-    appendSingleMsg({ id: Date.now(), user_id: p.id, username: p.username, avatar: p.avatar, role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: caption, image_url: compressed, created_at: new Date().toISOString() });
-    await window.sbRest('messages', 'POST', { user_id: p.id, username: p.username, avatar: 'logo.png', role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: caption, image_url: compressed, channel: activeChannel }, window.authToken);
-    lastChatHash = '';
-    pollChatAndMembers();
-  } catch (err) {
-    window.notify?.('Image upload failed: ' + err.message, true);
+  const limitInfo = getUploadLimitInfo(p);
+  const sizeMB = f.size / (1024 * 1024);
+  if (sizeMB > limitInfo.mb) {
+    return window.notify?.(`File too large (${sizeMB.toFixed(1)} MB). Your limit is ${limitInfo.label}.`, true);
+  }
+  const compressed = await compressChatImg(f, 680);
+  pendingAttachment = { name: f.name, dataUrl: compressed, sizeLabel: `${sizeMB.toFixed(2)} MB` };
+
+  let prev = document.getElementById('chat-attach-preview');
+  if (!prev) {
+    prev = document.createElement('div');
+    prev.id = 'chat-attach-preview';
+    prev.className = 'reply-banner';
+    chatForm?.before(prev);
+  }
+  prev.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;">
+      <img src="${compressed}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--neon-emerald);" />
+      <div><strong>${f.name}</strong><div class="mono-dim">${pendingAttachment.sizeLabel} • Ready to send with your message</div></div>
+    </div>
+    <button type="button" class="btn-ghost" onclick="clearPendingAttachment()">✕</button>`;
+  chatInput?.focus();
+});
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.msg-actions')) {
+    document.querySelectorAll('.react-popover').forEach(p => p.remove());
+    document.querySelectorAll('.msg-actions.open').forEach(a => a.classList.remove('open'));
   }
 });
 
@@ -434,7 +502,7 @@ function buildMsgEl(m) {
     <div style="flex:1;min-width:0;">
       ${m.reply_to ? `<div class="reply-quote">${CHAT_SVG.reply} <span>${String(m.reply_to).replace(/</g, '&lt;')}</span></div>` : ''}
       <div><strong style="color:${m.color || '#10b981'};cursor:pointer;" class="msg-author">${m.username}</strong> <span class="mono-dim">[${m.role || 'MEMBER'}]${m.is_beta ? ' [BETA]' : ''} • ${timeStr}</span></div>
-      ${m.content !== '[Sticker]' ? `<div class="msg-text-body" style="margin-top:3px;word-break:break-word;">${safeText}${m.edited ? ' <span class="mono-dim">(edited)</span>' : ''}</div>` : ''}
+      ${m.content && m.content !== '[Sticker]' ? `<div class="msg-text-body" style="margin-top:3px;word-break:break-word;">${safeText}${m.edited ? ' <span class="mono-dim">(edited)</span>' : ''}</div>` : ''}
       ${m.image_url ? `<img src="${m.image_url}" class="chat-img-attach" style="${m.content === '[Sticker]' ? 'width:110px;height:110px;border:none;' : ''}" />` : ''}
       ${reactHtml ? `<div class="react-row">${reactHtml}</div>` : ''}
     </div>`;
@@ -468,6 +536,12 @@ function formatLastSeen(ts) {
 async function pollChatAndMembers() {
   if (!window.sbRest) return;
   const me = window.userProfile;
+  if (!canAccessChannel(me, activeChannel)) {
+    activeChannel = 'global';
+    window.activeChatLabel = '#zynk-global';
+    buildChannelBar();
+  }
+
   try {
     const cols = 'id,user_id,username,role,color,content,reply_to,edited,reactions,is_beta,created_at,image_url,channel';
     const filter = activeChannel === 'global' ? 'or=(channel.eq.global,channel.is.null)' : `channel=eq.${encodeURIComponent(activeChannel)}`;
@@ -485,8 +559,8 @@ async function pollChatAndMembers() {
     if (Array.isArray(recentAll) && recentAll.length) {
       recentAll.forEach(m => {
         if (m.id > lastNotifiedMsgId) lastNotifiedMsgId = m.id;
-        if (!initialChatLoaded || !me || m.username === me.username || m.username === 'ZynkBot') return;
         const ch = m.channel || 'global';
+        if (!initialChatLoaded || !me || m.username === me.username || m.username === 'ZynkBot' || !canAccessChannel(me, ch)) return;
         if (ch !== activeChannel || !document.getElementById('chat-view')?.classList.contains('active')) {
           channelUnread[ch] = true;
         }
@@ -518,16 +592,16 @@ async function pollChatAndMembers() {
       }
     }
     if (memBox) {
-      const roleOrder = ['FOUNDER', 'ADMIN', 'MODERATOR', 'BETA', 'UPLOADER', 'DESIGNER', 'VIP', 'SUPPORTER', 'MEMBER'];
+      const roleOrder = ['FOUNDER', 'HEAD DEV', 'DEVELOPER', 'ADMIN', 'MODERATOR', 'BETA', 'UPLOADER', 'DESIGNER', 'VIP', 'SUPPORTER', 'MEMBER'];
       const roleColMap = window.ROLE_COLORS || {};
       const online = users.filter(u => u.online);
       const offline = users.filter(u => !u.online);
       const renderMem = (u, isOn) => {
         const av = u.avatar && !u.avatar.includes('dicebear') ? u.avatar : 'logo.png';
         const sub = isOn ? (u.activity_text || u.role) : `${u.last_channel || u.role}${u.last_seen ? ` • ${formatLastSeen(u.last_seen)}` : ''}`;
-        return `<div class="member-item" style="opacity:${isOn ? '1' : '0.6'}" onclick="openUserModal('${u.id}')">
+        return `<div class="member-card" style="opacity:${isOn ? '1' : '0.62'}" onclick="openUserModal('${u.id}')">
           <div class="mem-av-wrap"><img src="${av}" /><span class="mem-dot" style="background:${isOn ? '#10b981' : '#64748b'}"></span></div>
-          <div style="min-width:0;"><div style="color:${u.equipped_color || '#f8fafc'};font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.username}</div><div class="mono-dim" style="font-size:0.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sub}</div></div>
+          <div style="min-width:0;flex:1;"><div style="color:${u.equipped_color || '#f8fafc'};font-weight:700;font-size:0.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.username}</div><div class="mono-dim" style="font-size:0.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sub}</div></div>
         </div>`;
       };
       let groupedHtml = '';
@@ -544,13 +618,16 @@ async function pollChatAndMembers() {
 
 chatInput?.addEventListener('input', () => {
   const p = window.userProfile;
-  if (p && chatInput.value.trim() && Date.now() - lastTypingPing > 2500) {
+  const cc = document.getElementById('chat-char-count');
+  if (cc) cc.textContent = `${chatInput.value.length}/2000`;
+
+  if (p && Date.now() - lastTypingPing > 2000) {
     lastTypingPing = Date.now();
-    window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { typing_until: Date.now() + 4500 }, window.authToken).catch(() => {});
+    window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { typing_until: Date.now() + 5000 }, window.authToken).catch(() => {});
   }
   if (!acBox) return;
   const val = chatInput.value;
-  const isStaff = p && ['FOUNDER', 'ADMIN', 'MODERATOR'].includes(p.role);
+  const isStaff = p && ['FOUNDER', 'HEAD DEV', 'DEVELOPER', 'ADMIN', 'MODERATOR'].includes((p.role || '').toUpperCase());
   const isFounder = p && p.role === 'FOUNDER';
 
   if (val.startsWith('/')) {
@@ -593,22 +670,35 @@ chatForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
   acBox?.classList.add('hidden');
   const raw = chatInput.value.trim();
-  if (!raw) return;
+  const att = pendingAttachment;
+  if (!raw && !att) return;
   const p = window.userProfile;
   if (!p) return window.notify?.('Sign in to send messages in Zynk Chat!', true);
+  if (!canAccessChannel(p, activeChannel)) return window.notify?.('You do not have permission to post here.', true);
   if (activeChannel === 'updates' && p.role !== 'FOUNDER') return window.notify?.('Only Founder can post in #updates.', true);
   if (p.is_muted || (p.mute_until && p.mute_until > Date.now())) {
     const mins = p.mute_until > Date.now() ? Math.ceil((p.mute_until - Date.now()) / 60000) + 'm left' : 'Active';
     return window.notify?.(`You are muted (${mins}). Reason: ${p.mute_reason || 'Staff action'}`, true);
   }
+
+  const isStaff = ['FOUNDER', 'HEAD DEV', 'DEVELOPER', 'ADMIN', 'MODERATOR'].includes((p.role || '').toUpperCase()) || (p.extra_roles || []).some(r => ['ADMIN', 'MODERATOR'].includes(r));
+  const slowSec = channelSlowMode[activeChannel] || 0;
+  if (!isStaff && slowSec > 0) {
+    const last = lastSentByChannel[activeChannel] || 0;
+    const wait = Math.ceil((slowSec * 1000 - (Date.now() - last)) / 1000);
+    if (wait > 0) return window.notify?.(`Slow mode is active: wait ${wait}s before sending again.`, true);
+  }
+  lastSentByChannel[activeChannel] = Date.now();
+
   chatInput.value = '';
+  const cc = document.getElementById('chat-char-count');
+  if (cc) cc.textContent = '0/2000';
+  window.clearPendingAttachment();
   const replyText = activeReply || '';
   window.clearChatReply();
 
   try {
-    const isStaff = ['FOUNDER', 'ADMIN', 'MODERATOR'].includes(p.role) || (p.extra_roles || []).some(r => ['ADMIN', 'MODERATOR'].includes(r));
     const isFounder = p.role === 'FOUNDER';
-
     if (raw.startsWith('/')) {
       const parts = raw.split(' ');
       const cmd = parts.at(0).toLowerCase();
@@ -625,18 +715,24 @@ chatForm?.addEventListener('submit', async (e) => {
           ids.forEach(id => document.querySelector(`[data-mid="${id}"]`)?.remove());
           await window.sbRest(`messages?id=in.(${ids.join(',')})`, 'DELETE', null, window.authToken);
         }
+        await window.logAudit('PURGE', window.activeChatLabel, `Deleted ${ids.length} messages`);
         lastChatHash = '';
         return botPost(`Purged ${ids.length} message(s) by @${p.username}.`);
       }
       if (cmd === '/clear' && isStaff) {
         await window.sbRest('messages?id=gt.0', 'DELETE', null, window.authToken);
+        await window.logAudit('CLEAR_CHAT', window.activeChatLabel, 'Cleared chat history');
         lastChatHash = '';
         return botPost(`Chat cleared by @${p.username}.`);
       }
-      if (cmd === '/announce' && isFounder) return botPost(`[BROADCAST] ${parts.slice(1).join(' ')}`);
+      if (cmd === '/announce' && isFounder) {
+        await window.logAudit('CHAT_ANNOUNCE', window.activeChatLabel, parts.slice(1).join(' '));
+        return botPost(`[BROADCAST] ${parts.slice(1).join(' ')}`);
+      }
       if (cmd === '/warn' && isStaff && targetName) {
         const reason = parts.slice(2).join(' ') || 'Follow community rules';
         await logInfraction(targetName, 'Warning', reason);
+        await window.logAudit('WARN', `@${targetName}`, reason);
         return botPost(`@${targetName} was warned by @${p.username}. Reason: ${reason}`);
       }
       if (cmd === '/mute' && isStaff && targetName) {
@@ -644,10 +740,12 @@ chatForm?.addEventListener('submit', async (e) => {
         const reason = parts.slice(3).join(' ') || 'Chat violation';
         await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`, 'PATCH', { is_muted: true, mute_until: Date.now() + durMs, mute_reason: reason }, window.authToken);
         await logInfraction(targetName, `Muted (${parts.at(2) || '10m'})`, reason);
+        await window.logAudit('MUTE', `@${targetName}`, `${parts.at(2) || '10m'} — ${reason}`);
         return botPost(`@${targetName} muted for ${parts.at(2) || '10m'} by @${p.username}. Reason: ${reason}`);
       }
       if (cmd === '/unmute' && isStaff && targetName) {
         await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`, 'PATCH', { is_muted: false, mute_until: 0, mute_reason: '' }, window.authToken);
+        await window.logAudit('UNMUTE', `@${targetName}`, 'Unmuted user');
         return botPost(`@${targetName} was unmuted by @${p.username}.`);
       }
       if (cmd === '/ban' && isStaff && targetName) {
@@ -655,10 +753,12 @@ chatForm?.addEventListener('submit', async (e) => {
         const reason = parts.slice(3).join(' ') || 'Rule violation';
         await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`, 'PATCH', { ban_until: Date.now() + durMs, ban_reason: reason, online: false }, window.authToken);
         await logInfraction(targetName, `Banned (${parts.at(2) || '10m'})`, reason);
+        await window.logAudit('BAN', `@${targetName}`, `${parts.at(2) || '10m'} — ${reason}`);
         return botPost(`@${targetName} banned for ${parts.at(2) || '10m'} by @${p.username}. Reason: ${reason}`);
       }
       if (cmd === '/unban' && isStaff && targetName) {
         await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`, 'PATCH', { ban_until: 0, ban_reason: '' }, window.authToken);
+        await window.logAudit('UNBAN', `@${targetName}`, 'Unbanned user');
         return botPost(`@${targetName} was unbanned by @${p.username}.`);
       }
       if (cmd === '/give' && isFounder && targetName) {
@@ -668,6 +768,7 @@ chatForm?.addEventListener('submit', async (e) => {
         const u = Array.isArray(found) ? found.at(0) : null;
         if (!u) return window.notify(`User @${targetName} not found.`, true);
         await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { credits: u.credits + amt }, window.authToken);
+        await window.logAudit('GIVE_CREDITS', `@${u.username}`, `+${amt} Z-Credits`);
         await window.refreshMyProfile();
         return botPost(`Founder @${p.username} granted +${amt} Z-Credits to @${u.username}!`);
       }
@@ -684,10 +785,11 @@ chatForm?.addEventListener('submit', async (e) => {
       }
     }
 
-    appendSingleMsg({ id: Date.now(), user_id: p.id, username: p.username, avatar: p.avatar, role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: raw, reply_to: replyText, created_at: new Date().toISOString() });
-    await window.sbRest('messages', 'POST', { user_id: p.id, username: p.username, avatar: 'logo.png', role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: raw, reply_to: replyText, channel: activeChannel }, window.authToken);
+    const mult = (p.boost_until && p.boost_until > Date.now()) ? 2 : 1;
+    appendSingleMsg({ id: Date.now(), user_id: p.id, username: p.username, avatar: p.avatar, role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: raw, image_url: att?.dataUrl || '', reply_to: replyText, created_at: new Date().toISOString() });
+    await window.sbRest('messages', 'POST', { user_id: p.id, username: p.username, avatar: 'logo.png', role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: raw, image_url: att?.dataUrl || '', reply_to: replyText, channel: activeChannel }, window.authToken);
     lastChatHash = '';
-    window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + 5, xp: (p.xp || 0) + 25, msg_count: (p.msg_count || 0) + 1, typing_until: 0, last_channel: window.activeChatLabel, last_seen: Date.now() }, window.authToken).then(() => window.refreshMyProfile()).catch(() => {});
+    window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + (5 * mult), xp: (p.xp || 0) + (25 * mult), msg_count: (p.msg_count || 0) + 1, typing_until: 0, last_channel: window.activeChatLabel, last_seen: Date.now() }, window.authToken).then(() => window.refreshMyProfile()).catch(() => {});
   } catch (err) {
     window.notify('Chat error: ' + err.message, true);
   }
