@@ -29,13 +29,32 @@ const ALL_EMOJIS = [
   '💚','💙','💜','🧡','🖤','🤍','💔','💥','💫','💤','✅','❌','⚠️','🛡️','🔮','🛸'
 ];
 
+function compressChatImg(file, maxDim = 540) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/webp', 0.82));
+      };
+      img.onerror = () => resolve(reader.result);
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function renderChanBadge(ch) {
   const pings = channelPings[ch] || 0;
   if (pings > 0) return `<span style="background:#f43f5e;color:#fff;font-size:0.68rem;font-weight:800;padding:1px 6px;border-radius:999px;margin-left:5px;">${pings}</span>`;
   if (channelUnread[ch]) return `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#fff;margin-left:6px;"></span>`;
   return '';
 }
-
 function buildChannelBar() {
   const chatHeader = document.querySelector('#chat-view .view-topbar');
   if (!chatHeader) return;
@@ -79,17 +98,18 @@ window.switchChatChannel = function(chId, label) {
   if (chatInput) chatInput.placeholder = `Message ${window.activeChatLabel}... (Type / or @)`;
   pollChatAndMembers();
 };
+
 if (chatForm && !document.getElementById('chat-file-inp')) {
   const fileInp = document.createElement('input');
   fileInp.type = 'file';
   fileInp.id = 'chat-file-inp';
   fileInp.accept = 'image/*';
-  fileInp.className = 'hidden';
+  fileInp.style.cssText = 'position:fixed;left:-9999px;opacity:0;width:1px;height:1px;';
 
   const imgBtn = document.createElement('button');
   imgBtn.type = 'button';
   imgBtn.className = 'chat-tool-btn';
-  imgBtn.title = 'Upload Image (Max 5MB)';
+  imgBtn.title = 'Upload Image';
   imgBtn.innerHTML = CHAT_SVG.plus;
   imgBtn.onclick = () => fileInp.click();
 
@@ -104,7 +124,6 @@ if (chatForm && !document.getElementById('chat-file-inp')) {
   chatForm.insertBefore(imgBtn, chatInput);
   chatForm.insertBefore(stkBtn, chatInput);
 }
-
 let drawerBox = document.getElementById('chat-drawer-box');
 if (!drawerBox && chatForm) {
   drawerBox = document.createElement('div');
@@ -170,6 +189,7 @@ function getStickerLimit(p) {
   if (p.role !== 'MEMBER' || (p.rank_index || 0) >= 1 || (p.extra_roles || []).length > 0) return 10;
   return 2;
 }
+
 window.openNewDmModal = function() {
   const p = window.userProfile;
   if (!p) return window.notify?.('Sign in to start a Private DM!', true);
@@ -183,7 +203,6 @@ window.openNewDmModal = function() {
         <h3>Start Private DM</h3>
         <button class="btn-ghost" onclick="document.getElementById('user-modal').classList.add('hidden')">✕</button>
       </div>
-      <p class="sub-text" style="margin-bottom:10px;">Select a member to open your private 1-on-1 channel:</p>
       <div style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;">
         ${others.map(u => `<div class="ac-item" data-dm-uid="${u.id}" data-dm-name="${u.username}" style="border-radius:8px;background:rgba(4,7,11,0.75);"><strong style="color:${u.equipped_color || '#10b981'}">@${u.username}</strong><span class="mono-dim">[${u.role}]</span></div>`).join('') || '<p class="sub-text">No other members available yet.</p>'}
       </div>
@@ -223,9 +242,9 @@ window.toggleChatDrawer = function() {
         <button type="button" class="btn-ghost" onclick="drawerBox.classList.add('hidden')">✕</button>
       </div>
     </div>
-    <input type="file" id="sticker-file-inp" accept="image/*" class="hidden" />
+    <input type="file" id="sticker-file-inp" accept="image/*" style="position:fixed;left:-9999px;opacity:0;width:1px;height:1px;" />
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-      ${myStickers.map((src, i) => `<img src="${src}" style="width:58px;height:58px;border-radius:8px;object-fit:cover;cursor:pointer;border:1px solid rgba(255,255,255,0.12);" onclick="sendStickerImg(${i})" title="Click to send sticker" />`).join('') || '<span class="mono-dim">No custom stickers uploaded yet.</span>'}
+      ${myStickers.map((src, i) => `<img src="${src}" style="width:58px;height:58px;border-radius:8px;object-fit:cover;cursor:pointer;border:1px solid rgba(255,255,255,0.12);" onclick="sendStickerImg(${i})" />`).join('') || '<span class="mono-dim">No custom stickers uploaded yet.</span>'}
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:4px;border-top:1px solid rgba(255,255,255,0.08);padding-top:8px;">
       ${ALL_EMOJIS.map(em => `<button type="button" class="react-choice" onclick="chatInput.value+='${em}';chatInput.focus();">${em}</button>`).join('')}
@@ -236,19 +255,15 @@ window.toggleChatDrawer = function() {
     if (myStickers.length >= limit) return window.notify?.(`Sticker limit reached (${limit} max).`, true);
     document.getElementById('sticker-file-inp').click();
   };
-  document.getElementById('sticker-file-inp').onchange = (e) => {
+  document.getElementById('sticker-file-inp').onchange = async (e) => {
     const f = e.target.files?.at(0);
     if (!f) return;
-    if (f.size > 5 * 1024 * 1024) return window.notify?.('Sticker must be under 5MB!', true);
-    const r = new FileReader();
-    r.onload = async () => {
-      const next = [...myStickers, r.result];
-      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { stickers: next }, window.authToken);
-      await window.refreshMyProfile();
-      window.notify('Sticker saved!');
-      window.toggleChatDrawer();
-    };
-    r.readAsDataURL(f);
+    const compressed = await compressChatImg(f, 220);
+    const next = [...myStickers, compressed];
+    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { stickers: next }, window.authToken);
+    await window.refreshMyProfile();
+    window.notify('Sticker saved!');
+    window.toggleChatDrawer();
   };
 };
 
@@ -268,7 +283,7 @@ document.addEventListener('click', (e) => {
   }
 });
 
-document.getElementById('chat-file-inp')?.addEventListener('change', (e) => {
+document.getElementById('chat-file-inp')?.addEventListener('change', async (e) => {
   const f = e.target.files?.at(0);
   const p = window.userProfile;
   if (!f || !p) return;
@@ -276,17 +291,19 @@ document.getElementById('chat-file-inp')?.addEventListener('change', (e) => {
     e.target.value = '';
     return window.notify?.('Only Founder can post in #updates.', true);
   }
-  if (f.size > 5 * 1024 * 1024) return window.notify?.('File must be 5MB or smaller!', true);
-  const r = new FileReader();
-  r.onload = async () => {
-    const caption = chatInput.value.trim() || f.name;
-    chatInput.value = '';
-    e.target.value = '';
-    appendSingleMsg({ id: Date.now(), user_id: p.id, username: p.username, avatar: p.avatar, role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: caption, image_url: r.result, created_at: new Date().toISOString() });
-    await window.sbRest('messages', 'POST', { user_id: p.id, username: p.username, avatar: 'logo.png', role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: caption, image_url: r.result, channel: activeChannel }, window.authToken);
+  const caption = chatInput.value.trim() || f.name;
+  chatInput.value = '';
+  e.target.value = '';
+  window.notify?.('Uploading image...');
+  try {
+    const compressed = await compressChatImg(f, 560);
+    appendSingleMsg({ id: Date.now(), user_id: p.id, username: p.username, avatar: p.avatar, role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: caption, image_url: compressed, created_at: new Date().toISOString() });
+    await window.sbRest('messages', 'POST', { user_id: p.id, username: p.username, avatar: 'logo.png', role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: caption, image_url: compressed, channel: activeChannel }, window.authToken);
     lastChatHash = '';
-  };
-  r.readAsDataURL(f);
+    pollChatAndMembers();
+  } catch (err) {
+    window.notify?.('Image upload failed: ' + err.message, true);
+  }
 });
 
 window.toggleReaction = async function(msgId, emoji) {
@@ -355,6 +372,7 @@ window.editChatMsg = function(msgId, oldText) {
     if (ev.key === 'Enter') { ev.preventDefault(); save(); }
   };
 };
+
 window.setChatReply = function(username, text) {
   activeReply = `@${username}: ${text.slice(0, 65)}`;
   let bar = document.getElementById('reply-preview-bar');
@@ -428,7 +446,6 @@ function renderMessages(msgs) {
   msgs.forEach(m => msgBox.appendChild(buildMsgEl(m)));
   if (wasAtBottom || !initialChatLoaded) msgBox.scrollTop = msgBox.scrollHeight;
 }
-
 function formatLastSeen(ts) {
   if (!ts) return '';
   const mins = Math.max(1, Math.floor((Date.now() - ts) / 60000));
@@ -436,13 +453,14 @@ function formatLastSeen(ts) {
   if (mins < 1440) return `${Math.floor(mins / 60)}h ago`;
   return `${Math.floor(mins / 1440)}d ago`;
 }
+
 async function pollChatAndMembers() {
   if (!window.sbRest) return;
   const me = window.userProfile;
   try {
     const cols = 'id,user_id,username,role,color,content,reply_to,edited,reactions,is_beta,created_at,image_url,channel';
     const filter = activeChannel === 'global' ? 'or=(channel.eq.global,channel.is.null)' : `channel=eq.${encodeURIComponent(activeChannel)}`;
-    const msgs = await window.sbRest(`messages?select=${cols}&${filter}&order=id.desc&limit=40`);
+    const msgs = await window.sbRest(`messages?select=${cols}&${filter}&order=id.desc&limit=35`);
     if (Array.isArray(msgs)) {
       msgs.reverse();
       const hash = activeChannel + ':' + JSON.stringify(msgs.map(m => [m.id, m.content, m.edited, m.reactions]));
@@ -482,13 +500,15 @@ async function pollChatAndMembers() {
     const typers = users.filter(u => u.typing_until && u.typing_until > Date.now() && (!me || u.id !== me.id));
     if (typingBar) {
       if (typers.length) {
-        const names = typers.length === 1 ? `@${typers.at(0).username} is typing` : `${typers.map(t => '@' + t.username).join(', ')} are typing`;
-        typingBar.innerHTML = `<span class="typing-dots"><span></span><span></span><span></span></span><span>${names}</span>`;
+        const names = typers.length === 1 ? `@${typers.at(0).username} is typing...` : `${typers.map(t => '@' + t.username).join(', ')} are typing...`;
+        typingBar.innerHTML = `<span class="typing-pill"><span class="typing-dots"><span></span><span></span><span></span></span><span>${names}</span></span>`;
       } else {
         typingBar.innerHTML = '';
       }
     }
     if (memBox) {
+      const roleOrder = ['FOUNDER', 'ADMIN', 'MODERATOR', 'BETA', 'UPLOADER', 'DESIGNER', 'VIP', 'SUPPORTER', 'MEMBER'];
+      const roleColMap = window.ROLE_COLORS || {};
       const online = users.filter(u => u.online);
       const offline = users.filter(u => !u.online);
       const renderMem = (u, isOn) => {
@@ -499,11 +519,14 @@ async function pollChatAndMembers() {
           <div style="min-width:0;"><div style="color:${u.equipped_color || '#f8fafc'};font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.username}</div><div class="mono-dim" style="font-size:0.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sub}</div></div>
         </div>`;
       };
-      memBox.innerHTML = `
-        <div class="members-head">ONLINE — ${online.length}</div>
-        ${online.map(u => renderMem(u, true)).join('') || '<div class="mono-dim" style="padding:4px 8px;">None</div>'}
-        <div class="members-head">OFFLINE — ${offline.length}</div>
-        ${offline.map(u => renderMem(u, false)).join('')}`;
+      let groupedHtml = '';
+      roleOrder.forEach(r => {
+        const list = online.filter(u => (u.role || 'MEMBER').toUpperCase() === r);
+        if (list.length) {
+          groupedHtml += `<div class="members-head" style="color:${roleColMap[r] || '#94a3b8'}">${r} — ${list.length}</div>` + list.map(u => renderMem(u, true)).join('');
+        }
+      });
+      memBox.innerHTML = `${groupedHtml || '<div class="mono-dim" style="padding:4px 8px;">No members online</div>'}<div class="members-head">OFFLINE — ${offline.length}</div>${offline.map(u => renderMem(u, false)).join('')}`;
     }
   }
 }
@@ -514,7 +537,6 @@ chatInput?.addEventListener('input', () => {
     lastTypingPing = Date.now();
     window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { typing_until: Date.now() + 4500 }, window.authToken).catch(() => {});
   }
-
   if (!acBox) return;
   const val = chatInput.value;
   const isStaff = p && ['FOUNDER', 'ADMIN', 'MODERATOR'].includes(p.role);
