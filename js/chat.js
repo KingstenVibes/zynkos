@@ -146,15 +146,15 @@ const ROLE_POWER = { FOUNDER: 100, ADMIN: 80, MODERATOR: 60, BETA: 30, UPLOADER:
 const SLASH_CMDS = [
   { cmd: '/help', desc: 'Show all available commands', staff: false },
   { cmd: '/credits', desc: 'Check your Z-Credits & Level', staff: false },
-  { cmd: '/pay @user 50', desc: 'Send Z-Credits to another member', staff: false },
-  { cmd: '/purge 10', desc: 'Delete the last N messages in this channel', staff: true },
+  { cmd: '/pay @user 50', desc: 'Change number, Send Z-Credits to another member', staff: false },
+  { cmd: '/purge 10', desc: 'Change Number, Delete the last N messages in this channel', staff: true },
   { cmd: '/warn @user reason', desc: 'Warn a member & log infraction', staff: true },
-  { cmd: '/mute @user 10m reason', desc: 'Mute a member (10m, 1h, 1d)', staff: true },
+  { cmd: '/mute @user 10m reason', desc: 'Change Number, Mute a member (10m, 1h, 1d)', staff: true },
   { cmd: '/unmute @user', desc: 'Unmute a member', staff: true },
-  { cmd: '/ban @user 1h reason', desc: 'Ban a member with duration & reason', staff: true },
+  { cmd: '/ban @user 1h reason', desc: 'Change Number, Ban a member with duration & reason', staff: true },
   { cmd: '/unban @user', desc: 'Lift a member ban', staff: true },
   { cmd: '/clear', desc: 'Clear chat history', staff: true },
-  { cmd: '/give @user 250', desc: 'Grant Z-Credits to a member (Founder)', founder: true },
+  { cmd: '/give @user 250', desc: 'Change Number, Grant Z-Credits to a member (Founder)', founder: true },
   { cmd: '/announce message', desc: 'Post system broadcast in chat (Founder)', founder: true }
 ];
 
