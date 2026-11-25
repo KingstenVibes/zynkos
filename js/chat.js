@@ -19,6 +19,7 @@ const CHAT_SVG = {
   reply: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>`,
   edit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`,
   trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
+  flag: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>`,
   plus: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
   sticker: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z"/><path d="M15 3v6h6"/></svg>`
 };
@@ -146,15 +147,15 @@ const ROLE_POWER = { FOUNDER: 100, ADMIN: 80, MODERATOR: 60, BETA: 30, UPLOADER:
 const SLASH_CMDS = [
   { cmd: '/help', desc: 'Show all available commands', staff: false },
   { cmd: '/credits', desc: 'Check your Z-Credits & Level', staff: false },
-  { cmd: '/pay @user 50', desc: 'Change number, Send Z-Credits to another member', staff: false },
-  { cmd: '/purge 10', desc: 'Change Number, Delete the last N messages in this channel', staff: true },
+  { cmd: '/pay @user 50', desc: 'Send Z-Credits to another member', staff: false },
+  { cmd: '/purge 10', desc: 'Delete the last N messages in this channel', staff: true },
   { cmd: '/warn @user reason', desc: 'Warn a member & log infraction', staff: true },
-  { cmd: '/mute @user 10m reason', desc: 'Change Number, Mute a member (10m, 1h, 1d)', staff: true },
+  { cmd: '/mute @user 10m reason', desc: 'Mute a member (10m, 1h, 1d)', staff: true },
   { cmd: '/unmute @user', desc: 'Unmute a member', staff: true },
-  { cmd: '/ban @user 1h reason', desc: 'Change Number, Ban a member with duration & reason', staff: true },
+  { cmd: '/ban @user 1h reason', desc: 'Ban a member with duration & reason', staff: true },
   { cmd: '/unban @user', desc: 'Lift a member ban', staff: true },
   { cmd: '/clear', desc: 'Clear chat history', staff: true },
-  { cmd: '/give @user 250', desc: 'Change Number, Grant Z-Credits to a member (Founder)', founder: true },
+  { cmd: '/give @user 250', desc: 'Grant Z-Credits to a member (Founder)', founder: true },
   { cmd: '/announce message', desc: 'Post system broadcast in chat (Founder)', founder: true }
 ];
 
@@ -339,6 +340,15 @@ window.deleteChatMsg = async function(msgId) {
   }
 };
 
+window.reportChatMsg = async function(msgId, targetUser, msgText) {
+  const me = window.userProfile;
+  if (!me) return window.notify?.('Sign in to report messages!', true);
+  const reason = prompt(`Report @${targetUser} — Enter reason (e.g. Spam, Harassment, NSFW):`);
+  if (!reason || !reason.trim()) return;
+  await window.sbRest('zynk_reports', 'POST', { reporter: me.username, target_user: targetUser, message_id: msgId, message_text: msgText, channel: activeChannel, reason: reason.trim() }, window.authToken);
+  window.notify?.('Report submitted to Moderation Queue!');
+};
+
 window.editChatMsg = function(msgId, oldText) {
   const row = document.querySelector(`[data-mid="${msgId}"]`);
   const textEl = row?.querySelector('.msg-text-body');
@@ -417,6 +427,7 @@ function buildMsgEl(m) {
       <button type="button" class="msg-act-btn" title="Add Reaction" onclick="openReactPicker(this, ${m.id})">${CHAT_SVG.react}</button>
       <button type="button" class="msg-act-btn" title="Reply" onclick="setChatReply('${m.username}', \`${String(m.content || '').replace(/`/g, '')}\`)">${CHAT_SVG.reply}</button>
       ${isOwner ? `<button type="button" class="msg-act-btn" title="Edit Message" onclick="editChatMsg(${m.id}, \`${String(m.content || '').replace(/`/g, '')}\`)">${CHAT_SVG.edit}</button>` : ''}
+      ${!isOwner && m.username !== 'ZynkBot' ? `<button type="button" class="msg-act-btn" style="color:#f59e0b;" title="Report Message" onclick="reportChatMsg(${m.id}, '${m.username}', \`${String(m.content || '').replace(/`/g, '')}\`)">${CHAT_SVG.flag}</button>` : ''}
       ${canDel ? `<button type="button" class="msg-act-btn" style="color:#f43f5e;" title="Delete Message" onclick="deleteChatMsg(${m.id})">${CHAT_SVG.trash}</button>` : ''}
     </div>
     <img class="msg-avatar" src="${av}" />
@@ -446,6 +457,7 @@ function renderMessages(msgs) {
   msgs.forEach(m => msgBox.appendChild(buildMsgEl(m)));
   if (wasAtBottom || !initialChatLoaded) msgBox.scrollTop = msgBox.scrollHeight;
 }
+
 function formatLastSeen(ts) {
   if (!ts) return '';
   const mins = Math.max(1, Math.floor((Date.now() - ts) / 60000));
@@ -453,7 +465,6 @@ function formatLastSeen(ts) {
   if (mins < 1440) return `${Math.floor(mins / 60)}h ago`;
   return `${Math.floor(mins / 1440)}d ago`;
 }
-
 async function pollChatAndMembers() {
   if (!window.sbRest) return;
   const me = window.userProfile;
