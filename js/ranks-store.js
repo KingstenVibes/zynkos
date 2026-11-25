@@ -43,6 +43,8 @@ function syncHud() {
   document.getElementById('hud-lvl').textContent = `◈ LEVEL ${lvl}`;
   document.getElementById('hud-xp-text').textContent = `${(p.xp || 0) % 1000} / 1,000 XP`;
   document.getElementById('hud-xp-bar').style.width = `${((p.xp || 0) % 1000) / 10}%`;
+  const stPill = document.getElementById('dash-streak-pill');
+  if (stPill) stPill.textContent = `🔥 ${p.daily_streak || 0} DAY STREAK`;
   const av = document.getElementById('hud-avatar-img');
   if (av) {
     av.src = p.avatar && !p.avatar.includes('dicebear') ? p.avatar : 'logo.png';
@@ -98,7 +100,7 @@ async function openGiftSearchModal(item, finalCost) {
   draw('');
   document.getElementById('gift-search-inp').oninput = (e) => draw(e.target.value);
 }
-async function renderRanksAndStore() {
+window.renderRanksAndStore = async function() {
   syncHud();
   const p = window.userProfile;
 
@@ -150,8 +152,8 @@ async function renderRanksAndStore() {
 
     const sortSel = document.getElementById('shop-sort-sel');
     sortSel.value = activeShopSort;
-    sortSel.onchange = () => { activeShopSort = sortSel.value; renderRanksAndStore(); };
-    sGrid.querySelectorAll('[data-sfilt]').forEach(b => (b.onclick = () => { activeShopFilter = b.dataset.sfilt; renderRanksAndStore(); }));
+    sortSel.onchange = () => { activeShopSort = sortSel.value; window.renderRanksAndStore(); };
+    sGrid.querySelectorAll('[data-sfilt]').forEach(b => (b.onclick = () => { activeShopFilter = b.dataset.sfilt; window.renderRanksAndStore(); }));
     const area = document.getElementById('shop-body-area');
 
     if (activeShopFilter === 'REQUEST') {
@@ -234,7 +236,7 @@ async function renderRanksAndStore() {
       area.appendChild(card);
     });
   }
-}
+};
 
-window.addEventListener('zynk-profile-updated', renderRanksAndStore);
-window.addEventListener('DOMContentLoaded', renderRanksAndStore);
+window.addEventListener('zynk-profile-updated', window.renderRanksAndStore);
+window.addEventListener('DOMContentLoaded', window.renderRanksAndStore);
