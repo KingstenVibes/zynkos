@@ -1,3 +1,22 @@
+const TAB_ACTIVITIES = {
+  'dash-view': 'On Dashboard',
+  'chat-view': 'Chatting in Zynk Chat',
+  'vortex-view': 'Viewing Vortex Guild',
+  'arcade-view': 'Playing in UGS Arcade',
+  'ranks-view': 'Checking ZynkOS Ranks',
+  'store-view': 'Browsing Zynk Store',
+  'profile-view': 'Customizing Profile',
+  'achieve-view': 'Viewing Quests',
+  'leader-view': 'Checking Leaderboards',
+  'tools-view': 'Using Utility Tools',
+  'partners-view': 'Viewing Partners',
+  'credits-view': 'Viewing Credits & Team',
+  'rules-view': 'Reading Rules & Terms',
+  'beta-view': 'Testing in Beta Lab',
+  'admin-view': 'In Founder Panel',
+  'settings-view': 'Adjusting Settings'
+};
+
 window.openTab = function(tabId) {
   if (!tabId) return;
   const p = window.userProfile;
@@ -8,6 +27,10 @@ window.openTab = function(tabId) {
 
   document.querySelectorAll('.dock-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
   document.querySelectorAll('.tab-view').forEach(v => v.classList.toggle('active', v.id === tabId));
+
+  if (p && window.sbRest && TAB_ACTIVITIES[tabId]) {
+    window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { activity_text: TAB_ACTIVITIES[tabId], online: true }, window.authToken).catch(() => {});
+  }
 };
 
 const root = document.getElementById('zynk-root');
@@ -115,10 +138,10 @@ const main = mk('main', 'main-viewport', `
     <div class="bento-grid" style="padding-top:8px;">
       <div class="glass-card" style="display:flex;flex-direction:column;justify-content:space-between;">
         <div>
-          <div class="card-head"><span>🎁 Daily Member Stipend</span><span class="mono-dim">+150 Z-CREDITS</span></div>
-          <p class="sub-text" style="margin-bottom:14px;">Claim your daily Z-Credit bonus every 24 hours to unlock Store gear.</p>
+          <div class="card-head"><span>🎁 Daily Mystery Reward</span><span class="mono-dim" id="dash-streak-pill">0 DAY STREAK</span></div>
+          <p class="sub-text" style="margin-bottom:14px;">Pick 1 of 3 mystery cards every 24 hours for Common, Uncommon, or Epic Z-Credits & XP!</p>
         </div>
-        <button class="btn-neon" id="dash-daily-btn" style="width:100%;">Claim +150 Daily Z-Credits</button>
+        <button class="btn-neon" id="dash-daily-btn" style="width:100%;">🎁 Pick Daily Mystery Card</button>
       </div>
 
       <div class="glass-card" style="grid-column:span 2;">
@@ -126,6 +149,7 @@ const main = mk('main', 'main-viewport', `
         <div id="dash-announcements-list" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-right:4px;"></div>
       </div>
     </div>
+    <div style="text-align:center;padding:12px 0 24px;color:var(--text-dim);font-size:0.78rem;">© 2026 ZynkOS • All Rights Reserved • Powered by ZynkOS Network</div>
   </section>
 
   <section id="chat-view" class="tab-view chat-layout">
@@ -138,15 +162,19 @@ const main = mk('main', 'main-viewport', `
     <aside class="members-panel"><div class="members-head">ONLINE MEMBERS</div><div id="online-members-list"></div></aside>
   </section>
 
-  <section id="vortex-view" class="tab-view full-embed" style="flex-direction:column;">
-    <div class="view-topbar" style="padding:10px 20px;border-bottom:1px solid var(--border-glass);background:rgba(4,7,11,0.85);">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span class="status-pill"><span class="pulse-dot"></span> Vortex Guild Live</span>
-        <span class="mono-dim">Powered by <a href="https://vortexos.net" target="_blank" rel="noopener" style="color:var(--neon-emerald);text-decoration:none;font-weight:700;">VortexOS.net ↗</a></span>
+  <section id="vortex-view" class="tab-view padded-view">
+    <div class="glass-card" style="max-width:600px;margin:20px auto;padding:30px;text-align:center;">
+      <span class="rarity-tag">OFFICIAL PARTNER INTEGRATION • VORTEXOS</span>
+      <h2 style="margin:8px 0 10px;">Vortex Guild & Community Hub</h2>
+      <p class="sub-text" style="margin-bottom:16px;">Connect with the official ZynkOS Guild on Vortex. By launching Vortex, you agree to follow Vortex's Community Guidelines and ZynkOS Rules.</p>
+      <div style="padding:12px;border-radius:10px;background:rgba(4,7,11,0.75);border:1px solid rgba(255,255,255,0.08);margin-bottom:18px;font-size:0.84rem;color:var(--text-dim);">
+        Powered by <a href="https://vortexos.net" target="_blank" rel="noopener" style="color:var(--neon-emerald);font-weight:700;text-decoration:none;">VortexOS.net ↗</a> • External Guild Window
       </div>
-      <button type="button" class="btn-outline" style="padding:5px 12px;font-size:0.8rem;" onclick="window.open('https://vortexos.net')">Open Fullscreen ↗</button>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+        <button type="button" class="btn-neon" onclick="window.open('https://vortexos.net')">❖ Log in with Vortex & Open Guild ↗</button>
+        <button type="button" class="btn-outline" onclick="window.open('https://vortexos.net')">Vortex Partner Policy ↗</button>
+      </div>
     </div>
-    <iframe src="https://vortexos.net" title="VortexOS Guild Chat" allow="clipboard-read; clipboard-write" style="flex:1;width:100%;height:100%;border:none;background:#04070b;"></iframe>
   </section>
 
   <section id="arcade-view" class="tab-view full-embed"><div id="custom-game-container" style="width:100%;height:100%;display:flex;"></div></section>
@@ -159,7 +187,7 @@ const main = mk('main', 'main-viewport', `
   <section id="partners-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Partners</h2><span class="sub-text">The projects & communities we collaborate with</span></div></div><div id="partners-container"></div></section>
   <section id="credits-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Credits & Team</h2><span class="sub-text">Founders, developers, designers & contributors</span></div></div><div id="credits-container"></div></section>
   <section id="rules-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Rules, Privacy Policy & Terms</h2><span class="sub-text">Community guidelines, 13+ age requirement & platform policies</span></div></div><div id="rules-container"></div></section>
-  <section id="beta-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Beta Lab</h2><span class="sub-text">Experimental themes, HUD scale & tester rewards</span></div></div><div class="cards-grid" id="beta-grid"></div></section>
+  <section id="beta-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Beta Lab</h2><span class="sub-text">Exclusive Beta Tester chat, themes & rewards</span></div></div><div id="beta-grid"></div></section>
   <section id="admin-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Founder Command Panel</h2><span class="sub-text">Broadcasts, store items, partners, team credits & roles</span></div></div><div id="admin-panel-container"></div></section>
   <section id="settings-view" class="tab-view padded-view"><div id="settings-shell"></div></section>
 `);
