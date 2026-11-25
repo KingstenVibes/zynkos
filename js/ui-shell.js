@@ -2,7 +2,6 @@ const TAB_ACTIVITIES = {
   'dash-view': 'On Dashboard',
   'chat-view': 'Chatting in Zynk Chat',
   'vortex-view': 'Viewing Vortex Guild',
-  'arcade-view': 'Playing in UGS Arcade',
   'ranks-view': 'Checking ZynkOS Ranks',
   'store-view': 'Browsing Zynk Store',
   'profile-view': 'Customizing Profile',
@@ -20,11 +19,11 @@ const TAB_ACTIVITIES = {
 
 const TAB_SLUGS = {
   'dash-view': 'dashboard', 'chat-view': 'chat', 'vortex-view': 'vortex',
-  'arcade-view': 'arcade', 'ranks-view': 'ranks', 'store-view': 'store',
-  'profile-view': 'profile', 'achieve-view': 'quests', 'leader-view': 'leaderboards',
-  'tools-view': 'tools', 'partners-view': 'partners', 'credits-view': 'credits',
-  'rules-view': 'rules', 'reports-view': 'reports', 'beta-view': 'beta',
-  'admin-view': 'founder', 'settings-view': 'settings'
+  'ranks-view': 'ranks', 'store-view': 'store', 'profile-view': 'profile',
+  'achieve-view': 'quests', 'leader-view': 'leaderboards', 'tools-view': 'tools',
+  'partners-view': 'partners', 'credits-view': 'credits', 'rules-view': 'rules',
+  'reports-view': 'reports', 'beta-view': 'beta', 'admin-view': 'founder',
+  'settings-view': 'settings'
 };
 
 window.openTab = function(tabId, skipHash = false) {
@@ -82,31 +81,43 @@ const userModal = mk('div', 'modal-backdrop hidden', `<div class="glass-card pro
 userModal.id = 'user-modal';
 const shell = mk('div', 'os-shell');
 const dock = mk('aside', 'left-dock', `
+  <button type="button" class="collapse-btn" id="toggle-dock" onclick="document.getElementById('left-dock').classList.toggle('expanded')" title="Expand / Collapse Sidebar">${ic.arrow || '▶'}</button>
   <div class="dock-top">
     <img src="logo.png" alt="ZynkOS" style="width:32px;height:32px;border-radius:8px;object-fit:cover;flex-shrink:0;" />
     <span class="brand-title">ZynkOS</span>
-    <button type="button" class="collapse-btn" id="toggle-dock" onclick="document.getElementById('left-dock').classList.toggle('expanded')" title="Expand / Collapse Sidebar">${ic.arrow || '▶'}</button>
   </div>
-  <div class="dock-section">
-    <button type="button" class="dock-btn active" data-tab="dash-view" onclick="openTab('dash-view')"><span class="sym">${ic.home || ''}</span><span class="lbl">Dashboard</span></button>
-    <button type="button" class="dock-btn" data-tab="chat-view" onclick="openTab('chat-view')" style="position:relative;"><span class="sym">${ic.chat || ''}</span><span class="lbl">Zynk Chat</span><span id="dock-chat-badge" class="hidden" style="position:absolute;top:6px;right:8px;background:#f43f5e;color:#fff;font-size:0.65rem;font-weight:800;padding:1px 5px;border-radius:999px;">0</span></button>
-    <button type="button" class="dock-btn" data-tab="vortex-view" onclick="openTab('vortex-view')"><span class="sym">${ic.vortex || ''}</span><span class="lbl">Vortex Guild</span></button>
-    <button type="button" class="dock-btn" data-tab="arcade-view" onclick="openTab('arcade-view')"><span class="sym">${ic.arcade || ''}</span><span class="lbl">UGS Arcade</span></button>
-    <button type="button" class="dock-btn" data-tab="ranks-view" onclick="openTab('ranks-view')"><span class="sym">${ic.ranks || ''}</span><span class="lbl">Ranks</span></button>
-    <button type="button" class="dock-btn" data-tab="store-view" onclick="openTab('store-view')"><span class="sym">${ic.store || ''}</span><span class="lbl">Zynk Store</span></button>
-  </div>
-  <div class="dock-section">
-    <button type="button" class="dock-btn" data-tab="profile-view" onclick="openTab('profile-view')"><span class="sym">${ic.profile || ''}</span><span class="lbl">My Profile & Vault</span></button>
-    <button type="button" class="dock-btn" data-tab="achieve-view" onclick="openTab('achieve-view')"><span class="sym">${ic.quests || ''}</span><span class="lbl">Quests</span></button>
-    <button type="button" class="dock-btn" data-tab="leader-view" onclick="openTab('leader-view')"><span class="sym">${ic.leader || ''}</span><span class="lbl">Leaderboards</span></button>
-    <button type="button" class="dock-btn" data-tab="tools-view" onclick="openTab('tools-view')"><span class="sym">${ic.tools || ''}</span><span class="lbl">Utility Tools</span></button>
-    <button type="button" class="dock-btn" data-tab="partners-view" onclick="openTab('partners-view')"><span class="sym">${ic.vortex || ''}</span><span class="lbl">Partners</span></button>
-    <button type="button" class="dock-btn" data-tab="credits-view" onclick="openTab('credits-view')"><span class="sym">${ic.ranks || ''}</span><span class="lbl">Credits & Team</span></button>
-    <button type="button" class="dock-btn" data-tab="rules-view" onclick="openTab('rules-view')"><span class="sym">${ic.quests || ''}</span><span class="lbl">Rules & Terms</span></button>
-    <button type="button" class="dock-btn hidden" id="nav-reports-btn" style="display:none;" data-tab="reports-view" onclick="openTab('reports-view')"><span class="sym">${ic.admin || ''}</span><span class="lbl">Staff Reports</span></button>
-    <button type="button" class="dock-btn hidden" id="nav-beta-btn" style="display:none;" data-tab="beta-view" onclick="openTab('beta-view')"><span class="sym">${ic.beta || ''}</span><span class="lbl">Beta Lab</span></button>
-    <button type="button" class="dock-btn hidden" id="nav-admin-btn" style="display:none;" data-tab="admin-view" onclick="openTab('admin-view')"><span class="sym">${ic.admin || ''}</span><span class="lbl">Founder Panel</span></button>
-    <button type="button" class="dock-btn" data-tab="settings-view" onclick="openTab('settings-view')"><span class="sym">${ic.settings || ''}</span><span class="lbl">Settings</span></button>
+  <div class="dock-scroll">
+    <div class="dock-cat-head" onclick="this.nextElementSibling.classList.toggle('hidden')"><span>MAIN</span><span>▾</span></div>
+    <div class="dock-section">
+      <button type="button" class="dock-btn active" data-tab="dash-view" onclick="openTab('dash-view')"><span class="sym">${ic.home || ''}</span><span class="lbl">Dashboard</span></button>
+      <button type="button" class="dock-btn" data-tab="chat-view" onclick="openTab('chat-view')" style="position:relative;"><span class="sym">${ic.chat || ''}</span><span class="lbl">Zynk Chat</span><span id="dock-chat-badge" class="hidden" style="position:absolute;top:6px;right:8px;background:#f43f5e;color:#fff;font-size:0.65rem;font-weight:800;padding:1px 5px;border-radius:999px;">0</span></button>
+      <button type="button" class="dock-btn" data-tab="vortex-view" onclick="openTab('vortex-view')"><span class="sym">${ic.vortex || ''}</span><span class="lbl">Vortex Guild</span></button>
+    </div>
+    <div class="dock-sep-line"></div>
+    <div class="dock-cat-head" onclick="this.nextElementSibling.classList.toggle('hidden')"><span>APPS & REWARDS</span><span>▾</span></div>
+    <div class="dock-section">
+      <button type="button" class="dock-btn" data-tab="ranks-view" onclick="openTab('ranks-view')"><span class="sym">${ic.ranks || ''}</span><span class="lbl">Ranks</span></button>
+      <button type="button" class="dock-btn" data-tab="store-view" onclick="openTab('store-view')"><span class="sym">${ic.store || ''}</span><span class="lbl">Zynk Store</span></button>
+      <button type="button" class="dock-btn" data-tab="achieve-view" onclick="openTab('achieve-view')"><span class="sym">${ic.quests || ''}</span><span class="lbl">Quests</span></button>
+      <button type="button" class="dock-btn" data-tab="leader-view" onclick="openTab('leader-view')"><span class="sym">${ic.leader || ''}</span><span class="lbl">Leaderboards</span></button>
+      <button type="button" class="dock-btn" data-tab="tools-view" onclick="openTab('tools-view')"><span class="sym">${ic.tools || ''}</span><span class="lbl">Utility Tools</span></button>
+    </div>
+    <div class="dock-sep-line"></div>
+    <div class="dock-cat-head" onclick="this.nextElementSibling.classList.toggle('hidden')"><span>ACCOUNT & INFO</span><span>▾</span></div>
+    <div class="dock-section">
+      <button type="button" class="dock-btn" data-tab="profile-view" onclick="openTab('profile-view')"><span class="sym">${ic.profile || ''}</span><span class="lbl">My Profile & Vault</span></button>
+      <button type="button" class="dock-btn" data-tab="partners-view" onclick="openTab('partners-view')"><span class="sym">${ic.vortex || ''}</span><span class="lbl">Partners</span></button>
+      <button type="button" class="dock-btn" data-tab="credits-view" onclick="openTab('credits-view')"><span class="sym">${ic.ranks || ''}</span><span class="lbl">Credits & Team</span></button>
+      <button type="button" class="dock-btn" data-tab="rules-view" onclick="openTab('rules-view')"><span class="sym">${ic.quests || ''}</span><span class="lbl">Rules & Terms</span></button>
+      <button type="button" class="dock-btn" data-tab="settings-view" onclick="openTab('settings-view')"><span class="sym">${ic.settings || ''}</span><span class="lbl">Settings</span></button>
+    </div>
+    <div class="dock-sep-line"></div>
+    <div class="dock-cat-head" onclick="this.nextElementSibling.classList.toggle('hidden')"><span>STAFF & LABS</span><span>▾</span></div>
+    <div class="dock-section">
+      <button type="button" class="dock-btn hidden" id="nav-reports-btn" style="display:none;" data-tab="reports-view" onclick="openTab('reports-view')"><span class="sym">${ic.admin || ''}</span><span class="lbl">Staff Reports</span></button>
+      <button type="button" class="dock-btn hidden" id="nav-beta-btn" style="display:none;" data-tab="beta-view" onclick="openTab('beta-view')"><span class="sym">${ic.beta || ''}</span><span class="lbl">Beta Lab</span></button>
+      <button type="button" class="dock-btn hidden" id="nav-admin-btn" style="display:none;" data-tab="admin-view" onclick="openTab('admin-view')"><span class="sym">${ic.admin || ''}</span><span class="lbl">Founder Panel</span></button>
+    </div>
   </div>
   <div class="dock-clock"><span id="dock-hr">12</span><span class="dock-sep">:</span><span id="dock-min">00</span></div>
 `);
@@ -154,6 +165,7 @@ const main = mk('main', 'main-viewport', `
         <div class="hero-tz" id="hero-tz">Local Time • Change in Settings</div>
       </div>
     </div>
+    <div id="dash-staff-stipend-slot" style="padding:0 26px 8px;"></div>
     <div class="bento-grid" style="padding-top:8px;">
       <div class="glass-card" style="display:flex;flex-direction:column;justify-content:space-between;">
         <div>
@@ -174,14 +186,13 @@ const main = mk('main', 'main-viewport', `
       <div class="view-topbar"><div><h2># zynk-global</h2><span class="sub-text">Type / for commands or @ to mention & ping a member</span></div><span class="pill" id="chat-credits">0 Z-Credits</span></div>
       <div class="chat-feed" id="chat-messages"></div>
       <div id="chat-ac-box" class="autocomplete-pop hidden"></div>
-      <form class="chat-input-bar" id="chat-form"><input type="text" id="chat-input" placeholder="Message #zynk-global... (Type / or @)" autocomplete="off" /><button type="submit" class="btn-neon">Send</button></form>
+      <form class="chat-input-bar" id="chat-form"><input type="text" id="chat-input" maxlength="2000" placeholder="Message #zynk-global... (Type / or @)" autocomplete="off" /><button type="submit" class="btn-neon">Send</button></form>
     </div>
     <aside class="members-panel"><div class="members-head">ONLINE MEMBERS</div><div id="online-members-list"></div></aside>
   </section>
   <section id="vortex-view" class="tab-view chat-layout"></section>
-  <section id="arcade-view" class="tab-view full-embed"><div id="custom-game-container" style="width:100%;height:100%;display:flex;"></div></section>
   <section id="ranks-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Ranks</h2><span class="sub-text">Member ranks & perks</span></div></div><div id="ranks-grid"></div></section>
-  <section id="store-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Zynk Store</h2><span class="sub-text">Daily deals, avatars, frames, themes & gifting</span></div><span class="pill" id="store-credits">0 Z-Credits</span></div><div id="store-grid"></div></section>
+  <section id="store-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Zynk Store</h2><span class="sub-text">Power-ups, boosters, custom upload tokens & cosmetics</span></div><span class="pill" id="store-credits">0 Z-Credits</span></div><div id="store-grid"></div></section>
   <section id="profile-view" class="tab-view padded-view"><div id="my-profile-container"></div></section>
   <section id="achieve-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Quests & Daily Rewards</h2><span class="sub-text">Daily, Weekly & Secret challenges</span></div></div><div id="achieve-grid"></div></section>
   <section id="leader-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Global Leaderboards</h2><span class="sub-text">Top ZynkOS members ranked by Z-Credits & XP</span></div></div><div class="glass-card" id="leaderboard-list"></div></section>
@@ -191,7 +202,7 @@ const main = mk('main', 'main-viewport', `
   <section id="rules-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Rules, Privacy Policy & Terms</h2><span class="sub-text">Community guidelines, 13+ age requirement & platform policies</span></div></div><div id="rules-container"></div></section>
   <section id="reports-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Staff Reports Queue</h2><span class="sub-text">Review reported messages & users (Moderators, Admins & Founder only)</span></div></div><div id="reports-container"></div></section>
   <section id="beta-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Beta Lab</h2><span class="sub-text">Exclusive Beta Tester chat, themes & rewards</span></div></div><div id="beta-grid"></div></section>
-  <section id="admin-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Founder Command Panel</h2><span class="sub-text">Broadcasts, store items, partners, team credits & roles</span></div></div><div id="admin-panel-container"></div></section>
+  <section id="admin-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Founder Command Panel</h2><span class="sub-text">Broadcasts, store items, audit log, partners & roles</span></div></div><div id="admin-panel-container"></div></section>
   <section id="settings-view" class="tab-view padded-view"><div id="settings-shell"></div></section>
 `);
 
