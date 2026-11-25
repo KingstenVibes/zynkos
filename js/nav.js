@@ -404,3 +404,202 @@ window.addEventListener('zynk-profile-updated', () => {
   renderSettingsPanel();
   syncRouteFromHash();
 });
+
+let vtxClient = null;
+let vtxReplyId = null;
+
+async function initVortexGuildClient() {
+  const host = document.getElementById('vortex-view');
+  if (!host) return;
+  host.className = 'tab-view chat-layout';
+  host.style.cssText = '';
+  host.innerHTML = `
+    <div class="chat-main">
+      <div class="view-topbar" style="flex-wrap:wrap;gap:8px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <h2 id="vtx-ch-title"># vortex-guild</h2>
+          <span class="mono-dim">Powered by <a href="https://vortexos.net" target="_blank" rel="noopener" style="color:var(--neon-emerald);font-weight:700;text-decoration:none;">VortexOS.net ↗</a></span>
+        </div>
+        <div id="vtx-ch-bar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"></div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="mono-dim" id="vtx-status">Connecting...</span>
+          <button type="button" class="btn-neon" id="vtx-login-btn" style="padding:6px 12px;font-size:0.8rem;">Log in with Vortex</button>
+          <button type="button" class="btn-outline hidden" id="vtx-logout-btn" style="padding:6px 12px;font-size:0.8rem;">Log Out</button>
+        </div>
+      </div>
+      <div class="chat-feed" id="vortex-messages"></div>
+      <div id="vtx-typing-bar" class="typing-bar"></div>
+      <div id="vtx-reply-bar" class="reply-banner hidden"></div>
+      <form class="chat-input-bar" id="vtx-form">
+        <input type="text" id="vtx-input" maxlength="2000" placeholder="Sign in with Vortex to chat in the Guild..." autocomplete="off" disabled />
+        <button type="submit" class="btn-neon" id="vtx-send-btn" disabled>Send</button>
+      </form>
+    </div>
+    <aside class="members-panel">
+      <div class="members-head" id="vtx-guild-name">VORTEX GUILD MEMBERS</div>
+      <div id="vortex-members-list"></div>
+    </aside>`;
+
+  if (!window.Vortex) {
+    document.getElementById('vtx-status').textContent = 'Vortex SDK loading...';
+    return;
+  }
+
+  vtxClient = window.Vortex.init({ clientId: 'vtx_bc3f3d47d3074ad0f5f1' });
+  const statusEl = document.getElementById('vtx-status');
+  const loginBtn = document.getElementById('vtx-login-btn');
+  const logoutBtn = document.getElementById('vtx-logout-btn');
+  const msgFeed = document.getElementById('vortex-messages');
+  const inp = document.getElementById('vtx-input');
+  const sendBtn = document.getElementById('vtx-send-btn');
+
+  const renderVtxMsg = (m) => {
+    if (document.querySelector(`[data-vtx-id="${m.id}"]`)) return;
+    const div = document.createElement('div');
+    div.className = 'chat-msg';
+    div.dataset.vtxId = m.id;
+    const col = Array.isArray(m.author?.color) ? m.author.color[0] : (m.author?.color || '#a855f7');
+    const av = m.author?.avatar ? vtxClient.asset(m.author.avatar) : 'logo.png';
+    const time = m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    const canDel = vtxClient.user && (vtxClient.user.id === m.author?.id || (vtxClient.permissions || []).includes('manageMessages'));
+    const canEdit = vtxClient.user && vtxClient.user.id === m.author?.id;
+
+    div.innerHTML = `
+      <div class="msg-actions">
+        <button type="button" class="msg-act-btn" title="Reply" data-vrep="${m.id}" data-vuser="${m.author?.username || 'user'}">↩</button>
+        ${canEdit ? `<button type="button" class="msg-act-btn" title="Edit" data-vedit="${m.id}">✎</button>` : ''}
+        ${canDel ? `<button type="button" class="msg-act-btn" style="color:#f43f5e;" title="Delete" data-vdel="${m.id}">✕</button>` : ''}
+        <button type="button" class="msg-act-btn" style="color:#f59e0b;" title="Report to Vortex" data-vrepmsg="${m.id}">⚑</button>
+      </div>
+      <img class="msg-avatar" src="${av}" onerror="this.src='logo.png'" />
+      <div style="flex:1;min-width:0;">
+        ${m.replyTo ? `<div class="reply-quote">↩ Replying to @${m.replyTo.author?.username || 'member'}: ${String(m.replyTo.content || '').slice(0, 50).replace(/</g, '&lt;')}</div>` : ''}
+        <div><strong style="color:${col}">${m.author?.username || 'Member'}</strong> <span class="mono-dim">${time}</span></div>
+        <div class="vtx-body" style="margin-top:3px;word-break:break-word;">${m.html || vtxClient.render(m.content || '')}${m.editedAt ? ' <span class="mono-dim">(edited)</span>' : ''}</div>
+      </div>`;
+
+    div.querySelector('[data-vrep]')?.addEventListener('click', () => {
+      vtxReplyId = m.id;
+      const rBar = document.getElementById('vtx-reply-bar');
+      rBar.innerHTML = `<span>Replying to <strong>@${m.author?.username}</strong></span><button type="button" class="btn-ghost" id="vtx-cancel-rep">✕</button>`;
+      rBar.classList.remove('hidden');
+      document.getElementById('vtx-cancel-rep').onclick = () => { vtxReplyId = null; rBar.classList.add('hidden'); };
+      inp.focus();
+    });
+    div.querySelector('[data-vedit]')?.addEventListener('click', async () => {
+      const next = prompt('Edit Vortex message:', m.content || '');
+      if (next && next.trim()) await vtxClient.edit(m.id, next.trim()).catch(e => window.notify?.(e.message, true));
+    });
+    div.querySelector('[data-vdel]')?.addEventListener('click', async () => {
+      await vtxClient.delete(m.id).catch(e => window.notify?.(e.message, true));
+    });
+    div.querySelector('[data-vrepmsg]')?.addEventListener('click', () => vtxClient.report(m.id));
+    msgFeed.appendChild(div);
+    msgFeed.scrollTop = msgFeed.scrollHeight;
+  };
+  const loadChannelHistory = async (ch) => {
+    if (!ch) return;
+    document.getElementById('vtx-ch-title').textContent = `${vtxClient.guild?.name || 'Vortex Guild'} • #${ch.name}`;
+    msgFeed.innerHTML = '<div class="mono-dim" style="padding:12px;">Loading channel messages...</div>';
+    try {
+      const { messages } = await vtxClient.history(ch.id, 50);
+      msgFeed.innerHTML = '';
+      if (!messages.length) msgFeed.innerHTML = '<div class="mono-dim" style="padding:12px;">No messages in this channel yet. Say hi!</div>';
+      messages.forEach(renderVtxMsg);
+    } catch (err) {
+      msgFeed.innerHTML = `<div class="mono-dim" style="padding:12px;color:#f43f5e;">${err.message}</div>`;
+    }
+  };
+
+  const loadGuildMembers = async () => {
+    const mList = document.getElementById('vortex-members-list');
+    if (!mList) return;
+    try {
+      const { members } = await vtxClient.members('', 50);
+      mList.innerHTML = (members || []).map(mb => {
+        const u = mb.user || mb;
+        const col = Array.isArray(u.color) ? u.color[0] : (u.color || '#f8fafc');
+        const av = u.avatar ? vtxClient.asset(u.avatar) : 'logo.png';
+        return `<div class="member-item"><div class="mem-av-wrap"><img src="${av}" onerror="this.src='logo.png'" /><span class="mem-dot" style="background:${u.online ? '#10b981' : '#64748b'}"></span></div><div style="min-width:0;"><div style="color:${col};font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.username}</div></div></div>`;
+      }).join('');
+    } catch (e) {}
+  };
+
+  await vtxClient.ready;
+  if (!vtxClient.site.allowed) {
+    statusEl.textContent = `Blocked: ${vtxClient.site.reason || 'Add site in Vortex Where it works'}`;
+    return;
+  }
+
+  if (vtxClient.user) {
+    statusEl.textContent = `@${vtxClient.user.username}`;
+    loginBtn.classList.add('hidden');
+    logoutBtn.classList.remove('hidden');
+    inp.disabled = false;
+    sendBtn.disabled = false;
+    inp.placeholder = 'Message Vortex Guild...';
+  } else {
+    statusEl.textContent = 'Not signed in';
+  }
+
+  loginBtn.onclick = async () => {
+    try {
+      await vtxClient.login({ popup: true });
+      initVortexGuildClient();
+    } catch (err) {
+      statusEl.textContent = err.message;
+    }
+  };
+
+  logoutBtn.onclick = () => {
+    vtxClient.logout();
+    initVortexGuildClient();
+  };
+
+  const chBar = document.getElementById('vtx-ch-bar');
+  const channels = vtxClient.channels || [];
+  chBar.innerHTML = channels.map(c => `<button type="button" class="${c.id === vtxClient.channel ? 'btn-neon' : 'btn-outline'}" style="padding:4px 10px;font-size:0.78rem;" data-vch="${c.id}">#${c.name}</button>`).join('');
+  chBar.querySelectorAll('[data-vch]').forEach(b => (b.onclick = async () => {
+    await vtxClient.join(b.dataset.vch);
+    chBar.querySelectorAll('[data-vch]').forEach(x => (x.className = x.dataset.vch === b.dataset.vch ? 'btn-neon' : 'btn-outline'));
+    loadChannelHistory(channels.find(x => x.id === b.dataset.vch));
+  }));
+
+  const initialCh = channels.find(c => c.id === vtxClient.channel) || channels.at(0);
+  if (initialCh) {
+    await vtxClient.join(initialCh.id).catch(() => {});
+    await loadChannelHistory(initialCh);
+  }
+  loadGuildMembers();
+
+  vtxClient.on('message', (msg) => {
+    if (msg.channelId === vtxClient.channel) renderVtxMsg(msg);
+  });
+  vtxClient.on('edit', (msg) => {
+    const el = document.querySelector(`[data-vtx-id="${msg.id}"] .vtx-body`);
+    if (el) el.innerHTML = `${msg.html || vtxClient.render(msg.content || '')} <span class="mono-dim">(edited)</span>`;
+  });
+  vtxClient.on('delete', ({ id }) => document.querySelector(`[data-vtx-id="${id}"]`)?.remove());
+  vtxClient.on('typing', ({ channelId, username, typing }) => {
+    if (channelId !== vtxClient.channel) return;
+    document.getElementById('vtx-typing-bar').innerHTML = typing ? `<span class="typing-pill">@${username} is typing in Vortex...</span>` : '';
+  });
+
+  inp.oninput = () => vtxClient.typing(vtxClient.channel);
+  document.getElementById('vtx-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const txt = inp.value.trim();
+    if (!txt) return;
+    inp.value = '';
+    const rep = vtxReplyId;
+    vtxReplyId = null;
+    document.getElementById('vtx-reply-bar').classList.add('hidden');
+    try {
+      await vtxClient.send(txt, rep);
+    } catch (err) {
+      window.notify?.(err.message, true);
+    }
+  };
+}
+
+window.addEventListener('DOMContentLoaded', initVortexGuildClient);
