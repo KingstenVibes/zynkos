@@ -17,7 +17,15 @@ const TAB_ACTIVITIES = {
   'settings-view': 'Adjusting Settings'
 };
 
-window.openTab = function(tabId) {
+const TAB_SLUGS = {
+  'dash-view': 'dashboard', 'chat-view': 'chat', 'vortex-view': 'vortex',
+  'arcade-view': 'arcade', 'ranks-view': 'ranks', 'store-view': 'store',
+  'profile-view': 'profile', 'achieve-view': 'quests', 'leader-view': 'leaderboards',
+  'tools-view': 'tools', 'partners-view': 'partners', 'credits-view': 'credits',
+  'rules-view': 'rules', 'beta-view': 'beta', 'admin-view': 'founder', 'settings-view': 'settings'
+};
+
+window.openTab = function(tabId, skipHash = false) {
   if (!tabId) return;
   const p = window.userProfile;
   const isFounder = p && p.role === 'FOUNDER';
@@ -27,13 +35,13 @@ window.openTab = function(tabId) {
 
   document.querySelectorAll('.dock-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
   document.querySelectorAll('.tab-view').forEach(v => v.classList.toggle('active', v.id === tabId));
+  if (!skipHash && TAB_SLUGS[tabId]) history.replaceState(null, '', '#' + TAB_SLUGS[tabId]);
 
   if (p && window.sbRest && TAB_ACTIVITIES[tabId]) {
     const chPatch = tabId === 'chat-view' ? { last_channel: window.activeChatLabel || '#zynk-global' } : {};
     window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { activity_text: TAB_ACTIVITIES[tabId], online: true, last_seen: Date.now(), ...chPatch }, window.authToken).catch(() => {});
   }
 };
-
 const root = document.getElementById('zynk-root');
 const ic = window.ZYNK_ICONS || {};
 function mk(tag, cls, html) {
@@ -49,6 +57,7 @@ document.addEventListener('mousemove', (e) => {
   halo.style.setProperty('--mx', e.clientX + 'px');
   halo.style.setProperty('--my', e.clientY + 'px');
 });
+
 const authModal = mk('div', 'startup-gate', `
   <div class="glass-card startup-box">
     <img src="logo.png" alt="ZynkOS" style="width:54px;height:54px;margin:0 auto 10px;border-radius:12px;object-fit:cover;display:block;" />
@@ -67,7 +76,6 @@ authModal.id = 'auth-modal';
 
 const userModal = mk('div', 'modal-backdrop hidden', `<div class="glass-card profile-modal" id="user-modal-content"></div>`);
 userModal.id = 'user-modal';
-
 const shell = mk('div', 'os-shell');
 const dock = mk('aside', 'left-dock', `
   <div class="dock-top">
@@ -112,7 +120,6 @@ const main = mk('main', 'main-viewport', `
         <button class="btn-outline" id="top-auth-btn">Sign Out</button>
       </div>
     </div>
-
     <div class="bento-grid" style="padding-bottom:10px;">
       <div class="glass-card profile-card" style="grid-column:span 2;">
         <div class="profile-row">
@@ -135,7 +142,6 @@ const main = mk('main', 'main-viewport', `
           <button class="btn-outline" onclick="openTab('leader-view')">Leaderboards</button>
         </div>
       </div>
-
       <div class="glass-card" style="text-align:center;display:flex;flex-direction:column;justify-content:center;">
         <div class="hero-day" id="hero-day" style="font-size:0.8rem;">SUNDAY</div>
         <div class="hero-time-row"><span id="hero-time" style="font-size:3.1rem;">12:00</span><span class="hero-ampm" id="hero-ampm">PM</span></div>
@@ -143,7 +149,6 @@ const main = mk('main', 'main-viewport', `
         <div class="hero-tz" id="hero-tz">Local Time • Change in Settings</div>
       </div>
     </div>
-
     <div class="bento-grid" style="padding-top:8px;">
       <div class="glass-card" style="display:flex;flex-direction:column;justify-content:space-between;">
         <div>
@@ -152,7 +157,6 @@ const main = mk('main', 'main-viewport', `
         </div>
         <button class="btn-neon" id="dash-daily-btn" style="width:100%;">Pick Daily Mystery Card</button>
       </div>
-
       <div class="glass-card" style="grid-column:span 2;">
         <div class="card-head"><span>System Announcements</span><span class="mono-dim">BROADCAST FEED</span></div>
         <div id="dash-announcements-list" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-right:4px;"></div>
@@ -169,28 +173,19 @@ const main = mk('main', 'main-viewport', `
     </div>
     <aside class="members-panel"><div class="members-head">ONLINE MEMBERS</div><div id="online-members-list"></div></aside>
   </section>
-
-  <section id="vortex-view" class="tab-view padded-view">
-    <div class="glass-card" style="max-width:620px;margin:20px auto;padding:30px;text-align:center;">
-      <span class="rarity-tag">OFFICIAL PARTNER INTEGRATION • VORTEXOS</span>
-      <h2 style="margin:8px 0 10px;">Vortex Guild & Global Network</h2>
-      <p class="sub-text" style="margin-bottom:14px;">Choose whether to enter the ZynkOS Guild channel only or browse Vortex Global. Follow all Vortex Community Rules & Partner Guidelines.</p>
-      <div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px;">
-        <button type="button" class="btn-neon" id="vtx-mode-guild" onclick="window.setVortexMode('guild')">ZynkOS Guild Only</button>
-        <button type="button" class="btn-outline" id="vtx-mode-global" onclick="window.setVortexMode('global')">Vortex Global</button>
+  <section id="vortex-view" class="tab-view full-embed" style="flex-direction:column;">
+    <div class="view-topbar" style="padding:10px 20px;border-bottom:1px solid var(--border-glass);background:rgba(4,7,11,0.9);flex-wrap:wrap;gap:8px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="status-pill"><span class="pulse-dot"></span> ZynkOS Vortex Guild</span>
+        <span class="mono-dim">Powered by <a href="https://vortexos.net" target="_blank" rel="noopener" style="color:var(--neon-emerald);font-weight:700;text-decoration:none;">VortexOS.net ↗</a></span>
       </div>
-      <label class="remember-row" style="justify-content:center;margin-bottom:16px;">
-        <input type="checkbox" id="vtx-rules-ok" checked />
-        <span>I agree to follow Vortex Rules, Partner Policy & ZynkOS Guidelines</span>
-      </label>
-      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-        <button type="button" class="btn-neon" id="vtx-launch-btn">Log in with Vortex & Open ↗</button>
-        <button type="button" class="btn-outline" onclick="window.open('https://vortexos.net')">Vortex Partner Policy ↗</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" class="btn-outline" style="padding:5px 11px;font-size:0.8rem;" onclick="window.open('https://vortexos.net')">Vortex Global ↗</button>
+        <button type="button" class="btn-outline" style="padding:5px 11px;font-size:0.8rem;" onclick="window.open('https://vortexos.net')">Open Fullscreen ↗</button>
       </div>
-      <div style="margin-top:14px;font-size:0.8rem;color:var(--text-dim);">Powered by <a href="https://vortexos.net" target="_blank" rel="noopener" style="color:var(--neon-emerald);font-weight:700;text-decoration:none;">VortexOS.net ↗</a></div>
     </div>
+    <iframe src="https://vortexos.net" title="chat" referrerpolicy="no-referrer-when-downgrade" allow="clipboard-read; clipboard-write" style="flex:1;width:100%;height:100%;border:none;background:#04070b;"></iframe>
   </section>
-
   <section id="arcade-view" class="tab-view full-embed"><div id="custom-game-container" style="width:100%;height:100%;display:flex;"></div></section>
   <section id="ranks-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>ZynkOS Ranks</h2><span class="sub-text">Member ranks & perks</span></div></div><div id="ranks-grid"></div></section>
   <section id="store-view" class="tab-view padded-view"><div class="view-topbar"><div><h2>Zynk Store</h2><span class="sub-text">Daily deals, avatars, frames, themes & gifting</span></div><span class="pill" id="store-credits">0 Z-Credits</span></div><div id="store-grid"></div></section>
