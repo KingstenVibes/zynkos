@@ -12,11 +12,11 @@ window.addEventListener('beforeinstallprompt', (e) => {
 });
 
 const CLOAKS = {
-  none: { title: 'ZynkOS — Neural OS & Arcade', icon: 'logo.png' },
-  clever: { title: 'Clever | Portal', icon: 'https://www.google.com/s2/favicons?domain=clever.com&sz=128' },
-  classroom: { title: 'Home - Classroom', icon: 'https://www.gstatic.com/classroom/logo_square_rounded.svg' },
-  drive: { title: 'My Drive - Google Drive', icon: 'https://ssl.gstatic.com/images/branding/productlogos/drive_2026/v2/ico/drive_2026_256dp.ico' },
-  docs: { title: 'Google Docs', icon: 'https://ssl.gstatic.com/images/branding/productlogos/docs_2026/v2/ico/docs_2026_256dp.ico' }
+  none: { title: 'ZynkOS — Neural OS & Community', icon: 'logo.png' },
+  clever: { title: 'Clever | Portal', icon: 'https://clever.com' },
+  classroom: { title: 'Home - Classroom', icon: 'https://gstatic.com' },
+  drive: { title: 'My Drive - Google Drive', icon: 'https://gstatic.com' },
+  docs: { title: 'Google Docs', icon: 'https://gstatic.com' }
 };
 
 function applyCloak(key) {
@@ -27,12 +27,82 @@ function applyCloak(key) {
   link.href = c.icon;
 }
 
+let rainAnimFrame = null;
+
+function stopRainCanvas() {
+  if (rainAnimFrame) cancelAnimationFrame(rainAnimFrame);
+  rainAnimFrame = null;
+  document.getElementById('zynk-rain-canvas')?.remove();
+}
+
+function startFoggyWindowRain() {
+  stopRainCanvas();
+  const cv = document.createElement('canvas');
+  cv.id = 'zynk-rain-canvas';
+  cv.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:0;opacity:0.75;';
+  document.body.prepend(cv);
+  const ctx = cv.getContext('2d');
+  let w = (cv.width = window.innerWidth);
+  let h = (cv.height = window.innerHeight);
+  window.addEventListener('resize', () => { if (cv.isConnected) { w = cv.width = window.innerWidth; h = cv.height = window.innerHeight; } });
+
+  const bokeh = [
+    { x: 0.18, y: 0.28, r: 95, c: 'rgba(16,185,129,0.16)' },
+    { x: 0.78, y: 0.22, r: 120, c: 'rgba(6,182,212,0.15)' },
+    { x: 0.52, y: 0.65, r: 140, c: 'rgba(245,158,11,0.11)' },
+    { x: 0.85, y: 0.75, r: 100, c: 'rgba(168,85,247,0.13)' }
+  ];
+  const drops = Array.from({ length: 55 }, () => ({
+    x: Math.random() * w,
+    y: Math.random() * h,
+    r: 1.5 + Math.random() * 2.2,
+    vy: 1.4 + Math.random() * 2.4,
+    wobble: Math.random() * Math.PI * 2
+  }));
+
+  function tick() {
+    if (!cv.isConnected) return;
+    ctx.clearRect(0, 0, w, h);
+    bokeh.forEach(b => {
+      const g = ctx.createRadialGradient(b.x * w, b.y * h, 5, b.x * w, b.y * h, b.r);
+      g.addColorStop(0, b.c);
+      g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(b.x * w, b.y * h, b.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.06)';
+    ctx.fillRect(0, 0, w, h);
+
+    drops.forEach(d => {
+      d.wobble += 0.04;
+      d.x += Math.sin(d.wobble) * 0.25;
+      d.y += d.vy;
+      if (d.y > h + 10) { d.y = -10; d.x = Math.random() * w; }
+      ctx.strokeStyle = 'rgba(203, 213, 225, 0.22)';
+      ctx.lineWidth = d.r * 0.65;
+      ctx.beginPath();
+      ctx.moveTo(d.x, d.y - d.vy * 4);
+      ctx.lineTo(d.x, d.y);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(248, 250, 252, 0.35)';
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    rainAnimFrame = requestAnimationFrame(tick);
+  }
+  tick();
+}
+
 window.applyLiveWallpaper = function(wp) {
+  stopRainCanvas();
   let layer = document.getElementById('zynk-live-wp');
   if (!layer) {
     layer = document.createElement('div');
     layer.id = 'zynk-live-wp';
-    layer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.5;transition:opacity 0.3s;';
+    layer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.55;transition:opacity 0.3s;will-change:background-position;';
     document.body.prepend(layer);
   }
   if (!document.getElementById('zynk-wp-keyframes')) {
@@ -46,7 +116,13 @@ window.applyLiveWallpaper = function(wp) {
     `;
     document.head.appendChild(st);
   }
-  if (wp === 'grid') {
+  layer.style.backdropFilter = 'none';
+  if (wp === 'foggy-rain') {
+    layer.style.background = 'linear-gradient(180deg, rgba(15,23,42,0.55), rgba(4,7,11,0.85))';
+    layer.style.backdropFilter = 'blur(6px)';
+    layer.style.animation = 'none';
+    startFoggyWindowRain();
+  } else if (wp === 'grid') {
     layer.style.background = 'linear-gradient(rgba(16,185,129,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(16,185,129,0.2) 1px, transparent 1px)';
     layer.style.backgroundSize = '48px 48px';
     layer.style.animation = 'zynkGridMove 4s linear infinite';
@@ -70,6 +146,14 @@ window.applyLiveWallpaper = function(wp) {
     layer.style.background = 'linear-gradient(125deg, rgba(16,185,129,0.26), rgba(6,182,212,0.26), rgba(168,85,247,0.26), rgba(245,158,11,0.2))';
     layer.style.backgroundSize = '300% 300%';
     layer.style.animation = 'zynkAuroraMove 10s ease infinite';
+  } else if (wp === 'cyber-pulse') {
+    layer.style.background = 'repeating-linear-gradient(0deg, rgba(6,182,212,0.12) 0px, rgba(6,182,212,0.12) 1px, transparent 1px, transparent 28px)';
+    layer.style.backgroundSize = '100% 56px';
+    layer.style.animation = 'zynkRainFall 3s linear infinite';
+  } else if (wp === 'ember-drift') {
+    layer.style.background = 'radial-gradient(2px 2px at 30px 40px, #f59e0b, transparent), radial-gradient(2px 2px at 80px 20px, #f43f5e, transparent)';
+    layer.style.backgroundSize = '110px 110px';
+    layer.style.animation = 'zynkGridMove 6s linear infinite reverse';
   } else {
     layer.style.background = 'none';
     layer.style.animation = 'none';
@@ -254,7 +338,7 @@ function renderSettingsPanel() {
     card.innerHTML = `
       <h2 style="margin-bottom:14px;">Themes, Live Wallpapers & Clock</h2>
       <div class="setting-group"><label>Color Theme</label><select id="set-theme" class="tool-input"><option value="default">Emerald Neural (Default)</option><option value="theme-cyber">Cyber Cyan</option><option value="theme-crimson">Crimson Ops</option><option value="theme-gold">Solar Gold</option><option value="theme-violet">Violet Pulse</option></select></div>
-      <div class="setting-group"><label>Animated Live Wallpaper</label><select id="set-wp" class="tool-input"><option value="none">None (Solid Dark)</option><option value="grid">Cyber Matrix Grid (Moving)</option><option value="nebula">Neon Nebula Pulse (Animated)</option><option value="solar">Solar Aura Shift (Animated)</option><option value="stars">Starfield Warp (Animated)</option><option value="rain">Emerald Digital Rain (Animated)</option><option value="aurora">Aurora Prism Wave (Animated)</option></select></div>
+      <div class="setting-group"><label>Animated Live Wallpaper</label><select id="set-wp" class="tool-input"><option value="none">None (Solid Dark)</option><option value="foggy-rain">Foggy Window Rain & Blurred Lights (Realistic)</option><option value="grid">Cyber Matrix Grid (Moving)</option><option value="nebula">Neon Nebula Pulse (Animated)</option><option value="solar">Solar Aura Shift (Animated)</option><option value="stars">Starfield Warp (Animated)</option><option value="rain">Emerald Digital Rain (Animated)</option><option value="aurora">Aurora Prism Wave (Animated)</option><option value="cyber-pulse">Cyber Scanlines (Animated)</option><option value="ember-drift">Ember Sparks Drift (Animated)</option></select></div>
       <div class="setting-group"><label>TimeZone</label><select id="set-tz" class="tool-input"><option value="auto">Auto-Detect (Local Time)</option><option value="America/New_York">Eastern Time (ET)</option><option value="America/Chicago">Central Time (CT)</option><option value="America/Denver">Mountain Time (MT)</option><option value="America/Los_Angeles">Pacific Time (PT)</option><option value="UTC">UTC</option></select></div>
       <div class="setting-group"><label>Clock Format</label><select id="set-format" class="tool-input"><option value="12">12-Hour (AM / PM)</option><option value="24">24-Hour (Military)</option></select></div>
       <div class="setting-group"><label>UI Interface Scale</label><select id="set-zoom" class="tool-input"><option value="1">100% (Standard)</option><option value="0.9">90% (Compact)</option><option value="1.1">110% (Large)</option></select></div>
@@ -413,15 +497,15 @@ let vtxReplyId = null;
 function ensureVortexSdkLoaded() {
   return new Promise((resolve) => {
     if (window.Vortex) return resolve(window.Vortex);
-    let sc = document.querySelector('script[src*="vortexos.net/sdk"]');
+    let sc = document.querySelector('script[src*="vortex.js"]');
     if (!sc) {
       sc = document.createElement('script');
-      sc.src = 'https://vortexos.net';
+      sc.src = 'https://vortexos.net/sdk/v1/vortex.js';
       document.head.appendChild(sc);
     }
     sc.addEventListener('load', () => resolve(window.Vortex));
     sc.addEventListener('error', () => resolve(null));
-    setTimeout(() => resolve(window.Vortex || null), 3500);
+    setTimeout(() => resolve(window.Vortex || null), 4000);
   });
 }
 
@@ -430,13 +514,24 @@ window.initVortexGuildClient = async function() {
   if (!host) return;
   host.className = 'tab-view chat-layout';
   host.innerHTML = `
+    <aside class="chat-channels-panel">
+      <div style="font-weight:800;font-size:0.95rem;padding:2px 6px;">CHAT HUB</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+        <button type="button" class="btn-outline" style="padding:5px 6px;font-size:0.75rem;" onclick="openTab('chat-view')">Main chat</button>
+        <button type="button" class="btn-neon" style="padding:5px 6px;font-size:0.75rem;">Vortex chat</button>
+      </div>
+      <div class="dock-sep-line"></div>
+      <div class="mono-dim" style="padding:0 6px;font-weight:700;">VORTEX GLOBAL</div>
+      <div id="vtx-global-list" style="display:flex;flex-direction:column;gap:3px;"></div>
+      <div class="mono-dim" style="padding:8px 6px 0;font-weight:700;">GUILD CHANNELS</div>
+      <div id="vtx-guild-list" style="display:flex;flex-direction:column;gap:3px;"></div>
+    </aside>
     <div class="chat-main">
       <div class="view-topbar" style="flex-wrap:wrap;gap:8px;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <h2 id="vtx-ch-title"># vortex-guild</h2>
-          <span class="mono-dim">Powered by <a href="https://vortexos.net" target="_blank" rel="noopener" style="color:var(--neon-emerald);font-weight:700;text-decoration:none;">VortexOS.net ↗</a></span>
+        <div>
+          <h2 id="vtx-ch-title"># Vortex Global</h2>
+          <div class="mono-dim" id="vtx-ch-topic">Cross-guild Vortex channel • Powered by <a href="https://vortexos.net" target="_blank" rel="noopener" style="color:var(--neon-emerald);font-weight:700;text-decoration:none;">VortexOS.net ↗</a></div>
         </div>
-        <div id="vtx-ch-bar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"></div>
         <div style="display:flex;gap:8px;align-items:center;">
           <span class="mono-dim" id="vtx-status">Connecting...</span>
           <button type="button" class="btn-neon" id="vtx-login-btn" style="padding:6px 12px;font-size:0.8rem;">Log in with Vortex</button>
@@ -447,12 +542,12 @@ window.initVortexGuildClient = async function() {
       <div id="vtx-typing-bar" class="typing-bar"></div>
       <div id="vtx-reply-bar" class="reply-banner hidden"></div>
       <form class="chat-input-bar" id="vtx-form">
-        <input type="text" id="vtx-input" maxlength="2000" placeholder="Sign in with Vortex to chat in the Guild..." autocomplete="off" disabled />
+        <input type="text" id="vtx-input" maxlength="2000" placeholder="Sign in with Vortex to chat..." autocomplete="off" disabled />
         <button type="submit" class="btn-neon" id="vtx-send-btn" disabled>Send</button>
       </form>
     </div>
     <aside class="members-panel">
-      <div class="members-head" id="vtx-guild-name">VORTEX GUILD MEMBERS</div>
+      <div class="members-head" id="vtx-guild-name">VORTEX MEMBERS</div>
       <div id="vortex-members-list"></div>
     </aside>`;
 
@@ -465,22 +560,26 @@ window.initVortexGuildClient = async function() {
 
   const sdk = await ensureVortexSdkLoaded();
   if (!sdk) {
-    statusEl.textContent = 'Vortex SDK offline';
+    statusEl.textContent = 'Vortex SDK unreachable';
+    msgFeed.innerHTML = `<div class="glass-card" style="margin:20px;"><h3>Vortex SDK Connection</h3><p class="sub-text" style="margin-top:6px;">Could not load <code>https://vortexos.net/sdk/v1/vortex.js</code>. Make sure your network allows <strong>vortexos.net</strong> and <strong>vtx.chat</strong>.</p></div>`;
     return;
   }
 
   vtxClient = sdk.init({ clientId: 'vtx_bc3f3d47d3074ad0f5f1' });
-
   const renderVtxMsg = (m) => {
-    if (document.querySelector(`[data-vtx-id="${m.id}"]`)) return;
+    if (!m || !m.id || document.querySelector(`[data-vtx-id="${m.id}"]`)) return;
     const div = document.createElement('div');
     div.className = 'chat-msg';
     div.dataset.vtxId = m.id;
     const col = Array.isArray(m.author?.color) ? m.author.color : (m.author?.color || '#a855f7');
-    const av = m.author?.avatar ? vtxClient.asset(m.author.avatar) : 'logo.png';
+    const av = m.author?.avatar || 'logo.png';
     const time = m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-    const canDel = vtxClient.user && (vtxClient.user.id === m.author?.id || (vtxClient.permissions || []).includes('manageMessages'));
+    const srcLabel = (m.source && m.source !== 'vortex') ? m.source.toUpperCase() : 'VTEX';
+    const canDel = vtxClient.user && (vtxClient.user.id === m.author?.id || vtxClient.permissions?.manageMessages);
     const canEdit = vtxClient.user && vtxClient.user.id === m.author?.id;
+
+    const attachHtml = (m.attachments || []).map(url => `<img src="${url}" class="chat-img-attach" />`).join('')
+      + (m.gif?.url ? `<img src="${m.gif.url}" class="chat-img-attach" />` : '');
 
     div.innerHTML = `
       <div class="msg-actions">
@@ -491,9 +590,15 @@ window.initVortexGuildClient = async function() {
       </div>
       <img class="msg-avatar" src="${av}" onerror="this.src='logo.png'" />
       <div style="flex:1;min-width:0;">
-        ${m.replyTo ? `<div class="reply-quote">↩ Replying to @${m.replyTo.author?.username || 'member'}: ${String(m.replyTo.content || '').slice(0, 50).replace(/</g, '&lt;')}</div>` : ''}
-        <div><strong style="color:${col}">${m.author?.username || 'Member'}</strong> <span class="role-chip" style="color:#a855f7;padding:1px 7px;">VTEX</span> <span class="mono-dim">${time}</span></div>
+        ${m.replyTo ? `<div class="reply-quote">↩ Replying to @${m.replyTo.author || 'member'}: ${String(m.replyTo.content || '').slice(0, 50).replace(/</g, '&lt;')}</div>` : ''}
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <strong style="color:${col}">${m.author?.username || 'Member'}</strong>
+          <span class="role-chip" style="color:#38bdf8;border-color:rgba(56,189,248,0.35);padding:1px 7px;" title="Sent from ${srcLabel}">${srcLabel}</span>
+          ${m.author?.rank ? `<span class="role-chip" style="color:#a855f7;padding:1px 7px;">${m.author.rank}</span>` : ''}
+          <span class="mono-dim">${time}</span>
+        </div>
         <div class="vtx-body" style="margin-top:3px;word-break:break-word;">${m.html || vtxClient.render(m.content || '')}${m.editedAt ? ' <span class="mono-dim">(edited)</span>' : ''}</div>
+        ${attachHtml}
       </div>`;
 
     div.querySelector('[data-vrep]')?.addEventListener('click', () => {
@@ -511,16 +616,21 @@ window.initVortexGuildClient = async function() {
     div.querySelector('[data-vdel]')?.addEventListener('click', async () => {
       await vtxClient.delete(m.id).catch(e => window.notify?.(e.message, true));
     });
-    div.querySelector('[data-vrepmsg]')?.addEventListener('click', () => vtxClient.report(m.id));
+    div.querySelector('[data-vrepmsg]')?.addEventListener('click', () => vtxClient.report());
     msgFeed.appendChild(div);
     msgFeed.scrollTop = msgFeed.scrollHeight;
   };
   const loadChannelHistory = async (ch) => {
     if (!ch) return;
-    document.getElementById('vtx-ch-title').textContent = `${vtxClient.guild?.name || 'Vortex Guild'} • #${ch.name}`;
+    const isGlobal = /global/i.test(ch.name || '') || ch.global;
+    document.getElementById('vtx-ch-title').textContent = isGlobal ? `# ${ch.name}` : `${vtxClient.guild?.name || 'Vortex Guild'} • #${ch.name}`;
+    document.getElementById('vtx-ch-topic').textContent = isGlobal
+      ? 'Vortex Global is an official cross-guild channel showing messages & source tags from connected guilds.'
+      : (ch.topic || `Guild channel #${ch.name}`);
+    inp.placeholder = `Message #${ch.name}...`;
     msgFeed.innerHTML = '<div class="mono-dim" style="padding:12px;">Loading channel messages...</div>';
     try {
-      const { messages } = await vtxClient.history(ch.id, 50);
+      const { messages } = await vtxClient.history({ channel: ch.id, limit: 50 });
       msgFeed.innerHTML = '';
       if (!messages.length) msgFeed.innerHTML = '<div class="mono-dim" style="padding:12px;">No messages in this channel yet. Say hi!</div>';
       messages.forEach(renderVtxMsg);
@@ -533,12 +643,14 @@ window.initVortexGuildClient = async function() {
     const mList = document.getElementById('vortex-members-list');
     if (!mList) return;
     try {
-      const { members } = await vtxClient.members('', 50);
-      mList.innerHTML = (members || []).map(mb => {
+      const { members } = await vtxClient.members({ limit: 50 });
+      const list = members || [];
+      document.getElementById('vtx-guild-name').textContent = `VORTEX MEMBERS — ${list.length}`;
+      mList.innerHTML = list.map(mb => {
         const u = mb.user || mb;
         const col = Array.isArray(u.color) ? u.color : (u.color || '#f8fafc');
         const av = u.avatar ? vtxClient.asset(u.avatar) : 'logo.png';
-        return `<div class="member-card"><div class="mem-av-wrap"><img src="${av}" onerror="this.src='logo.png'" /><span class="mem-dot" style="background:${u.online ? '#10b981' : '#64748b'}"></span></div><div style="min-width:0;flex:1;"><div style="color:${col};font-weight:700;font-size:0.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.username}</div><div class="mono-dim" style="font-size:0.68rem;">Vortex Member</div></div></div>`;
+        return `<div class="member-card"><div class="mem-av-wrap"><img src="${av}" onerror="this.src='logo.png'" /><span class="mem-dot" style="background:${u.online ? '#10b981' : '#64748b'}"></span></div><div style="min-width:0;flex:1;"><div style="color:${col};font-weight:700;font-size:0.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.username}</div><div class="mono-dim" style="font-size:0.68rem;">${u.rank || 'Vortex Member'}</div></div></div>`;
       }).join('');
     } catch (e) {}
   };
@@ -559,8 +671,9 @@ window.initVortexGuildClient = async function() {
   };
 
   await vtxClient.ready;
-  if (!vtxClient.site.allowed) {
-    statusEl.textContent = `Site check: ${vtxClient.site.reason || 'Verify site tag'}`;
+  if (!vtxClient.site?.allowed) {
+    statusEl.textContent = vtxClient.site?.reason || 'Site not allowed';
+    msgFeed.innerHTML = `<div class="glass-card" style="margin:20px;"><h3>Vortex Integration Notice</h3><p class="sub-text" style="margin-top:6px;">${vtxClient.site?.reason || 'Add https://linkpc.net to your Vortex Guild CDN allowed domains.'}</p></div>`;
     return;
   }
 
@@ -570,26 +683,35 @@ window.initVortexGuildClient = async function() {
     logoutBtn.classList.remove('hidden');
     inp.disabled = false;
     sendBtn.disabled = false;
-    inp.placeholder = 'Message Vortex Guild...';
   } else {
-    statusEl.textContent = 'Ready to sign in';
+    statusEl.textContent = 'Sign in required';
+    msgFeed.innerHTML = `<div class="glass-card" style="margin:20px;"><h3>Sign in with Vortex</h3><p class="sub-text" style="margin-top:6px;">Click <strong>Log in with Vortex</strong> at the top right to view and chat in <strong>#Vortex Global</strong> and your <strong>Vortex Guild</strong> channels!</p></div>`;
   }
 
-  const chBar = document.getElementById('vtx-ch-bar');
   const channels = vtxClient.channels || [];
-  chBar.innerHTML = channels.map(c => `<button type="button" class="${c.id === vtxClient.channel ? 'btn-neon' : 'btn-outline'}" style="padding:4px 10px;font-size:0.78rem;" data-vch="${c.id}">#${c.name}</button>`).join('');
-  chBar.querySelectorAll('[data-vch]').forEach(b => (b.onclick = async () => {
-    await vtxClient.join(b.dataset.vch);
-    chBar.querySelectorAll('[data-vch]').forEach(x => (x.className = x.dataset.vch === b.dataset.vch ? 'btn-neon' : 'btn-outline'));
-    loadChannelHistory(channels.find(x => x.id === b.dataset.vch));
-  }));
+  const globalChs = channels.filter(c => /global/i.test(c.name || '') || c.global);
+  const guildChs = channels.filter(c => !globalChs.includes(c));
 
-  const initialCh = channels.find(c => c.id === vtxClient.channel) || channels;
-  if (initialCh) {
+  const renderChList = (boxId, list) => {
+    const el = document.getElementById(boxId);
+    if (!el) return;
+    el.innerHTML = list.map(c => `<button type="button" class="ch-item-btn ${c.id === vtxClient.channel ? 'active' : ''}" data-vch="${c.id}"><span># ${c.name}</span></button>`).join('') || '<span class="mono-dim" style="padding:4px 8px;">None</span>';
+    el.querySelectorAll('[data-vch]').forEach(b => (b.onclick = async () => {
+      await vtxClient.join(b.dataset.vch);
+      document.querySelectorAll('[data-vch]').forEach(x => x.classList.toggle('active', x.dataset.vch === b.dataset.vch));
+      loadChannelHistory(channels.find(x => x.id === b.dataset.vch));
+    }));
+  };
+
+  renderChList('vtx-global-list', globalChs);
+  renderChList('vtx-guild-list', guildChs);
+
+  const initialCh = channels.find(c => c.id === vtxClient.channel) || globalChs || guildChs;
+  if (initialCh && vtxClient.user) {
     await vtxClient.join(initialCh.id).catch(() => {});
     await loadChannelHistory(initialCh);
   }
-  loadGuildMembers();
+  if (vtxClient.user) loadGuildMembers();
 
   vtxClient.on('message', (msg) => {
     if (msg.channelId === vtxClient.channel) renderVtxMsg(msg);
@@ -604,7 +726,7 @@ window.initVortexGuildClient = async function() {
     document.getElementById('vtx-typing-bar').innerHTML = typing ? `<span class="typing-pill">@${username} is typing in Vortex...</span>` : '';
   });
 
-  inp.oninput = () => vtxClient.typing(vtxClient.channel);
+  inp.oninput = () => vtxClient.typing({ channel: vtxClient.channel });
   document.getElementById('vtx-form').onsubmit = async (e) => {
     e.preventDefault();
     const txt = inp.value.trim();
@@ -614,7 +736,7 @@ window.initVortexGuildClient = async function() {
     vtxReplyId = null;
     document.getElementById('vtx-reply-bar').classList.add('hidden');
     try {
-      await vtxClient.send(txt, rep);
+      await vtxClient.send(txt, { replyTo: rep });
     } catch (err) {
       window.notify?.(err.message, true);
     }
