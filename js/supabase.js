@@ -5,6 +5,12 @@ window.authToken = null;
 window.userProfile = null;
 let isSignUpMode = false;
 
+window.applySavedTheme = function(profTheme) {
+  const th = profTheme || localStorage.getItem('zynk_theme') || 'default';
+  if (profTheme) localStorage.setItem('zynk_theme', profTheme);
+  document.body.className = th === 'default' ? '' : th;
+};
+
 window.notify = function(msg, isErr = false, onClick = null) {
   let box = document.getElementById('zynk-toast-box');
   if (!box) {
@@ -39,11 +45,10 @@ window.sbRest = async function(path, method = 'GET', body = null, token = null) 
   if (res.status === 204) return [];
   return res.json().catch(() => []);
 };
-
 function applyNavPermissions() {
   const p = window.userProfile;
   const isFounder = p && p.role === 'FOUNDER';
-  const isStaff = p && (['FOUNDER', 'ADMIN', 'MODERATOR'].includes(p.role) || (p.extra_roles || []).some(r => ['ADMIN', 'MODERATOR'].includes(r)));
+  const isStaff = p && (['FOUNDER', 'HEAD DEV', 'DEVELOPER', 'ADMIN', 'MODERATOR'].includes((p.role || '').toUpperCase()) || (p.extra_roles || []).some(r => ['ADMIN', 'MODERATOR'].includes(r)));
   const isBeta = p && (p.role === 'FOUNDER' || p.role === 'BETA' || p.is_beta || (p.extra_roles || []).includes('BETA'));
 
   const admBtn = document.getElementById('nav-admin-btn');
@@ -84,6 +89,7 @@ window.refreshMyProfile = async function() {
         return null;
       }
       window.userProfile = prof;
+      window.applySavedTheme(prof.profile_theme);
       localStorage.setItem('zynk_cached_prof', JSON.stringify(prof));
       applyNavPermissions();
       window.dispatchEvent(new Event('zynk-profile-updated'));
@@ -187,6 +193,7 @@ document.addEventListener('click', async (e) => {
   }
 });
 window.addEventListener('DOMContentLoaded', async () => {
+  window.applySavedTheme();
   applyNavPermissions();
   const raw = localStorage.getItem('zynk_session');
   if (!raw) return;
@@ -196,6 +203,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (cached && sess.access_token) {
       window.authToken = sess.access_token;
       window.userProfile = JSON.parse(cached);
+      window.applySavedTheme(window.userProfile.profile_theme);
       document.getElementById('auth-modal')?.classList.add('hidden');
       applyNavPermissions();
       window.dispatchEvent(new Event('zynk-profile-updated'));
