@@ -1,6 +1,9 @@
 const SB_URL = 'https://zynkos-api.mustafa-rizvic.workers.dev';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nbHlibW56c3B2eXJ1end3Z2RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUyOTkzMDQsImV4cCI6MjExMDg3NTMwNH0.E2pZaS0OGtkEk6hfsMSOJ2MUu8i-iZyAHnEKg-RhnH0';
 
+const SB_URL = 'https://workers.dev';
+const SB_KEY = 'PASTE_YOUR_SUPABASE_KEY_HERE';
+
 window.authToken = null;
 window.userProfile = null;
 let isSignUpMode = false;
@@ -45,7 +48,6 @@ window.sbRest = async function(path, method = 'GET', body = null, token = null) 
   if (res.status === 204) return [];
   return res.json().catch(() => []);
 };
-
 function applyNavPermissions() {
   const p = window.userProfile;
   const isFounder = p && p.role === 'FOUNDER';
@@ -77,10 +79,14 @@ window.refreshMyProfile = async function() {
     const rows = await window.sbRest(`users?id=eq.${authUser.id}&select=${SAFE_USER_COLS}`, 'GET', null, window.authToken);
     let prof = Array.isArray(rows) ? rows.at(0) : null;
     if (!prof) {
-      const uname = authUser.user_metadata?.username || authUser.email.split('@').at(0);
+      const baseUname = authUser.user_metadata?.username || authUser.email.split('@').at(0);
       await window.sbRest('users', 'POST', {
-        id: authUser.id, email: authUser.email, username: uname, role: 'MEMBER', credits: 150, xp: 0, online: true
-      }, window.authToken);
+        id: authUser.id, username: baseUname, role: 'MEMBER', credits: 150, xp: 0, online: true
+      }, window.authToken).catch(async () => {
+        await window.sbRest('users', 'POST', {
+          id: authUser.id, username: `${baseUname}_${authUser.id.slice(0, 4)}`, role: 'MEMBER', credits: 150, xp: 0, online: true
+        }, window.authToken).catch(() => {});
+      });
       const created = await window.sbRest(`users?id=eq.${authUser.id}&select=${SAFE_USER_COLS}`, 'GET', null, window.authToken);
       prof = Array.isArray(created) ? created.at(0) : null;
     }
@@ -131,10 +137,12 @@ document.addEventListener('click', async (e) => {
       window.authToken = null;
       window.userProfile = null;
       applyNavPermissions();
-      document.getElementById('auth-modal')?.classList.remove('hidden');
+      const gate = document.getElementById('auth-modal');
+      if (gate) { gate.style.background = '#04070b'; gate.classList.remove('hidden'); }
       window.notify('Signed out of ZynkOS.');
     } else {
-      document.getElementById('auth-modal')?.classList.remove('hidden');
+      const gate = document.getElementById('auth-modal');
+      if (gate) { gate.style.background = '#04070b'; gate.classList.remove('hidden'); }
     }
   }
 
@@ -199,6 +207,8 @@ document.addEventListener('click', async (e) => {
   }
 });
 window.addEventListener('DOMContentLoaded', async () => {
+  const gate = document.getElementById('auth-modal');
+  if (gate) gate.style.background = '#04070b';
   window.applySavedTheme();
   applyNavPermissions();
   const raw = localStorage.getItem('zynk_session');
@@ -242,3 +252,4 @@ window.addEventListener('beforeunload', () => {
     }).catch(() => {});
   }
 });
+
