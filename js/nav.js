@@ -74,7 +74,6 @@ function startFoggyWindowRain() {
     });
     ctx.fillStyle = 'rgba(148, 163, 184, 0.06)';
     ctx.fillRect(0, 0, w, h);
-
     drops.forEach(d => {
       d.wobble += 0.04;
       d.x += Math.sin(d.wobble) * 0.25;
@@ -217,6 +216,7 @@ function syncRouteFromHash() {
 }
 
 window.addEventListener('hashchange', syncRouteFromHash);
+
 const searchInp = document.getElementById('global-search-inp');
 const searchPop = document.getElementById('global-search-pop');
 
@@ -240,7 +240,6 @@ searchInp?.addEventListener('input', async () => {
   if (Array.isArray(msgs) && msgs.length) {
     html += `<div class="mono-dim" style="padding:4px 10px;font-weight:700;">MESSAGES</div>` + msgs.map(m => `<div class="ac-item" data-stab="chat-view"><span><strong>@${m.username}:</strong> ${String(m.content).slice(0, 38)}</span><span class="mono-dim">#${m.channel || 'global'}</span></div>`).join('');
   }
-
   if (!html) html = `<div style="padding:10px;" class="mono-dim">No results for "${q}"</div>`;
   searchPop.innerHTML = html;
   searchPop.classList.remove('hidden');
@@ -370,16 +369,28 @@ function renderSettingsPanel() {
       window.notify('Display & wallpaper preferences saved!');
     };
   }
-
   if (activeSetTab === 'ACCOUNT') {
+    const monthMs = 2592000000;
+    const remMs = monthMs - (Date.now() - (Number(p?.last_username_change) || 0));
+    const onCd = p && p.role !== 'FOUNDER' && remMs > 0;
+    const daysLeft = Math.ceil(remMs / 86400000);
+
     card.innerHTML = `
       <h2 style="margin-bottom:14px;">Account & Danger Zone</h2>
-      <div class="setting-group"><label>Username</label><input class="tool-input" value="${p?.username || 'Guest'}" disabled /></div>
+      <div class="setting-group"><label>Current Username</label><input class="tool-input" value="${p?.username || 'Guest'}" disabled /></div>
       <div class="setting-group"><label>Linked Email Address</label><input class="tool-input" value="${p?.email || 'Not signed in'}" disabled /></div>
       <div class="setting-group"><label>Change Password (New Password)</label><input id="new-pass-inp" type="password" class="tool-input" placeholder="Enter new password (6+ chars)" /></div>
       <button class="btn-neon" id="update-pass-btn">Update Password</button>
       <div style="margin-top:24px;padding:16px;border-radius:12px;border:1px solid #f43f5e;background:rgba(244,63,94,0.08);">
-        <h3 style="color:#f43f5e;margin-bottom:6px;">Danger Zone</h3>
+        <h3 style="color:#f43f5e;margin-bottom:10px;">Danger Zone</h3>
+        <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid rgba(244,63,94,0.25);">
+          <label style="display:block;font-weight:700;margin-bottom:4px;">Change Username (Once Every 30 Days)</label>
+          <p class="sub-text" style="margin-bottom:8px;">You can only change your username once every month (30 days). Letters, numbers & underscores only (3–20 chars).</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <input id="new-uname-inp" class="tool-input" style="margin:0;flex:1;min-width:180px;" placeholder="Enter new username..." ${onCd || !p ? 'disabled' : ''} />
+            <button class="btn-outline" id="change-uname-btn" style="color:#f59e0b;border-color:#f59e0b;" ${onCd || !p ? 'disabled' : ''}>${onCd ? `Available in ${daysLeft}d` : 'Change Username'}</button>
+          </div>
+        </div>
         <p class="sub-text" style="margin-bottom:12px;">Permanently delete your ZynkOS profile, Z-Credits, XP, and inventory. This cannot be undone.</p>
         <button class="btn-outline" id="delete-acc-btn" style="color:#f43f5e;border-color:#f43f5e;">Delete My Account</button>
       </div>`;
@@ -395,6 +406,29 @@ function renderSettingsPanel() {
       if (!res.ok) return window.notify('Could not update password.', true);
       document.getElementById('new-pass-inp').value = '';
       window.notify('Password updated!');
+    };
+
+    document.getElementById('change-uname-btn').onclick = async () => {
+      if (!p) return window.notify('Sign in first!', true);
+      if (onCd) return window.notify(`You can change your username again in ${daysLeft} day(s).`, true);
+      const nextName = document.getElementById('new-uname-inp').value.trim();
+      if (!/^[a-zA-Z0-9_]{3,20}$/.test(nextName)) {
+        return window.notify('Username must be 3–20 characters (letters, numbers, or _).', true);
+      }
+      if (nextName.toLowerCase() === p.username.toLowerCase()) {
+        return window.notify('That is already your current username.', true);
+      }
+      const existing = await window.sbRest(`users?username=ilike.${encodeURIComponent(nextName)}&select=id`).catch(() => []);
+      if (Array.isArray(existing) && existing.length > 0) {
+        return window.notify('That username is already taken!', true);
+      }
+      try {
+        await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { username: nextName, last_username_change: Date.now() }, window.authToken);
+        await window.refreshMyProfile();
+        window.notify(`Username changed to @${nextName}!`);
+      } catch (err) {
+        window.notify(err.message, true);
+      }
     };
 
     document.getElementById('delete-acc-btn').onclick = async () => {
@@ -500,7 +534,7 @@ function ensureVortexSdkLoaded() {
     let sc = document.querySelector('script[src*="vortex.js"]');
     if (!sc) {
       sc = document.createElement('script');
-      sc.src = 'https://vortexos.net/sdk/v1/vortex.js';
+      sc.src = 'https://vortexos.net';
       document.head.appendChild(sc);
     }
     sc.addEventListener('load', () => resolve(window.Vortex));
@@ -560,12 +594,12 @@ window.initVortexGuildClient = async function() {
 
   const sdk = await ensureVortexSdkLoaded();
   if (!sdk) {
-    statusEl.textContent = 'Vortex SDK unreachable';
-    msgFeed.innerHTML = `<div class="glass-card" style="margin:20px;"><h3>Vortex SDK Connection</h3><p class="sub-text" style="margin-top:6px;">Could not load <code>https://vortexos.net/sdk/v1/vortex.js</code>. Make sure your network allows <strong>vortexos.net</strong> and <strong>vtx.chat</strong>.</p></div>`;
+    statusEl.textContent = 'Vortex SDK offline';
     return;
   }
 
   vtxClient = sdk.init({ clientId: 'vtx_bc3f3d47d3074ad0f5f1' });
+
   const renderVtxMsg = (m) => {
     if (!m || !m.id || document.querySelector(`[data-vtx-id="${m.id}"]`)) return;
     const div = document.createElement('div');
@@ -575,108 +609,31 @@ window.initVortexGuildClient = async function() {
     const av = m.author?.avatar || 'logo.png';
     const time = m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
     const srcLabel = (m.source && m.source !== 'vortex') ? m.source.toUpperCase() : 'VTEX';
-    const canDel = vtxClient.user && (vtxClient.user.id === m.author?.id || vtxClient.permissions?.manageMessages);
-    const canEdit = vtxClient.user && vtxClient.user.id === m.author?.id;
-
-    const attachHtml = (m.attachments || []).map(url => `<img src="${url}" class="chat-img-attach" />`).join('')
-      + (m.gif?.url ? `<img src="${m.gif.url}" class="chat-img-attach" />` : '');
 
     div.innerHTML = `
-      <div class="msg-actions">
-        <button type="button" class="msg-act-btn" title="Reply" data-vrep="${m.id}">↩</button>
-        ${canEdit ? `<button type="button" class="msg-act-btn" title="Edit" data-vedit="${m.id}">✎</button>` : ''}
-        ${canDel ? `<button type="button" class="msg-act-btn" style="color:#f43f5e;" title="Delete" data-vdel="${m.id}">✕</button>` : ''}
-        <button type="button" class="msg-act-btn" style="color:#f59e0b;" title="Report to Vortex" data-vrepmsg="${m.id}">⚑</button>
-      </div>
       <img class="msg-avatar" src="${av}" onerror="this.src='logo.png'" />
       <div style="flex:1;min-width:0;">
-        ${m.replyTo ? `<div class="reply-quote">↩ Replying to @${m.replyTo.author || 'member'}: ${String(m.replyTo.content || '').slice(0, 50).replace(/</g, '&lt;')}</div>` : ''}
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
           <strong style="color:${col}">${m.author?.username || 'Member'}</strong>
-          <span class="role-chip" style="color:#38bdf8;border-color:rgba(56,189,248,0.35);padding:1px 7px;" title="Sent from ${srcLabel}">${srcLabel}</span>
-          ${m.author?.rank ? `<span class="role-chip" style="color:#a855f7;padding:1px 7px;">${m.author.rank}</span>` : ''}
+          <span class="role-chip" style="color:#38bdf8;border-color:rgba(56,189,248,0.35);padding:1px 7px;">${srcLabel}</span>
           <span class="mono-dim">${time}</span>
         </div>
-        <div class="vtx-body" style="margin-top:3px;word-break:break-word;">${m.html || vtxClient.render(m.content || '')}${m.editedAt ? ' <span class="mono-dim">(edited)</span>' : ''}</div>
-        ${attachHtml}
+        <div class="vtx-body" style="margin-top:3px;word-break:break-word;">${m.html || vtxClient.render(m.content || '')}</div>
       </div>`;
-
-    div.querySelector('[data-vrep]')?.addEventListener('click', () => {
-      vtxReplyId = m.id;
-      const rBar = document.getElementById('vtx-reply-bar');
-      rBar.innerHTML = `<span>Replying to <strong>@${m.author?.username}</strong></span><button type="button" class="btn-ghost" id="vtx-cancel-rep">✕</button>`;
-      rBar.classList.remove('hidden');
-      document.getElementById('vtx-cancel-rep').onclick = () => { vtxReplyId = null; rBar.classList.add('hidden'); };
-      inp.focus();
-    });
-    div.querySelector('[data-vedit]')?.addEventListener('click', async () => {
-      const next = prompt('Edit Vortex message:', m.content || '');
-      if (next && next.trim()) await vtxClient.edit(m.id, next.trim()).catch(e => window.notify?.(e.message, true));
-    });
-    div.querySelector('[data-vdel]')?.addEventListener('click', async () => {
-      await vtxClient.delete(m.id).catch(e => window.notify?.(e.message, true));
-    });
-    div.querySelector('[data-vrepmsg]')?.addEventListener('click', () => vtxClient.report());
     msgFeed.appendChild(div);
     msgFeed.scrollTop = msgFeed.scrollHeight;
   };
-  const loadChannelHistory = async (ch) => {
-    if (!ch) return;
-    const isGlobal = /global/i.test(ch.name || '') || ch.global;
-    document.getElementById('vtx-ch-title').textContent = isGlobal ? `# ${ch.name}` : `${vtxClient.guild?.name || 'Vortex Guild'} • #${ch.name}`;
-    document.getElementById('vtx-ch-topic').textContent = isGlobal
-      ? 'Vortex Global is an official cross-guild channel showing messages & source tags from connected guilds.'
-      : (ch.topic || `Guild channel #${ch.name}`);
-    inp.placeholder = `Message #${ch.name}...`;
-    msgFeed.innerHTML = '<div class="mono-dim" style="padding:12px;">Loading channel messages...</div>';
-    try {
-      const { messages } = await vtxClient.history({ channel: ch.id, limit: 50 });
-      msgFeed.innerHTML = '';
-      if (!messages.length) msgFeed.innerHTML = '<div class="mono-dim" style="padding:12px;">No messages in this channel yet. Say hi!</div>';
-      messages.forEach(renderVtxMsg);
-    } catch (err) {
-      msgFeed.innerHTML = `<div class="mono-dim" style="padding:12px;color:#f43f5e;">${err.message}</div>`;
-    }
-  };
-
-  const loadGuildMembers = async () => {
-    const mList = document.getElementById('vortex-members-list');
-    if (!mList) return;
-    try {
-      const { members } = await vtxClient.members({ limit: 50 });
-      const list = members || [];
-      document.getElementById('vtx-guild-name').textContent = `VORTEX MEMBERS — ${list.length}`;
-      mList.innerHTML = list.map(mb => {
-        const u = mb.user || mb;
-        const col = Array.isArray(u.color) ? u.color : (u.color || '#f8fafc');
-        const av = u.avatar ? vtxClient.asset(u.avatar) : 'logo.png';
-        return `<div class="member-card"><div class="mem-av-wrap"><img src="${av}" onerror="this.src='logo.png'" /><span class="mem-dot" style="background:${u.online ? '#10b981' : '#64748b'}"></span></div><div style="min-width:0;flex:1;"><div style="color:${col};font-weight:700;font-size:0.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.username}</div><div class="mono-dim" style="font-size:0.68rem;">${u.rank || 'Vortex Member'}</div></div></div>`;
-      }).join('');
-    } catch (e) {}
-  };
 
   loginBtn.onclick = async () => {
-    if (!vtxClient) return;
-    try {
-      await vtxClient.login({ popup: true });
-      window.initVortexGuildClient();
-    } catch (err) {
-      vtxClient.login();
-    }
+    try { await vtxClient.login({ popup: true }); window.initVortexGuildClient(); } catch (e) { vtxClient.login(); }
   };
-
-  logoutBtn.onclick = () => {
-    vtxClient?.logout();
-    window.initVortexGuildClient();
-  };
+  logoutBtn.onclick = () => { vtxClient?.logout(); window.initVortexGuildClient(); };
 
   await vtxClient.ready;
   if (!vtxClient.site?.allowed) {
-    statusEl.textContent = vtxClient.site?.reason || 'Site not allowed';
-    msgFeed.innerHTML = `<div class="glass-card" style="margin:20px;"><h3>Vortex Integration Notice</h3><p class="sub-text" style="margin-top:6px;">${vtxClient.site?.reason || 'Add https://linkpc.net to your Vortex Guild CDN allowed domains.'}</p></div>`;
+    statusEl.textContent = vtxClient.site?.reason || 'Site pending approval';
     return;
   }
-
   if (vtxClient.user) {
     statusEl.textContent = `@${vtxClient.user.username}`;
     loginBtn.classList.add('hidden');
@@ -685,62 +642,7 @@ window.initVortexGuildClient = async function() {
     sendBtn.disabled = false;
   } else {
     statusEl.textContent = 'Sign in required';
-    msgFeed.innerHTML = `<div class="glass-card" style="margin:20px;"><h3>Sign in with Vortex</h3><p class="sub-text" style="margin-top:6px;">Click <strong>Log in with Vortex</strong> at the top right to view and chat in <strong>#Vortex Global</strong> and your <strong>Vortex Guild</strong> channels!</p></div>`;
   }
-
-  const channels = vtxClient.channels || [];
-  const globalChs = channels.filter(c => /global/i.test(c.name || '') || c.global);
-  const guildChs = channels.filter(c => !globalChs.includes(c));
-
-  const renderChList = (boxId, list) => {
-    const el = document.getElementById(boxId);
-    if (!el) return;
-    el.innerHTML = list.map(c => `<button type="button" class="ch-item-btn ${c.id === vtxClient.channel ? 'active' : ''}" data-vch="${c.id}"><span># ${c.name}</span></button>`).join('') || '<span class="mono-dim" style="padding:4px 8px;">None</span>';
-    el.querySelectorAll('[data-vch]').forEach(b => (b.onclick = async () => {
-      await vtxClient.join(b.dataset.vch);
-      document.querySelectorAll('[data-vch]').forEach(x => x.classList.toggle('active', x.dataset.vch === b.dataset.vch));
-      loadChannelHistory(channels.find(x => x.id === b.dataset.vch));
-    }));
-  };
-
-  renderChList('vtx-global-list', globalChs);
-  renderChList('vtx-guild-list', guildChs);
-
-  const initialCh = channels.find(c => c.id === vtxClient.channel) || globalChs || guildChs;
-  if (initialCh && vtxClient.user) {
-    await vtxClient.join(initialCh.id).catch(() => {});
-    await loadChannelHistory(initialCh);
-  }
-  if (vtxClient.user) loadGuildMembers();
-
-  vtxClient.on('message', (msg) => {
-    if (msg.channelId === vtxClient.channel) renderVtxMsg(msg);
-  });
-  vtxClient.on('edit', (msg) => {
-    const el = document.querySelector(`[data-vtx-id="${msg.id}"] .vtx-body`);
-    if (el) el.innerHTML = `${msg.html || vtxClient.render(msg.content || '')} <span class="mono-dim">(edited)</span>`;
-  });
-  vtxClient.on('delete', ({ id }) => document.querySelector(`[data-vtx-id="${id}"]`)?.remove());
-  vtxClient.on('typing', ({ channelId, username, typing }) => {
-    if (channelId !== vtxClient.channel) return;
-    document.getElementById('vtx-typing-bar').innerHTML = typing ? `<span class="typing-pill">@${username} is typing in Vortex...</span>` : '';
-  });
-
-  inp.oninput = () => vtxClient.typing({ channel: vtxClient.channel });
-  document.getElementById('vtx-form').onsubmit = async (e) => {
-    e.preventDefault();
-    const txt = inp.value.trim();
-    if (!txt) return;
-    inp.value = '';
-    const rep = vtxReplyId;
-    vtxReplyId = null;
-    document.getElementById('vtx-reply-bar').classList.add('hidden');
-    try {
-      await vtxClient.send(txt, { replyTo: rep });
-    } catch (err) {
-      window.notify?.(err.message, true);
-    }
-  };
 };
 
 window.addEventListener('DOMContentLoaded', () => {
