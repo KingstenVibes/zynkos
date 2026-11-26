@@ -13,6 +13,7 @@ let lastTypingPing = 0;
 let lastSentByChannel = {};
 let channelSlowMode = { global: 0, updates: 0, beta: 0 };
 let activeChannel = 'global';
+let activeLeftMode = 'CHANNELS';
 window.activeChatLabel = '#zynk-global';
 let channelUnread = { global: false, updates: false, beta: false };
 let channelPings = { global: 0, updates: 0, beta: 0 };
@@ -67,6 +68,7 @@ function compressChatImg(file, maxDim = 640) {
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = () => {
+      if (file.type.startsWith('video/')) return resolve(reader.result);
       const img = new Image();
       img.onload = () => {
         const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
@@ -85,37 +87,78 @@ function compressChatImg(file, maxDim = 640) {
 
 function renderChanBadge(ch) {
   const pings = channelPings[ch] || 0;
-  if (pings > 0) return `<span style="background:#f43f5e;color:#fff;font-size:0.68rem;font-weight:800;padding:1px 6px;border-radius:999px;margin-left:5px;">${pings}</span>`;
-  if (channelUnread[ch]) return `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#fff;margin-left:6px;"></span>`;
+  if (pings > 0) return `<span style="background:#f43f5e;color:#fff;font-size:0.68rem;font-weight:800;padding:1px 6px;border-radius:999px;">${pings}</span>`;
+  if (channelUnread[ch]) return `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;"></span>`;
   return '';
 }
 
 function buildChannelBar() {
+  const chatView = document.getElementById('chat-view');
   const chatHeader = document.querySelector('#chat-view .view-topbar');
-  if (!chatHeader) return;
-  let bar = document.getElementById('chat-chan-bar');
-  if (!bar) {
-    bar = document.createElement('div');
-    bar.id = 'chat-chan-bar';
-    bar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;';
-    chatHeader.insertBefore(bar, document.getElementById('chat-credits'));
+  if (!chatView || !chatHeader) return;
+
+  let sideCol = document.getElementById('chat-ic-sidebar');
+  if (!sideCol) {
+    sideCol = document.createElement('aside');
+    sideCol.id = 'chat-ic-sidebar';
+    sideCol.className = 'chat-channels-panel';
+    chatView.insertBefore(sideCol, chatView.firstChild);
   }
+
   const p = window.userProfile;
   const isBeta = canAccessChannel(p, 'beta');
-  const isStaff = p && ['FOUNDER', 'ADMIN', 'MODERATOR', 'HEAD DEV', 'DEVELOPER'].includes((p.role || '').toUpperCase());
+  const isStaff = p && ['FOUNDER', 'HEAD DEV', 'DEVELOPER', 'ADMIN', 'MODERATOR'].includes((p.role || '').toUpperCase());
   const curSlow = channelSlowMode[activeChannel] || 0;
 
-  bar.innerHTML = `
-    <button type="button" class="${activeChannel === 'global' ? 'btn-neon' : 'btn-outline'}" data-ch="global" style="padding:5px 11px;font-size:0.8rem;"># zynk-global${renderChanBadge('global')}</button>
-    <button type="button" class="${activeChannel === 'updates' ? 'btn-neon' : 'btn-outline'}" data-ch="updates" style="padding:5px 11px;font-size:0.8rem;"># updates${renderChanBadge('updates')}</button>
-    ${isBeta ? `<button type="button" class="${activeChannel === 'beta' ? 'btn-neon' : 'btn-outline'}" data-ch="beta" style="padding:5px 11px;font-size:0.8rem;"># beta-lab${renderChanBadge('beta')}</button>` : ''}
-    <button type="button" class="btn-outline" id="new-dm-btn" style="padding:5px 11px;font-size:0.8rem;">Private DM</button>
-    ${isStaff ? `<select id="slowmode-sel" class="tool-input" style="width:auto;margin:0;padding:4px 8px;font-size:0.76rem;" title="Channel Slow Mode"><option value="0" ${curSlow === 0 ? 'selected' : ''}>Slow: Off</option><option value="5" ${curSlow === 5 ? 'selected' : ''}>Slow: 5s</option><option value="15" ${curSlow === 15 ? 'selected' : ''}>Slow: 15s</option><option value="30" ${curSlow === 30 ? 'selected' : ''}>Slow: 30s</option><option value="60" ${curSlow === 60 ? 'selected' : ''}>Slow: 1m</option></select>` : ''}`;
+  sideCol.innerHTML = `
+    <div style="font-weight:800;font-size:0.95rem;padding:2px 6px;">CHAT</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+      <button type="button" class="btn-neon" style="padding:5px 6px;font-size:0.75rem;">Main chat</button>
+      <button type="button" class="btn-outline" style="padding:5px 6px;font-size:0.75rem;" onclick="openTab('vortex-view')">Vortex chat</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+      <button type="button" class="${activeLeftMode === 'CHANNELS' ? 'btn-outline' : 'btn-ghost'}" id="ic-mode-ch" style="padding:5px 6px;font-size:0.75rem;">Channels</button>
+      <button type="button" class="${activeLeftMode === 'DMS' ? 'btn-outline' : 'btn-ghost'}" id="ic-mode-dm" style="padding:5px 6px;font-size:0.75rem;">Private Chats</button>
+    </div>
+    <div class="dock-sep-line"></div>
+    ${activeLeftMode === 'CHANNELS' ? `
+      <div class="mono-dim" style="padding:0 6px;font-weight:700;">IMPORTANT</div>
+      <button type="button" class="ch-item-btn ${activeChannel === 'updates' ? 'active' : ''}" data-ch="updates"><span># updates</span>${renderChanBadge('updates')}</button>
+      <div class="mono-dim" style="padding:6px 6px 0;font-weight:700;">COMMUNITY</div>
+      <button type="button" class="ch-item-btn ${activeChannel === 'global' ? 'active' : ''}" data-ch="global"><span># zynk-global</span>${renderChanBadge('global')}</button>
+      ${isBeta ? `<button type="button" class="ch-item-btn ${activeChannel === 'beta' ? 'active' : ''}" data-ch="beta"><span># beta-lab</span>${renderChanBadge('beta')}</button>` : ''}
+    ` : `
+      <div class="mono-dim" style="padding:0 6px;font-weight:700;">DIRECT MESSAGES</div>
+      <button type="button" class="btn-neon" id="new-dm-btn" style="width:100%;padding:6px 10px;font-size:0.78rem;">+ Start Private DM</button>
+      <div id="ic-dm-list" style="display:flex;flex-direction:column;gap:4px;margin-top:4px;"></div>
+    `}`;
 
-  bar.querySelectorAll('[data-ch]').forEach(b => (b.onclick = () => {
+  document.getElementById('ic-mode-ch').onclick = () => { activeLeftMode = 'CHANNELS'; buildChannelBar(); };
+  document.getElementById('ic-mode-dm').onclick = () => { activeLeftMode = 'DMS'; buildChannelBar(); };
+  sideCol.querySelectorAll('[data-ch]').forEach(b => (b.onclick = () => {
     window.switchChatChannel(b.dataset.ch, b.dataset.ch === 'global' ? '#zynk-global' : `#${b.dataset.ch}`);
   }));
-  document.getElementById('new-dm-btn').onclick = () => window.openNewDmModal();
+  const dmBtn = document.getElementById('new-dm-btn');
+  if (dmBtn) dmBtn.onclick = () => window.openNewDmModal();
+
+  const dmListBox = document.getElementById('ic-dm-list');
+  if (dmListBox && p) {
+    const others = cachedUsers.filter(u => String(u.id) !== String(p.id)).slice(0, 15);
+    dmListBox.innerHTML = others.map(u => {
+      const pair = [String(p.id), String(u.id)].sort().join('_');
+      const chId = `dm_${pair}`;
+      return `<button type="button" class="ch-item-btn ${activeChannel === chId ? 'active' : ''}" onclick="switchChatChannel('${chId}','@${u.username}')"><span>@${u.username}</span></button>`;
+    }).join('');
+  }
+
+  let slowBar = document.getElementById('chat-slow-wrap');
+  if (!slowBar) {
+    slowBar = document.createElement('div');
+    slowBar.id = 'chat-slow-wrap';
+    slowBar.style.cssText = 'display:flex;gap:8px;align-items:center;';
+    chatHeader.insertBefore(slowBar, document.getElementById('chat-credits'));
+  }
+  slowBar.innerHTML = isStaff ? `<select id="slowmode-sel" class="tool-input" style="width:auto;margin:0;padding:4px 8px;font-size:0.76rem;" title="Channel Slow Mode"><option value="0" ${curSlow === 0 ? 'selected' : ''}>Slow: Off</option><option value="5" ${curSlow === 5 ? 'selected' : ''}>Slow: 5s</option><option value="15" ${curSlow === 15 ? 'selected' : ''}>Slow: 15s</option><option value="30" ${curSlow === 30 ? 'selected' : ''}>Slow: 30s</option><option value="60" ${curSlow === 60 ? 'selected' : ''}>Slow: 1m</option></select>` : '';
   const smSel = document.getElementById('slowmode-sel');
   if (smSel) smSel.onchange = () => {
     channelSlowMode[activeChannel] = parseInt(smSel.value, 10) || 0;
@@ -151,13 +194,13 @@ if (chatForm && !document.getElementById('chat-file-inp')) {
   const fileInp = document.createElement('input');
   fileInp.type = 'file';
   fileInp.id = 'chat-file-inp';
-  fileInp.accept = 'image/*';
+  fileInp.accept = 'image/*,video/*';
   fileInp.style.cssText = 'position:fixed;left:-9999px;opacity:0;width:1px;height:1px;';
 
   const imgBtn = document.createElement('button');
   imgBtn.type = 'button';
   imgBtn.className = 'chat-tool-btn';
-  imgBtn.title = 'Attach Image';
+  imgBtn.title = 'Attach Image or Video';
   imgBtn.innerHTML = CHAT_SVG.plus;
   imgBtn.onclick = () => fileInp.click();
 
@@ -196,7 +239,6 @@ if (!typingBar && chatForm) {
   chatForm.before(typingBar);
 }
 buildChannelBar();
-
 const ROLE_POWER = { FOUNDER: 100, 'HEAD DEV': 95, DEVELOPER: 90, ADMIN: 80, MODERATOR: 60, BETA: 30, UPLOADER: 25, DESIGNER: 25, VIP: 20, SUPPORTER: 15, MEMBER: 10, SYSTEM: 90 };
 
 const SLASH_CMDS = [
@@ -321,7 +363,6 @@ window.toggleChatDrawer = function() {
     window.toggleChatDrawer();
   };
 };
-
 window.sendStickerImg = async function(idx) {
   const p = window.userProfile;
   const src = p?.stickers?.[idx];
@@ -351,7 +392,7 @@ document.getElementById('chat-file-inp')?.addEventListener('change', async (e) =
     return window.notify?.(`File too large (${sizeMB.toFixed(1)} MB). Your limit is ${limitInfo.label}.`, true);
   }
   const compressed = await compressChatImg(f, 680);
-  pendingAttachment = { name: f.name, dataUrl: compressed, sizeLabel: `${sizeMB.toFixed(2)} MB` };
+  pendingAttachment = { name: f.name, dataUrl: compressed, sizeLabel: `${sizeMB.toFixed(2)} MB`, isVid: f.type.startsWith('video/') };
 
   let prev = document.getElementById('chat-attach-preview');
   if (!prev) {
@@ -360,9 +401,12 @@ document.getElementById('chat-file-inp')?.addEventListener('change', async (e) =
     prev.className = 'reply-banner';
     chatForm?.before(prev);
   }
+  const thumb = pendingAttachment.isVid
+    ? `<div style="width:44px;height:44px;border-radius:8px;background:#04070b;display:flex;align-items:center;justify-content:center;border:1px solid var(--neon-emerald);font-size:0.7rem;">VID</div>`
+    : `<img src="${compressed}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--neon-emerald);" />`;
   prev.innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;">
-      <img src="${compressed}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--neon-emerald);" />
+      ${thumb}
       <div><strong>${f.name}</strong><div class="mono-dim">${pendingAttachment.sizeLabel} • Ready to send with your message</div></div>
     </div>
     <button type="button" class="btn-ghost" onclick="clearPendingAttachment()">✕</button>`;
@@ -450,7 +494,6 @@ window.editChatMsg = function(msgId, oldText) {
     if (ev.key === 'Enter') { ev.preventDefault(); save(); }
   };
 };
-
 window.setChatReply = function(username, text) {
   activeReply = `@${username}: ${text.slice(0, 65)}`;
   let bar = document.getElementById('reply-preview-bar');
@@ -490,6 +533,14 @@ function buildMsgEl(m) {
     return `<button type="button" class="react-pill ${mine ? 'mine' : ''}" title="Reacted by ${who}" onclick="toggleReaction(${m.id}, '${em}')">${em} ${arr.length}</button>`;
   }).join('');
 
+  const badgeIcons = matchedUser && window.renderRoleBadgeIcons ? window.renderRoleBadgeIcons(matchedUser) : '';
+  const isVideo = String(m.image_url || '').startsWith('data:video');
+  const mediaHtml = m.image_url
+    ? (isVideo
+      ? `<video src="${m.image_url}" controls class="chat-img-attach" style="max-width:340px;"></video>`
+      : `<img src="${m.image_url}" class="chat-img-attach" style="${m.content === '[Sticker]' ? 'width:110px;height:110px;border:none;' : ''}" />`)
+    : '';
+
   div.innerHTML = `
     <div class="msg-actions">
       <button type="button" class="msg-act-btn" title="Add Reaction" onclick="openReactPicker(this, ${m.id})">${CHAT_SVG.react}</button>
@@ -501,9 +552,9 @@ function buildMsgEl(m) {
     <img class="msg-avatar" src="${av}" />
     <div style="flex:1;min-width:0;">
       ${m.reply_to ? `<div class="reply-quote">${CHAT_SVG.reply} <span>${String(m.reply_to).replace(/</g, '&lt;')}</span></div>` : ''}
-      <div><strong style="color:${m.color || '#10b981'};cursor:pointer;" class="msg-author">${m.username}</strong> <span class="mono-dim">[${m.role || 'MEMBER'}]${m.is_beta ? ' [BETA]' : ''} • ${timeStr}</span></div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><strong style="color:${m.color || '#10b981'};cursor:pointer;" class="msg-author">${m.username}</strong>${badgeIcons}<span class="mono-dim">[${m.role || 'MEMBER'}]${m.is_beta ? ' [BETA]' : ''} • ${timeStr}</span></div>
       ${m.content && m.content !== '[Sticker]' ? `<div class="msg-text-body" style="margin-top:3px;word-break:break-word;">${safeText}${m.edited ? ' <span class="mono-dim">(edited)</span>' : ''}</div>` : ''}
-      ${m.image_url ? `<img src="${m.image_url}" class="chat-img-attach" style="${m.content === '[Sticker]' ? 'width:110px;height:110px;border:none;' : ''}" />` : ''}
+      ${mediaHtml}
       ${reactHtml ? `<div class="react-row">${reactHtml}</div>` : ''}
     </div>`;
   const openProf = () => { if (m.user_id && window.openUserModal) window.openUserModal(m.user_id); };
@@ -582,11 +633,11 @@ async function pollChatAndMembers() {
   const users = await window.sbRest('users?select=id,username,role,extra_roles,avatar,equipped_color,online,typing_until,activity_text,last_channel,last_seen&order=online.desc,xp.desc&limit=60').catch(() => []);
   if (Array.isArray(users)) {
     cachedUsers = users;
-    const typers = users.filter(u => u.typing_until && u.typing_until > Date.now() && (!me || u.id !== me.id));
+    const typers = users.filter(u => Number(u.typing_until || 0) > Date.now() && (!me || String(u.id) !== String(me.id)));
     if (typingBar) {
       if (typers.length) {
         const names = typers.length === 1 ? `@${typers.at(0).username} is typing...` : `${typers.map(t => '@' + t.username).join(', ')} are typing...`;
-        typingBar.innerHTML = `<span class="typing-pill"><span class="typing-dots"><span></span><span></span><span></span></span><span>${names}</span></span>`;
+        typingBar.innerHTML = `<span class="typing-pill">${names}</span>`;
       } else {
         typingBar.innerHTML = '';
       }
@@ -599,9 +650,10 @@ async function pollChatAndMembers() {
       const renderMem = (u, isOn) => {
         const av = u.avatar && !u.avatar.includes('dicebear') ? u.avatar : 'logo.png';
         const sub = isOn ? (u.activity_text || u.role) : `${u.last_channel || u.role}${u.last_seen ? ` • ${formatLastSeen(u.last_seen)}` : ''}`;
+        const icons = window.renderRoleBadgeIcons ? window.renderRoleBadgeIcons(u) : '';
         return `<div class="member-card" style="opacity:${isOn ? '1' : '0.62'}" onclick="openUserModal('${u.id}')">
           <div class="mem-av-wrap"><img src="${av}" /><span class="mem-dot" style="background:${isOn ? '#10b981' : '#64748b'}"></span></div>
-          <div style="min-width:0;flex:1;"><div style="color:${u.equipped_color || '#f8fafc'};font-weight:700;font-size:0.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.username}</div><div class="mono-dim" style="font-size:0.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sub}</div></div>
+          <div style="min-width:0;flex:1;"><div style="display:flex;align-items:center;gap:4px;"><span style="color:${u.equipped_color || '#f8fafc'};font-weight:700;font-size:0.84rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.username}</span>${icons}</div><div class="mono-dim" style="font-size:0.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sub}</div></div>
         </div>`;
       };
       let groupedHtml = '';
@@ -621,9 +673,9 @@ chatInput?.addEventListener('input', () => {
   const cc = document.getElementById('chat-char-count');
   if (cc) cc.textContent = `${chatInput.value.length}/2000`;
 
-  if (p && Date.now() - lastTypingPing > 2000) {
+  if (p && chatInput.value.length > 0 && Date.now() - lastTypingPing > 1000) {
     lastTypingPing = Date.now();
-    window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { typing_until: Date.now() + 5000 }, window.authToken).catch(() => {});
+    window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { typing_until: Date.now() + 5500 }, window.authToken).catch(() => {});
   }
   if (!acBox) return;
   const val = chatInput.value;
@@ -796,5 +848,5 @@ chatForm?.addEventListener('submit', async (e) => {
 });
 
 window.addEventListener('zynk-profile-updated', buildChannelBar);
-setInterval(pollChatAndMembers, 3500);
+setInterval(pollChatAndMembers, 2000);
 pollChatAndMembers();
