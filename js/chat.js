@@ -37,25 +37,16 @@ const ALL_EMOJIS = [
 function getUploadLimitInfo(p) {
   if (!p) return { mb: 50, label: '50 MB' };
   const roles = [p.role, ...(p.extra_roles || [])].map(r => String(r || '').toUpperCase());
-  if (roles.some(r => ['FOUNDER', 'HEAD DEV', 'HEAD_DEV', 'DEVELOPER', 'DEV'].includes(r))) {
-    return { mb: Infinity, label: 'Unlimited' };
-  }
-  if (roles.some(r => ['ADMIN', 'MODERATOR', 'STAFF'].includes(r))) {
-    return { mb: 52.5, label: '52.5 MB (+5% Staff)' };
-  }
+  if (roles.some(r => ['FOUNDER', 'HEAD DEV', 'HEAD_DEV', 'DEVELOPER', 'DEV'].includes(r))) return { mb: Infinity, label: 'Unlimited' };
+  if (roles.some(r => ['ADMIN', 'MODERATOR', 'STAFF'].includes(r))) return { mb: 52.5, label: '52.5 MB (+5% Staff)' };
   return { mb: 50, label: '50 MB' };
 }
 
 function canAccessChannel(p, ch) {
   if (!ch || ch === 'global' || ch === 'updates') return true;
   if (!p) return false;
-  if (ch === 'beta') {
-    return p.role === 'FOUNDER' || p.role === 'BETA' || !!p.is_beta || (p.extra_roles || []).includes('BETA');
-  }
-  if (ch.startsWith('dm_')) {
-    const parts = ch.replace(/^dm_/, '').split('_');
-    return parts.includes(String(p.id));
-  }
+  if (ch === 'beta') return p.role === 'FOUNDER' || p.role === 'BETA' || !!p.is_beta || (p.extra_roles || []).includes('BETA');
+  if (ch.startsWith('dm_')) return ch.replace(/^dm_/, '').split('_').includes(String(p.id));
   return true;
 }
 
@@ -68,7 +59,6 @@ function formatDiscordMarkdown(raw) {
   const codeBlocks = [];
   const inlineCodes = [];
   const escapes = [];
-
   let text = String(raw || '').replace(/\r\n/g, '\n');
 
   text = text.replace(/```([a-zA-Z0-9_-]*)\n?([\s\(\S\)]*?)```/g, (_, lang, code) => {
@@ -93,7 +83,6 @@ function formatDiscordMarkdown(raw) {
   });
 
   text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
   const lines = text.split('\n');
   const outLines = [];
   let inMultiQuote = false;
@@ -101,60 +90,32 @@ function formatDiscordMarkdown(raw) {
 
   for (let i = 0; i < lines.length; i++) {
     const ln = lines[i];
-    if (inMultiQuote) {
-      multiQuoteBuf.push(ln);
-      continue;
-    }
-    if (ln.startsWith('&gt;&gt;&gt; ')) {
-      inMultiQuote = true;
-      multiQuoteBuf.push(ln.slice(13));
-      continue;
-    }
-    if (ln.startsWith('&gt; ')) {
-      outLines.push(`<div class="md-quote">${ln.slice(5)}</div>`);
-    } else if (ln.startsWith('### ')) {
-      outLines.push(`<div class="md-h3">${ln.slice(4)}</div>`);
-    } else if (ln.startsWith('## ')) {
-      outLines.push(`<div class="md-h2">${ln.slice(3)}</div>`);
-    } else if (ln.startsWith('# ')) {
-      outLines.push(`<div class="md-h1">${ln.slice(2)}</div>`);
-    } else if (ln.startsWith('-# ')) {
-      outLines.push(`<span class="md-subtext">${ln.slice(3)}</span>`);
-    } else if (/^(\s*)[-*]\s+(.+)$/.test(ln)) {
+    if (inMultiQuote) { multiQuoteBuf.push(ln); continue; }
+    if (ln.startsWith('&gt;&gt;&gt; ')) { inMultiQuote = true; multiQuoteBuf.push(ln.slice(13)); continue; }
+    if (ln.startsWith('&gt; ')) outLines.push(`<div class="md-quote">${ln.slice(5)}</div>`);
+    else if (ln.startsWith('### ')) outLines.push(`<div class="md-h3">${ln.slice(4)}</div>`);
+    else if (ln.startsWith('## ')) outLines.push(`<div class="md-h2">${ln.slice(3)}</div>`);
+    else if (ln.startsWith('# ')) outLines.push(`<div class="md-h1">${ln.slice(2)}</div>`);
+    else if (ln.startsWith('-# ')) outLines.push(`<span class="md-subtext">${ln.slice(3)}</span>`);
+    else if (/^(\s*)[-*]\s+(.+)$/.test(ln)) {
       const m = ln.match(/^(\s*)[-*]\s+(.+)$/);
-      const pad = Math.min(48, (m[1]?.length || 0) * 10);
-      outLines.push(`<div style="padding-left:${14 + pad}px;">• ${m[2]}</div>`);
+      outLines.push(`<div style="padding-left:${14 + Math.min(48, (m?.length || 0) * 10)}px;">• ${m}</div>`);
     } else if (/^(\s*)(\d+)\.\s+(.+)$/.test(ln)) {
       const m = ln.match(/^(\s*)(\d+)\.\s+(.+)$/);
-      const pad = Math.min(48, (m[1]?.length || 0) * 10);
-      outLines.push(`<div style="padding-left:${14 + pad}px;">${m[2]}. ${m[3]}</div>`);
-    } else {
-      outLines.push(ln);
-    }
+      outLines.push(`<div style="padding-left:${14 + Math.min(48, (m?.length || 0) * 10)}px;">${m}. ${m}</div>`);
+    } else outLines.push(ln);
   }
-  if (inMultiQuote) {
-    outLines.push(`<div class="md-quote">${multiQuoteBuf.join('<br>')}</div>`);
-  }
+  if (inMultiQuote) outLines.push(`<div class="md-quote">${multiQuoteBuf.join('<br>')}</div>`);
 
   let html = outLines.join('<br>').replace(/(<\/div>|<\/pre>|<\/span>)<br>/g, '$1');
-
   html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color:var(--neon-cyan);text-decoration:underline;">$1</a>');
   html = html.replace(/&lt;(https?:\/\/[^\s&]+)&gt;/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:var(--neon-cyan);text-decoration:underline;">$1</a>');
   html = html.replace(/(^|[^"'>])(https?:\/\/[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer" style="color:var(--neon-cyan);text-decoration:underline;">$2</a>');
-
   html = html.replace(/\|\|([^|]+)\|\|/g, '<span class="md-spoiler" onclick="this.classList.toggle(\'revealed\')">$1</span>');
-  html = html.replace(/~~([^~]+)~~/g, '<s>$1</s>');
-  html = html.replace(/___([^_]+)___/g, '<u><em>$1</em></u>');
-  html = html.replace(/__([^_]+)__/g, '<u>$1</u>');
-  html = html.replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>');
-  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-  html = html.replace(/(^|[^a-zA-Z0-9_])_([^_\n]+)_/g, '$1<em>$2</em>');
-  html = html.replace(/(@[a-zA-Z0-9_]+)/g, '<strong style="color:#10b981;">$1</strong>');
-
-  html = html.replace(/\u0000IC(\d+)\u0000/g, (_, i) => inlineCodes[Number(i)] || '');
-  html = html.replace(/\u0000CB(\d+)\u0000/g, (_, i) => codeBlocks[Number(i)] || '');
-  html = html.replace(/\u0000ES(\d+)\u0000/g, (_, i) => escapes[Number(i)] || '');
+  html = html.replace(/~~([^~]+)~~/g, '<s>$1</s>').replace(/___([^_]+)___/g, '<u><em>$1</em></u>').replace(/__([^_]+)__/g, '<u>$1</u>');
+  html = html.replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  html = html.replace(/(^|[^a-zA-Z0-9_])_([^_\n]+)_/g, '$1<em>$2</em>').replace(/(@[a-zA-Z0-9_]+)/g, '<strong style="color:#10b981;">$1</strong>');
+  html = html.replace(/\u0000IC(\d+)\u0000/g, (_, i) => inlineCodes[Number(i)] || '').replace(/\u0000CB(\d+)\u0000/g, (_, i) => codeBlocks[Number(i)] || '').replace(/\u0000ES(\d+)\u0000/g, (_, i) => escapes[Number(i)] || '');
   return html;
 }
 function compressChatImg(file, maxDim = 640) {
@@ -210,7 +171,6 @@ function buildChannelBar() {
   const isBeta = canAccessChannel(p, 'beta');
   const isStaff = p && ['FOUNDER', 'HEAD DEV', 'DEVELOPER', 'ADMIN', 'MODERATOR'].includes((p.role || '').toUpperCase());
   const curSlow = channelSlowMode[activeChannel] || 0;
-
   sideCol.innerHTML = `
     <div style="font-weight:800;font-size:0.95rem;padding:2px 6px;">CHAT</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
@@ -290,8 +250,7 @@ window.switchChatChannel = function(chId, label) {
   buildChannelBar();
   if (chatInput) chatInput.placeholder = `Message ${window.activeChatLabel}... (Type / or @)`;
   pollChatAndMembers();
-};
-if (chatForm && !document.getElementById('chat-file-inp')) {
+};if (chatForm && !document.getElementById('chat-file-inp')) {
   const fileInp = document.createElement('input');
   fileInp.type = 'file';
   fileInp.id = 'chat-file-inp';
@@ -340,6 +299,7 @@ if (!typingBar && chatForm) {
   chatForm.before(typingBar);
 }
 buildChannelBar();
+
 const ROLE_POWER = { FOUNDER: 100, 'HEAD DEV': 95, DEVELOPER: 90, ADMIN: 80, MODERATOR: 60, BETA: 30, UPLOADER: 25, DESIGNER: 25, VIP: 20, SUPPORTER: 15, MEMBER: 10, SYSTEM: 90 };
 
 const SLASH_CMDS = [
@@ -356,7 +316,6 @@ const SLASH_CMDS = [
   { cmd: '/give @user 250', desc: 'Grant Z-Credits to a member (Founder)', founder: true },
   { cmd: '/announce message', desc: 'Post system broadcast in chat (Founder)', founder: true }
 ];
-
 function parseDurationMs(str) {
   const m = String(str || '').match(/^(\d+)([mhd])$/i);
   if (!m) return 600000;
@@ -388,6 +347,7 @@ function getStickerLimit(p) {
   if (p.role !== 'MEMBER' || (p.rank_index || 0) >= 1 || (p.extra_roles || []).length > 0) return 10;
   return 2;
 }
+
 window.openNewDmModal = function() {
   const p = window.userProfile;
   if (!p) return window.notify?.('Sign in to start a Private DM!', true);
@@ -424,7 +384,6 @@ window.openReactPicker = function(btn, msgId) {
   pop.innerHTML = ALL_EMOJIS.map(em => `<button type="button" class="react-choice" onclick="toggleReaction(${msgId}, '${em}')">${em}</button>`).join('');
   bar.appendChild(pop);
 };
-
 window.toggleChatDrawer = function() {
   if (!drawerBox) return;
   drawerBox.classList.toggle('hidden');
@@ -464,6 +423,7 @@ window.toggleChatDrawer = function() {
     window.toggleChatDrawer();
   };
 };
+
 window.sendStickerImg = async function(idx) {
   const p = window.userProfile;
   const src = p?.stickers?.[idx];
@@ -484,33 +444,17 @@ document.getElementById('chat-file-inp')?.addEventListener('change', async (e) =
   const p = window.userProfile;
   e.target.value = '';
   if (!f || !p) return;
-  if (activeChannel === 'updates' && p.role !== 'FOUNDER') {
-    return window.notify?.('Only Founder can post in #updates.', true);
-  }
+  if (activeChannel === 'updates' && p.role !== 'FOUNDER') return window.notify?.('Only Founder can post in #updates.', true);
   const limitInfo = getUploadLimitInfo(p);
   const sizeMB = f.size / (1024 * 1024);
-  if (sizeMB > limitInfo.mb) {
-    return window.notify?.(`File too large (${sizeMB.toFixed(1)} MB). Your limit is ${limitInfo.label}.`, true);
-  }
+  if (sizeMB > limitInfo.mb) return window.notify?.(`File too large (${sizeMB.toFixed(1)} MB). Your limit is ${limitInfo.label}.`, true);
   const compressed = await compressChatImg(f, 680);
   pendingAttachment = { name: f.name, dataUrl: compressed, sizeLabel: `${sizeMB.toFixed(2)} MB`, isVid: f.type.startsWith('video/') };
 
   let prev = document.getElementById('chat-attach-preview');
-  if (!prev) {
-    prev = document.createElement('div');
-    prev.id = 'chat-attach-preview';
-    prev.className = 'reply-banner';
-    chatForm?.before(prev);
-  }
-  const thumb = pendingAttachment.isVid
-    ? `<div style="width:44px;height:44px;border-radius:8px;background:#04070b;display:flex;align-items:center;justify-content:center;border:1px solid var(--neon-emerald);font-size:0.7rem;">VID</div>`
-    : `<img src="${compressed}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--neon-emerald);" />`;
-  prev.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;">
-      ${thumb}
-      <div><strong>${f.name}</strong><div class="mono-dim">${pendingAttachment.sizeLabel} • Ready to send with your message</div></div>
-    </div>
-    <button type="button" class="btn-ghost" onclick="clearPendingAttachment()">✕</button>`;
+  if (!prev) { prev = document.createElement('div'); prev.id = 'chat-attach-preview'; prev.className = 'reply-banner'; chatForm?.before(prev); }
+  const thumb = pendingAttachment.isVid ? `<div style="width:44px;height:44px;border-radius:8px;background:#04070b;display:flex;align-items:center;justify-content:center;border:1px solid var(--neon-emerald);font-size:0.7rem;">VID</div>` : `<img src="${compressed}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--neon-emerald);" />`;
+  prev.innerHTML = `<div style="display:flex;align-items:center;gap:10px;">${thumb}<div><strong>${f.name}</strong><div class="mono-dim">${pendingAttachment.sizeLabel} • Ready to send</div></div></div><button type="button" class="btn-ghost" onclick="clearPendingAttachment()">✕</button>`;
   chatInput?.focus();
 });
 document.addEventListener('click', (e) => {
@@ -568,11 +512,7 @@ window.editChatMsg = function(msgId, oldText) {
   if (!textEl || row.querySelector('.inline-edit-wrap')) return;
 
   const prevHtml = textEl.innerHTML;
-  textEl.innerHTML = `
-    <div class="inline-edit-wrap" style="margin-top:4px;">
-      <input type="text" class="tool-input inline-edit-inp" style="margin:0;padding:7px 10px;font-size:0.9rem;" value="${oldText.replace(/"/g, '&quot;')}" />
-      <div class="mono-dim" style="font-size:0.72rem;margin-top:4px;">escape to <span class="inline-cancel" style="color:#06b6d4;cursor:pointer;text-decoration:underline;">cancel</span> • enter to <span class="inline-save" style="color:#10b981;cursor:pointer;text-decoration:underline;">save</span></div>
-    </div>`;
+  textEl.innerHTML = `<div class="inline-edit-wrap" style="margin-top:4px;"><input type="text" class="tool-input inline-edit-inp" style="margin:0;padding:7px 10px;font-size:0.9rem;" value="${oldText.replace(/"/g, '&quot;')}" /><div class="mono-dim" style="font-size:0.72rem;margin-top:4px;">escape to <span class="inline-cancel" style="color:#06b6d4;cursor:pointer;text-decoration:underline;">cancel</span> • enter to <span class="inline-save" style="color:#10b981;cursor:pointer;text-decoration:underline;">save</span></div></div>`;
 
   const inp = textEl.querySelector('.inline-edit-inp');
   inp.focus();
@@ -598,12 +538,7 @@ window.editChatMsg = function(msgId, oldText) {
 window.setChatReply = function(username, text) {
   activeReply = `@${username}: ${text.slice(0, 65)}`;
   let bar = document.getElementById('reply-preview-bar');
-  if (!bar) {
-    bar = document.createElement('div');
-    bar.id = 'reply-preview-bar';
-    bar.className = 'reply-banner';
-    chatForm?.before(bar);
-  }
+  if (!bar) { bar = document.createElement('div'); bar.id = 'reply-preview-bar'; bar.className = 'reply-banner'; chatForm?.before(bar); }
   bar.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;">${CHAT_SVG.reply} Replying to <strong>${activeReply}</strong></span><button type="button" class="btn-ghost" onclick="clearChatReply()">✕</button>`;
   chatInput?.focus();
 };
@@ -630,17 +565,12 @@ function buildMsgEl(m) {
   const reacts = m.reactions && typeof m.reactions === 'object' ? m.reactions : {};
   const reactHtml = Object.entries(reacts).filter(([, arr]) => Array.isArray(arr) && arr.length).map(([em, arr]) => {
     const mine = me && arr.includes(me.username);
-    const who = arr.map(u => '@' + u).join(', ');
-    return `<button type="button" class="react-pill ${mine ? 'mine' : ''}" title="Reacted by ${who}" onclick="toggleReaction(${m.id}, '${em}')">${em} ${arr.length}</button>`;
+    return `<button type="button" class="react-pill ${mine ? 'mine' : ''}" title="Reacted by ${arr.map(u => '@' + u).join(', ')}" onclick="toggleReaction(${m.id}, '${em}')">${em} ${arr.length}</button>`;
   }).join('');
 
   const badgeIcons = matchedUser && window.renderRoleBadgeIcons ? window.renderRoleBadgeIcons(matchedUser) : '';
   const isVideo = String(m.image_url || '').startsWith('data:video');
-  const mediaHtml = m.image_url
-    ? (isVideo
-      ? `<video src="${m.image_url}" controls class="chat-img-attach" style="max-width:340px;"></video>`
-      : `<img src="${m.image_url}" class="chat-img-attach" style="${m.content === '[Sticker]' ? 'width:110px;height:110px;border:none;' : ''}" />`)
-    : '';
+  const mediaHtml = m.image_url ? (isVideo ? `<video src="${m.image_url}" controls class="chat-img-attach" style="max-width:340px;"></video>` : `<img src="${m.image_url}" class="chat-img-attach" style="${m.content === '[Sticker]' ? 'width:110px;height:110px;border:none;' : ''}" />`) : '';
 
   div.innerHTML = `
     <div class="msg-actions">
@@ -677,22 +607,10 @@ function renderMessages(msgs) {
   msgs.forEach(m => msgBox.appendChild(buildMsgEl(m)));
   if (wasAtBottom || !initialChatLoaded) msgBox.scrollTop = msgBox.scrollHeight;
 }
-
-function formatLastSeen(ts) {
-  if (!ts) return '';
-  const mins = Math.max(1, Math.floor((Date.now() - ts) / 60000));
-  if (mins < 60) return `${mins}m ago`;
-  if (mins < 1440) return `${Math.floor(mins / 60)}h ago`;
-  return `${Math.floor(mins / 1440)}d ago`;
-}
 async function pollChatAndMembers() {
   if (!window.sbRest) return;
   const me = window.userProfile;
-  if (!canAccessChannel(me, activeChannel)) {
-    activeChannel = 'global';
-    window.activeChatLabel = '#zynk-global';
-    buildChannelBar();
-  }
+  if (!canAccessChannel(me, activeChannel)) { activeChannel = 'global'; window.activeChatLabel = '#zynk-global'; buildChannelBar(); }
 
   try {
     const cols = 'id,user_id,username,role,color,content,reply_to,edited,reactions,is_beta,created_at,image_url,channel';
@@ -701,70 +619,21 @@ async function pollChatAndMembers() {
     if (Array.isArray(msgs)) {
       msgs.reverse();
       const hash = activeChannel + ':' + JSON.stringify(msgs.map(m => [m.id, m.content, m.edited, m.reactions]));
-      if (hash !== lastChatHash) {
-        lastChatHash = hash;
-        renderMessages(msgs);
-      }
+      if (hash !== lastChatHash) { lastChatHash = hash; renderMessages(msgs); }
     }
-
-    const recentAll = await window.sbRest(`messages?select=id,username,content,channel&id=gt.${lastNotifiedMsgId}&order=id.asc&limit=20`).catch(() => []);
-    if (Array.isArray(recentAll) && recentAll.length) {
-      recentAll.forEach(m => {
-        if (m.id > lastNotifiedMsgId) lastNotifiedMsgId = m.id;
-        const ch = m.channel || 'global';
-        if (!initialChatLoaded || !me || m.username === me.username || m.username === 'ZynkBot' || !canAccessChannel(me, ch)) return;
-        if (ch !== activeChannel || !document.getElementById('chat-view')?.classList.contains('active')) {
-          channelUnread[ch] = true;
-        }
-        if (new RegExp(`@${me.username}\\b`, 'i').test(m.content || '')) {
-          channelPings[ch] = (channelPings[ch] || 0) + 1;
-          window.notify?.(`@${m.username} pinged you in #${ch}: "${m.content}"`, false, () => {
-            window.openTab('chat-view');
-            window.switchChatChannel(ch, ch === 'global' ? '#zynk-global' : `#${ch}`);
-          });
-        }
-      });
-      buildChannelBar();
-    }
-  } catch (err) {
-    console.warn('Chat sync:', err.message);
-  }
+  } catch (err) {}
   initialChatLoaded = true;
 
   const users = await window.sbRest('users?select=id,username,role,extra_roles,avatar,equipped_color,online,typing_until,activity_text,last_channel,last_seen&order=online.desc,xp.desc&limit=60').catch(() => []);
   if (Array.isArray(users)) {
     cachedUsers = users;
     const typers = users.filter(u => Number(u.typing_until || 0) > Date.now() && (!me || String(u.id) !== String(me.id)));
-    if (typingBar) {
-      if (typers.length) {
-        const names = typers.length === 1 ? `@${typers.at(0).username} is typing...` : `${typers.map(t => '@' + t.username).join(', ')} are typing...`;
-        typingBar.innerHTML = `<span class="typing-pill">${names}</span>`;
-      } else {
-        typingBar.innerHTML = '';
-      }
-    }
+    if (typingBar) typingBar.innerHTML = typers.length ? `<span class="typing-pill">${typers.map(t => '@' + t.username).join(', ')} typing...</span>` : '';
     if (memBox) {
-      const roleOrder = ['FOUNDER', 'HEAD DEV', 'DEVELOPER', 'ADMIN', 'MODERATOR', 'BETA', 'UPLOADER', 'DESIGNER', 'VIP', 'SUPPORTER', 'MEMBER'];
-      const roleColMap = window.ROLE_COLORS || {};
       const online = users.filter(u => u.online);
       const offline = users.filter(u => !u.online);
-      const renderMem = (u, isOn) => {
-        const av = u.avatar && !u.avatar.includes('dicebear') ? u.avatar : 'logo.png';
-        const sub = isOn ? (u.activity_text || u.role) : `${u.last_channel || u.role}${u.last_seen ? ` • ${formatLastSeen(u.last_seen)}` : ''}`;
-        const icons = window.renderRoleBadgeIcons ? window.renderRoleBadgeIcons(u) : '';
-        return `<div class="member-card" style="opacity:${isOn ? '1' : '0.62'}" onclick="openUserModal('${u.id}')">
-          <div class="mem-av-wrap"><img src="${av}" /><span class="mem-dot" style="background:${isOn ? '#10b981' : '#64748b'}"></span></div>
-          <div style="min-width:0;flex:1;"><div style="display:flex;align-items:center;gap:4px;"><span style="color:${u.equipped_color || '#f8fafc'};font-weight:700;font-size:0.84rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.username}</span>${icons}</div><div class="mono-dim" style="font-size:0.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sub}</div></div>
-        </div>`;
-      };
-      let groupedHtml = '';
-      roleOrder.forEach(r => {
-        const list = online.filter(u => (u.role || 'MEMBER').toUpperCase() === r);
-        if (list.length) {
-          groupedHtml += `<div class="members-head" style="color:${roleColMap[r] || '#94a3b8'}">${r} — ${list.length}</div>` + list.map(u => renderMem(u, true)).join('');
-        }
-      });
-      memBox.innerHTML = `${groupedHtml || '<div class="mono-dim" style="padding:4px 8px;">No members online</div>'}<div class="members-head">OFFLINE — ${offline.length}</div>${offline.map(u => renderMem(u, false)).join('')}`;
+      const renderMem = (u, isOn) => `<div class="member-card" style="opacity:${isOn ? '1' : '0.62'}" onclick="openUserModal('${u.id}')"><div class="mem-av-wrap"><img src="${u.avatar || 'logo.png'}" /><span class="mem-dot" style="background:${isOn ? '#10b981' : '#64748b'}"></span></div><div style="min-width:0;flex:1;"><div style="color:${u.equipped_color || '#f8fafc'};font-weight:700;font-size:0.84rem;">${u.username}</div><div class="mono-dim" style="font-size:0.68rem;">${u.role}</div></div></div>`;
+      memBox.innerHTML = `<div class="members-head">ONLINE — ${online.length}</div>${online.map(u => renderMem(u, true)).join('')}<div class="members-head">OFFLINE — ${offline.length}</div>${offline.map(u => renderMem(u, false)).join('')}`;
     }
   }
 }
@@ -774,75 +643,18 @@ chatInput?.addEventListener('input', () => {
   const isFounder = p && p.role === 'FOUNDER';
   const cc = document.getElementById('chat-char-count');
   if (cc) cc.textContent = `${chatInput.value.length}/${isFounder ? '∞' : '2000'}`;
-
   if (p && chatInput.value.length > 0 && Date.now() - lastTypingPing > 1000) {
     lastTypingPing = Date.now();
     window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { typing_until: Date.now() + 5500 }, window.authToken).catch(() => {});
   }
-  if (!acBox) return;
-  const val = chatInput.value;
-  const isStaff = p && ['FOUNDER', 'HEAD DEV', 'DEVELOPER', 'ADMIN', 'MODERATOR'].includes((p.role || '').toUpperCase());
-
-  if (val.startsWith('/')) {
-    const q = val.toLowerCase();
-    const matches = SLASH_CMDS.filter(c => (!c.staff || isStaff) && (!c.founder || isFounder) && c.cmd.startsWith(q.split(' ').at(0)));
-    if (!matches.length) return acBox.classList.add('hidden');
-    acBox.innerHTML = matches.map(c => `<div class="ac-item" data-fill="${c.cmd.split(' ').slice(0, 2).join(' ')} "><strong>${c.cmd}</strong><span class="mono-dim">${c.desc}</span></div>`).join('');
-    acBox.classList.remove('hidden');
-    acBox.querySelectorAll('.ac-item').forEach(el => (el.onclick = () => { chatInput.value = el.dataset.fill; acBox.classList.add('hidden'); chatInput.focus(); }));
-    return;
-  }
-
-  const atMatch = val.match(/(?:^|\s)@([a-zA-Z0-9_]*)$/);
-  if (atMatch) {
-    const query = atMatch.at(1).toLowerCase();
-    const matches = cachedUsers.filter(u => u.username.toLowerCase().startsWith(query)).slice(0, 8);
-    if (!matches.length) return acBox.classList.add('hidden');
-    acBox.innerHTML = `<div style="padding:4px 10px;font-size:0.7rem;color:#94a3b8;font-weight:700;border-bottom:1px solid rgba(255,255,255,0.06);">MEMBERS MATCHING @${query}</div>` + matches.map(u => {
-      const av = u.avatar && !u.avatar.includes('dicebear') ? u.avatar : 'logo.png';
-      return `<div class="ac-item" data-uname="${u.username}"><div style="display:flex;align-items:center;gap:8px;"><img src="${av}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;" /><strong style="color:${u.equipped_color || '#10b981'}">${u.username}</strong></div><span class="mono-dim">[${u.role}]</span></div>`;
-    }).join('');
-    acBox.classList.remove('hidden');
-    acBox.querySelectorAll('.ac-item').forEach(el => (el.onclick = () => {
-      chatInput.value = val.replace(/@([a-zA-Z0-9_]*)$/, `@${el.dataset.uname} `);
-      acBox.classList.add('hidden');
-      chatInput.focus();
-    }));
-    return;
-  }
-  acBox.classList.add('hidden');
 });
-async function botPost(text) {
-  if (!window.sbRest) return;
-  await window.sbRest('messages', 'POST', { username: 'ZynkBot', avatar: 'logo.png', role: 'SYSTEM', color: '#06b6d4', content: text, channel: activeChannel }, window.authToken);
-  lastChatHash = '';
-  await pollChatAndMembers();
-}
 
 chatForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  acBox?.classList.add('hidden');
   const raw = chatInput.value.trim();
   const att = pendingAttachment;
-  if (!raw && !att) return;
   const p = window.userProfile;
-  if (!p) return window.notify?.('Sign in to send messages in Zynk Chat!', true);
-  if (!canAccessChannel(p, activeChannel)) return window.notify?.('You do not have permission to post here.', true);
-  if (activeChannel === 'updates' && p.role !== 'FOUNDER') return window.notify?.('Only Founder can post in #updates.', true);
-  if (p.is_muted || (p.mute_until && p.mute_until > Date.now())) {
-    const mins = p.mute_until > Date.now() ? Math.ceil((p.mute_until - Date.now()) / 60000) + 'm left' : 'Active';
-    return window.notify?.(`You are muted (${mins}). Reason: ${p.mute_reason || 'Staff action'}`, true);
-  }
-
-  const isStaff = ['FOUNDER', 'HEAD DEV', 'DEVELOPER', 'ADMIN', 'MODERATOR'].includes((p.role || '').toUpperCase()) || (p.extra_roles || []).some(r => ['ADMIN', 'MODERATOR'].includes(r));
-  const slowSec = channelSlowMode[activeChannel] || 0;
-  if (!isStaff && slowSec > 0) {
-    const last = lastSentByChannel[activeChannel] || 0;
-    const wait = Math.ceil((slowSec * 1000 - (Date.now() - last)) / 1000);
-    if (wait > 0) return window.notify?.(`Slow mode is active: wait ${wait}s before sending again.`, true);
-  }
-  lastSentByChannel[activeChannel] = Date.now();
-
+  if ((!raw && !att) || !p) return;
   const isFounder = p.role === 'FOUNDER';
   chatInput.value = '';
   const cc = document.getElementById('chat-char-count');
@@ -851,103 +663,14 @@ chatForm?.addEventListener('submit', async (e) => {
   const replyText = activeReply || '';
   window.clearChatReply();
 
-  try {
-    if (raw.startsWith('/')) {
-      const parts = raw.split(' ');
-      const cmd = parts.at(0).toLowerCase();
-      const targetName = parts.at(1)?.replace(/^@/, '');
-
-      if (cmd === '/help') return botPost('Commands: /help, /credits, /pay @user <amt>' + (isStaff ? ' | Staff: /purge <1-100>, /warn @user <reason>, /mute @user <10m/1h/1d> <reason>, /unmute @user, /ban @user <10m/1h/1d> <reason>, /unban @user, /clear' : '') + (isFounder ? ' | Founder: /give @user <amt>, /announce <msg>' : ''));
-      if (cmd === '/credits') return botPost(`@${p.username}: ${p.credits} Z-Credits (Level ${Math.floor((p.xp || 0) / 1000) + 1})`);
-      if (cmd === '/purge' && isStaff) {
-        const count = Math.min(100, Math.max(1, parseInt(parts.at(1), 10) || 10));
-        const filter = activeChannel === 'global' ? 'or=(channel.eq.global,channel.is.null)' : `channel=eq.${encodeURIComponent(activeChannel)}`;
-        const recent = await window.sbRest(`messages?select=id&${filter}&order=id.desc&limit=${count}`);
-        const ids = Array.isArray(recent) ? recent.map(r => r.id) : [];
-        if (ids.length) {
-          ids.forEach(id => document.querySelector(`[data-mid="${id}"]`)?.remove());
-          await window.sbRest(`messages?id=in.(${ids.join(',')})`, 'DELETE', null, window.authToken);
-        }
-        await window.logAudit('PURGE', window.activeChatLabel, `Deleted ${ids.length} messages`);
-        lastChatHash = '';
-        return botPost(`Purged ${ids.length} message(s) by @${p.username}.`);
-      }
-      if (cmd === '/clear' && isStaff) {
-        await window.sbRest('messages?id=gt.0', 'DELETE', null, window.authToken);
-        await window.logAudit('CLEAR_CHAT', window.activeChatLabel, 'Cleared chat history');
-        lastChatHash = '';
-        return botPost(`Chat cleared by @${p.username}.`);
-      }
-      if (cmd === '/announce' && isFounder) {
-        await window.logAudit('CHAT_ANNOUNCE', window.activeChatLabel, parts.slice(1).join(' '));
-        return botPost(`[BROADCAST] ${parts.slice(1).join(' ')}`);
-      }
-      if (cmd === '/warn' && isStaff && targetName) {
-        const reason = parts.slice(2).join(' ') || 'Follow community rules';
-        await logInfraction(targetName, 'Warning', reason);
-        await window.logAudit('WARN', `@${targetName}`, reason);
-        return botPost(`@${targetName} was warned by @${p.username}. Reason: ${reason}`);
-      }
-      if (cmd === '/mute' && isStaff && targetName) {
-        const durMs = parseDurationMs(parts.at(2));
-        const reason = parts.slice(3).join(' ') || 'Chat violation';
-        await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`, 'PATCH', { is_muted: true, mute_until: Date.now() + durMs, mute_reason: reason }, window.authToken);
-        await logInfraction(targetName, `Muted (${parts.at(2) || '10m'})`, reason);
-        await window.logAudit('MUTE', `@${targetName}`, `${parts.at(2) || '10m'} — ${reason}`);
-        return botPost(`@${targetName} muted for ${parts.at(2) || '10m'} by @${p.username}. Reason: ${reason}`);
-      }
-      if (cmd === '/unmute' && isStaff && targetName) {
-        await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`, 'PATCH', { is_muted: false, mute_until: 0, mute_reason: '' }, window.authToken);
-        await window.logAudit('UNMUTE', `@${targetName}`, 'Unmuted user');
-        return botPost(`@${targetName} was unmuted by @${p.username}.`);
-      }
-      if (cmd === '/ban' && isStaff && targetName) {
-        const durMs = parseDurationMs(parts.at(2));
-        const reason = parts.slice(3).join(' ') || 'Rule violation';
-        await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`, 'PATCH', { ban_until: Date.now() + durMs, ban_reason: reason, online: false }, window.authToken);
-        await logInfraction(targetName, `Banned (${parts.at(2) || '10m'})`, reason);
-        await window.logAudit('BAN', `@${targetName}`, `${parts.at(2) || '10m'} — ${reason}`);
-        return botPost(`@${targetName} banned for ${parts.at(2) || '10m'} by @${p.username}. Reason: ${reason}`);
-      }
-      if (cmd === '/unban' && isStaff && targetName) {
-        await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`, 'PATCH', { ban_until: 0, ban_reason: '' }, window.authToken);
-        await window.logAudit('UNBAN', `@${targetName}`, 'Unbanned user');
-        return botPost(`@${targetName} was unbanned by @${p.username}.`);
-      }
-      if (cmd === '/give' && isFounder && targetName) {
-        const amt = parseInt(parts.at(2), 10);
-        if (!(amt > 0)) return window.notify('Specify a valid amount.', true);
-        const found = await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`);
-        const u = Array.isArray(found) ? found.at(0) : null;
-        if (!u) return window.notify(`User @${targetName} not found.`, true);
-        await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { credits: u.credits + amt }, window.authToken);
-        await window.logAudit('GIVE_CREDITS', `@${u.username}`, `+${amt} Z-Credits`);
-        await window.refreshMyProfile();
-        return botPost(`Founder @${p.username} granted +${amt} Z-Credits to @${u.username}!`);
-      }
-      if (cmd === '/pay' && targetName) {
-        const amt = parseInt(parts.at(2), 10);
-        if (!(amt > 0) || p.credits < amt) return window.notify('Invalid or insufficient Z-Credits.', true);
-        const found = await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`);
-        const u = Array.isArray(found) ? found.at(0) : null;
-        if (!u) return window.notify(`User @${targetName} not found.`, true);
-        await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits - amt }, window.authToken);
-        await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { credits: u.credits + amt }, window.authToken);
-        await window.refreshMyProfile();
-        return botPost(`@${p.username} sent ${amt} Z-Credits to @${u.username}!`);
-      }
-    }
-
-    const mult = (p.boost_until && p.boost_until > Date.now()) ? 2 : 1;
-    appendSingleMsg({ id: Date.now(), user_id: p.id, username: p.username, avatar: p.avatar, role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: raw, image_url: att?.dataUrl || '', reply_to: replyText, created_at: new Date().toISOString() });
-    await window.sbRest('messages', 'POST', { user_id: p.id, username: p.username, avatar: 'logo.png', role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: raw, image_url: att?.dataUrl || '', reply_to: replyText, channel: activeChannel }, window.authToken);
-    lastChatHash = '';
-    window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + (5 * mult), xp: (p.xp || 0) + (25 * mult), msg_count: (p.msg_count || 0) + 1, typing_until: 0, last_channel: window.activeChatLabel, last_seen: Date.now() }, window.authToken).then(() => window.refreshMyProfile()).catch(() => {});
-  } catch (err) {
-    window.notify('Chat error: ' + err.message, true);
-  }
+  const mult = (p.boost_until && p.boost_until > Date.now()) ? 2 : 1;
+  appendSingleMsg({ id: Date.now(), user_id: p.id, username: p.username, avatar: p.avatar, role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: raw, image_url: att?.dataUrl || '', reply_to: replyText, created_at: new Date().toISOString() });
+  await window.sbRest('messages', 'POST', { user_id: p.id, username: p.username, avatar: 'logo.png', role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: raw, image_url: att?.dataUrl || '', reply_to: replyText, channel: activeChannel }, window.authToken);
+  lastChatHash = '';
+  window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + (5 * mult), xp: (p.xp || 0) + (25 * mult), msg_count: (p.msg_count || 0) + 1, typing_until: 0, last_channel: window.activeChatLabel, last_seen: Date.now() }, window.authToken).then(() => window.refreshMyProfile()).catch(() => {});
 });
 
 window.addEventListener('zynk-profile-updated', buildChannelBar);
 setInterval(pollChatAndMembers, 2000);
 pollChatAndMembers();
+
