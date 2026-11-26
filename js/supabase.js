@@ -63,6 +63,8 @@ function applyNavPermissions() {
   if (topBtn) topBtn.textContent = p ? 'Sign Out' : 'Sign In';
 }
 
+const SAFE_USER_COLS = 'id,username,avatar,banner,bio,role,extra_roles,rank_index,credits,xp,online,equipped_color,equipped_badge,owned_items,claimed,friends,friend_requests,following,is_beta,avatar_frame,profile_theme,last_daily,daily_streak,saved_streak,last_surge,last_restore,last_staff_stipend,staff_streak,boost_until,msg_count,items_bought,dailies_claimed,stickers,hide_leaderboard,infractions,activity_text,last_channel,last_seen,typing_until,is_muted,mute_until,mute_reason,ban_until,ban_reason,created_at';
+
 window.refreshMyProfile = async function() {
   if (!window.authToken) return null;
   try {
@@ -71,16 +73,18 @@ window.refreshMyProfile = async function() {
     });
     if (!uRes.ok) return null;
     const authUser = await uRes.json();
-    const rows = await window.sbRest(`users?id=eq.${authUser.id}`);
+    const rows = await window.sbRest(`users?id=eq.${authUser.id}&select=${SAFE_USER_COLS}`);
     let prof = Array.isArray(rows) ? rows.at(0) : null;
     if (!prof) {
       const uname = authUser.user_metadata?.username || authUser.email.split('@').at(0);
-      const created = await window.sbRest('users', 'POST', {
+      await window.sbRest('users', 'POST', {
         id: authUser.id, email: authUser.email, username: uname, role: 'MEMBER', credits: 150, xp: 0, online: true
       }, window.authToken);
+      const created = await window.sbRest(`users?id=eq.${authUser.id}&select=${SAFE_USER_COLS}`);
       prof = Array.isArray(created) ? created.at(0) : null;
     }
     if (prof) {
+      prof.email = authUser.email;
       if (prof.ban_until && prof.ban_until > Date.now()) {
         localStorage.removeItem('zynk_session');
         window.authToken = null;
@@ -162,10 +166,9 @@ document.addEventListener('click', async (e) => {
         if (remember) localStorage.setItem('zynk_session', JSON.stringify({ access_token: data.access_token, refresh_token: data.refresh_token }));
       } else {
         if (!loginId.includes('@')) {
-          const found = await window.sbRest(`users?username=ilike.${encodeURIComponent(loginId.replace(/^@/, ''))}&select=email`);
-          const m = Array.isArray(found) ? found.at(0) : null;
-          if (!m?.email) throw new Error('Username not found.');
-          loginId = m.email;
+          const emailLookup = await window.sbRest('rpc/get_login_email', 'POST', { uname: loginId.replace(/^@/, '') });
+          if (!emailLookup || typeof emailLookup !== 'string') throw new Error('Username not found.');
+          loginId = emailLookup;
         }
         const res = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, {
           method: 'POST',
@@ -236,3 +239,4 @@ window.addEventListener('beforeunload', () => {
     }).catch(() => {});
   }
 });
+
