@@ -21,6 +21,14 @@ function compressImageFile(file, maxDim = 320) {
   });
 }
 
+function formatStipendTimer(ms) {
+  if (ms <= 0) return null;
+  const h = String(Math.floor(ms / 3600000)).padStart(2, '0');
+  const m = String(Math.floor((ms % 3600000) / 60000)).padStart(2, '0');
+  const s = String(Math.floor((ms % 60000) / 1000)).padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
+
 window.claimStaffStipend = async function() {
   const p = window.userProfile;
   if (!p) return;
@@ -43,6 +51,7 @@ function buildStaffStipendCardHtml(p) {
   const nextStreak = (p.staff_streak || 0) + 1;
   const bonusPct = nextStreak * 5;
   const previewAmt = Math.round(250 * (1 + bonusPct / 100));
+  const cd = formatStipendTimer(rem);
   return `
     <div class="glass-card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;border-color:rgba(6,182,212,0.4);">
       <div>
@@ -50,7 +59,7 @@ function buildStaffStipendCardHtml(p) {
         <h3 style="margin:2px 0;">Staff Daily Bonus: +${previewAmt} Z-Credits & +150 XP</h3>
         <p class="sub-text">Grows by +5% every consecutive day you claim your staff stipend!</p>
       </div>
-      <button type="button" class="${rem <= 0 ? 'btn-neon' : 'btn-outline'}" ${rem <= 0 ? '' : 'disabled'} onclick="claimStaffStipend()">${rem <= 0 ? `Claim +${previewAmt} Z Stipend` : 'Claimed Today'}</button>
+      <button type="button" class="${rem <= 0 ? 'btn-neon' : 'btn-outline'} staff-stipend-btn" ${rem <= 0 ? '' : 'disabled'} onclick="claimStaffStipend()">${rem <= 0 ? `Claim +${previewAmt} Z Stipend` : `Next Stipend in ${cd}`}</button>
     </div>`;
 }
 
@@ -61,6 +70,20 @@ function renderStaffStipendOnHome() {
   if (!slot) return;
   slot.innerHTML = isStaff ? buildStaffStipendCardHtml(p) : '';
 }
+
+setInterval(() => {
+  const p = window.userProfile;
+  if (!p) return;
+  const rem = 86400000 - (Date.now() - (p.last_staff_stipend || 0));
+  const nextStreak = (p.staff_streak || 0) + 1;
+  const previewAmt = Math.round(250 * (1 + (nextStreak * 5) / 100));
+  const cd = formatStipendTimer(rem);
+  document.querySelectorAll('.staff-stipend-btn').forEach(btn => {
+    btn.disabled = rem > 0;
+    btn.className = `${rem <= 0 ? 'btn-neon' : 'btn-outline'} staff-stipend-btn`;
+    btn.textContent = rem <= 0 ? `Claim +${previewAmt} Z Stipend` : `Next Stipend in ${cd}`;
+  });
+}, 1000);
 async function renderStaffReports() {
   const box = document.getElementById('reports-container');
   const p = window.userProfile;
@@ -144,7 +167,7 @@ async function renderAdminAndBeta() {
       <div class="glass-card" style="border-color:rgba(168,85,247,0.45);">
         <span class="rarity-tag" style="color:#a855f7">BETA EXCLUSIVE CHANNEL</span>
         <h3>#beta-lab Live Chat</h3>
-        <p class="sub-text" style="margin:6px 0 14px;">Full-featured private Beta channel with Replies, Reactions, Custom Stickers, Image Uploads & @mentions.</p>
+        <p class="sub-text" style="margin:6px 0 14px;">Full-featured private Beta channel with Replies, Reactions, Custom Stickers, Image/Video Uploads & @mentions.</p>
         <button type="button" class="btn-neon" style="width:100%" id="beta-open-chat-btn">Open #beta-lab Chat</button>
       </div>
       <div class="glass-card">
@@ -154,10 +177,33 @@ async function renderAdminAndBeta() {
         <button class="${betaClaimed ? 'btn-outline' : 'btn-neon'}" style="width:100%" id="beta-bonus-btn" ${betaClaimed ? 'disabled' : ''}>${betaClaimed ? 'Claimed' : 'Claim +250 Z-Credits'}</button>
       </div>
       <div class="glass-card">
-        <span class="rarity-tag" style="color:#06b6d4">BETA PERK 2</span>
-        <h3>Quick Theme Switcher</h3>
-        <p class="sub-text" style="margin:6px 0 12px;">Preview steady page color themes instantly.</p>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn-outline" data-th="default">Emerald</button><button class="btn-outline" data-th="theme-cyber">Cyan</button><button class="btn-outline" data-th="theme-crimson">Crimson</button><button class="btn-outline" data-th="theme-violet">Violet</button></div>
+        <span class="rarity-tag" style="color:#a855f7">BETA EARLY ACCESS</span>
+        <h3>Beta Unreleased Themes</h3>
+        <p class="sub-text" style="margin:6px 0 12px;">Preview unreleased themes before public release.</p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn-outline" data-th="default">Emerald</button>
+          <button class="btn-outline" data-th="theme-cyber">Cyan</button>
+          <button class="btn-outline" data-th="theme-crimson">Crimson</button>
+          <button class="btn-outline" data-th="theme-gold">Solar Gold</button>
+          <button class="btn-outline" data-th="theme-violet">Violet</button>
+        </div>
+      </div>
+      <div class="glass-card">
+        <span class="rarity-tag" style="color:#10b981">BETA SANDBOX TOOL</span>
+        <h3>Live Profile & XP Multiplier Inspector</h3>
+        <p class="sub-text" style="margin:6px 0 12px;">Inspect your active XP multiplier, upload tier, and session state.</p>
+        <button type="button" class="btn-outline" style="width:100%" id="beta-inspect-btn">Run Beta Diagnostics</button>
+      </div>
+      <div class="glass-card">
+        <span class="rarity-tag" style="color:#f59e0b">BETA SANDBOX TOOL</span>
+        <h3>Live Wallpaper Quick-Tester</h3>
+        <p class="sub-text" style="margin:6px 0 12px;">Test experimental animated wallpapers instantly.</p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn-outline" data-bwp="stars">Starfield</button>
+          <button class="btn-outline" data-bwp="rain">Digital Rain</button>
+          <button class="btn-outline" data-bwp="aurora">Aurora</button>
+          <button class="btn-outline" data-bwp="none">Off</button>
+        </div>
       </div>`;
 
     document.getElementById('beta-open-chat-btn').onclick = () => {
@@ -166,11 +212,21 @@ async function renderAdminAndBeta() {
     };
 
     betaGrid.querySelectorAll('[data-th]').forEach(b => (b.onclick = async () => {
-      localStorage.setItem('zynk_theme', b.dataset.th);
-      document.body.className = b.dataset.th === 'default' ? '' : b.dataset.th;
+      window.applySavedTheme?.(b.dataset.th);
       await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { profile_theme: b.dataset.th }, window.authToken);
-      window.notify(`Applied theme: ${b.textContent}`);
+      window.notify(`Applied & saved Beta theme: ${b.textContent}`);
     }));
+
+    betaGrid.querySelectorAll('[data-bwp]').forEach(b => (b.onclick = () => {
+      localStorage.setItem('zynk_wp', b.dataset.bwp);
+      window.applyLiveWallpaper?.(b.dataset.bwp);
+      window.notify(`Beta wallpaper set: ${b.textContent}`);
+    }));
+
+    document.getElementById('beta-inspect-btn').onclick = () => {
+      const rank = (window.RANKS || [])[p.rank_index || 0] || { name: 'Circuit', mult: 1 };
+      window.notify(`UID: ${p.id.slice(0, 8)}... | Rank: ${rank.name} (${rank.mult}x XP) | Streak: ${p.daily_streak || 0}d`);
+    };
 
     const bBtn = document.getElementById('beta-bonus-btn');
     bBtn.onclick = async () => {
@@ -181,7 +237,6 @@ async function renderAdminAndBeta() {
       window.notify('Beta +250 Z-Credits claimed!');
     };
   }
-
   if (!adminBox || !isFounder) return;
 
   const ADM_SVG = {
@@ -244,6 +299,132 @@ async function renderAdminAndBeta() {
       await window.sbRest(`announcements?id=eq.${id}`, 'DELETE', null, window.authToken);
     }));
   }
+
+  if (activeFounderTab === 'SHOP') {
+    const storeItems = await window.sbRest('store_items?order=id.asc').catch(() => []);
+    sub.innerHTML = `
+      <div class="bento-grid" style="padding:0;">
+        <div class="glass-card">
+          <h3 style="display:flex;align-items:center;gap:8px;">${ADM_SVG.upload} Upload Store Item / Theme</h3>
+          <input id="adm-item-name" class="tool-input" style="margin-top:8px;" placeholder="Item Name" />
+          <input id="adm-item-file" type="file" accept="image/*" class="tool-input" />
+          <input id="adm-item-img" class="tool-input" placeholder="Or paste image URL..." />
+          <div style="display:flex;gap:8px;">
+            <select id="adm-item-type" class="tool-input"><option value="avatar">Avatar</option><option value="frame">Avatar Frame</option><option value="banner">Profile Banner</option><option value="theme">Steady Page Theme</option><option value="color">Name Color</option><option value="badge">Badge</option></select>
+            <select id="adm-item-rarity" class="tool-input"><option value="COMMON">COMMON</option><option value="UNCOMMON">UNCOMMON</option><option value="RARE">RARE</option><option value="EPIC">EPIC</option><option value="LEGENDARY">LEGENDARY</option><option value="MYTHIC">MYTHIC (RAINBOW)</option><option value="EXOTIC">EXOTIC</option></select>
+          </div>
+          <input id="adm-item-val" class="tool-input" placeholder="Frame/Color Hex (#06b6d4) or Theme (theme-cyber)" />
+          <input id="adm-item-cost" type="number" class="tool-input" value="250" placeholder="Z-Credits Cost" />
+          <label class="remember-row"><input type="checkbox" id="adm-item-deal" /><span>Feature as Daily Deal (10% Off)</span></label>
+          <button class="btn-neon" id="adm-add-item-btn" style="width:100%">Publish to Store</button>
+        </div>
+        <div class="glass-card">
+          <h3 style="display:flex;align-items:center;gap:8px;">${ADM_SVG.trash} Manage Store Items & Daily Deals (${(storeItems || []).length})</h3>
+          <div style="max-height:320px;overflow-y:auto;margin-top:8px;">
+            ${(storeItems || []).map(it => `<div id="st-row-${it.id}" style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span>${it.name} <span class="mono-dim">(${it.item_type})</span></span><div style="display:flex;gap:6px;"><button class="${it.is_daily_deal ? 'btn-neon' : 'btn-outline'}" style="padding:4px 8px;font-size:0.75rem;" data-deal-id="${it.id}" data-deal-on="${it.is_daily_deal ? '1' : '0'}">${it.is_daily_deal ? '10% OFF' : 'Deal'}</button><button class="btn-outline" style="padding:4px 8px;font-size:0.75rem;color:#f43f5e;border-color:#f43f5e;" data-del-item="${it.id}">Delete</button></div></div>`).join('') || '<p class="sub-text">No store items yet.</p>'}
+          </div>
+        </div>
+      </div>`;
+
+    document.getElementById('adm-item-file').onchange = async (e) => {
+      const f = e.target.files?.at(0);
+      if (!f) return;
+      uploadedImg = await compressImageFile(f, 340);
+      window.notify('Image compressed & ready to publish!');
+    };
+
+    document.getElementById('adm-add-item-btn').onclick = async () => {
+      const name = document.getElementById('adm-item-name').value.trim();
+      const img = uploadedImg || document.getElementById('adm-item-img').value.trim();
+      const rawVal = document.getElementById('adm-item-val').value.trim();
+      if (!name) return window.notify('Enter item name.', true);
+      await window.sbRest('store_items', 'POST', { name, image_url: img, item_type: document.getElementById('adm-item-type').value, rarity: document.getElementById('adm-item-rarity').value, item_value: rawVal || img || '#10b981', cost: parseInt(document.getElementById('adm-item-cost').value, 10) || 100, is_daily_deal: document.getElementById('adm-item-deal').checked }, window.authToken);
+      await window.logAudit?.('STORE_ADD', name, `Added ${document.getElementById('adm-item-type').value} to store`);
+      uploadedImg = '';
+      window.notify('Published to Store!');
+      window.renderRanksAndStore?.();
+      renderAdminAndBeta();
+    };
+
+    sub.querySelectorAll('[data-deal-id]').forEach(b => (b.onclick = async () => {
+      await window.sbRest(`store_items?id=eq.${b.dataset.dealId}`, 'PATCH', { is_daily_deal: b.dataset.dealOn !== '1' }, window.authToken);
+      window.renderRanksAndStore?.();
+      renderAdminAndBeta();
+    }));
+
+    sub.querySelectorAll('[data-del-item]').forEach(b => (b.onclick = async () => {
+      const id = b.dataset.delItem;
+      document.getElementById(`st-row-${id}`)?.remove();
+      await window.sbRest(`store_items?id=eq.${id}`, 'DELETE', null, window.authToken);
+      await window.logAudit?.('STORE_DELETE', `Item #${id}`, 'Removed item from store');
+      window.renderRanksAndStore?.();
+      window.notify('Deleted item from Store!');
+    }));
+  }
+  if (activeFounderTab === 'PARTNERS') {
+    const partners = await window.sbRest('zynk_partners?order=id.asc').catch(() => []);
+    const credits = await window.sbRest('zynk_credits?order=id.asc').catch(() => []);
+    sub.innerHTML = `
+      <div class="bento-grid" style="padding:0;">
+        <div class="glass-card">
+          <h3 style="display:flex;align-items:center;gap:8px;">${ADM_SVG.partner} Add Partner</h3>
+          <input id="pt-name" class="tool-input" style="margin-top:8px;" placeholder="Partner Name (e.g. VortexOS)" />
+          <input id="pt-tag" class="tool-input" value="PARTNER" placeholder="Tag (e.g. PARTNER NETWORK)" />
+          <input id="pt-url" class="tool-input" placeholder="Website URL (https://...)" />
+          <input id="pt-desc" class="tool-input" placeholder="Short description..." />
+          <button class="btn-neon" id="add-pt-btn" style="width:100%">Add Partner</button>
+          <div style="margin-top:12px;">
+            ${(partners || []).map(x => `<div id="pt-row-${x.id}" style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span>${x.name}</span><button class="btn-ghost" data-del-pt="${x.id}">✕</button></div>`).join('')}
+          </div>
+        </div>
+        <div class="glass-card">
+          <h3 style="display:flex;align-items:center;gap:8px;">${ADM_SVG.team} Add Team / Credits Member</h3>
+          <input id="cr-name" class="tool-input" style="margin-top:8px;" placeholder="Member Name" />
+          <input id="cr-role" class="tool-input" placeholder="Role (e.g. Lead Designer, Beta Tester)" />
+          <input id="cr-desc" class="tool-input" placeholder="What they contributed..." />
+          <input id="cr-uid" class="tool-input" placeholder="Optional User ID (for View Profile button)" />
+          <input id="cr-file" type="file" accept="image/*" class="tool-input" />
+          <button class="btn-neon" id="add-cr-btn" style="width:100%">Add to Credits Page</button>
+          <div style="margin-top:12px;">
+            ${(credits || []).map(x => `<div id="cr-row-${x.id}" style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.06);"><span>${x.name} (${x.role_label})</span><button class="btn-ghost" data-del-cr="${x.id}">✕</button></div>`).join('')}
+          </div>
+        </div>
+      </div>`;
+
+    let crImg = 'logo.png';
+    document.getElementById('cr-file').onchange = async (e) => {
+      const f = e.target.files?.at(0);
+      if (f) crImg = await compressImageFile(f, 200);
+    };
+
+    document.getElementById('add-pt-btn').onclick = async () => {
+      const name = document.getElementById('pt-name').value.trim();
+      if (!name) return window.notify('Enter partner name.', true);
+      await window.sbRest('zynk_partners', 'POST', { name, tag: document.getElementById('pt-tag').value.trim(), url: document.getElementById('pt-url').value.trim(), description: document.getElementById('pt-desc').value.trim() }, window.authToken);
+      window.notify('Partner added!');
+      renderAdminAndBeta();
+    };
+
+    document.getElementById('add-cr-btn').onclick = async () => {
+      const name = document.getElementById('cr-name').value.trim();
+      if (!name) return window.notify('Enter member name.', true);
+      await window.sbRest('zynk_credits', 'POST', { name, role_label: document.getElementById('cr-role').value.trim() || 'Contributor', description: document.getElementById('cr-desc').value.trim(), user_uid: document.getElementById('cr-uid').value.trim(), image_url: crImg }, window.authToken);
+      window.notify('Added to Credits page!');
+      renderAdminAndBeta();
+    };
+
+    sub.querySelectorAll('[data-del-pt]').forEach(b => (b.onclick = async () => {
+      const id = b.dataset.delPt;
+      document.getElementById(`pt-row-${id}`)?.remove();
+      await window.sbRest(`zynk_partners?id=eq.${id}`, 'DELETE', null, window.authToken);
+    }));
+
+    sub.querySelectorAll('[data-del-cr]').forEach(b => (b.onclick = async () => {
+      const id = b.dataset.delCr;
+      document.getElementById(`cr-row-${id}`)?.remove();
+      await window.sbRest(`zynk_credits?id=eq.${id}`, 'DELETE', null, window.authToken);
+    }));
+  }
   if (activeFounderTab === 'ROLES') {
     const allMembers = await window.sbRest('users?order=username.asc&limit=200').catch(() => []);
     sub.innerHTML = `
@@ -261,16 +442,23 @@ async function renderAdminAndBeta() {
 
     const resList = document.getElementById('adm-user-results');
     const editor = document.getElementById('adm-user-editor');
+    const extraBadgeChoices = ['SUPPORTER', 'VIP', 'UPLOADER', 'DESIGNER', 'OG', 'BETA', 'DEVELOPER', 'HEAD DEV'];
 
     const activateMember = (u) => {
       selectedMember = u;
+      const curExtras = Array.isArray(u.extra_roles) ? u.extra_roles : [];
       editor.innerHTML = `
         <h3 style="display:flex;align-items:center;gap:8px;">${ADM_SVG.shield} Editing: <span style="color:#10b981">@${u.username}</span></h3>
         <p class="mono-dim" style="margin-bottom:10px;">Balance: ${u.credits} Z-Credits • Streak: ${u.daily_streak || 0}d • Role: [${u.role}]</p>
         <label class="sub-text">Primary Role:</label>
         <select id="ed-role" class="tool-input"><option value="MEMBER">MEMBER</option><option value="SUPPORTER">SUPPORTER</option><option value="VIP">VIP</option><option value="UPLOADER">UPLOADER</option><option value="DESIGNER">DESIGNER</option><option value="BETA">BETA TESTER</option><option value="MODERATOR">MODERATOR</option><option value="ADMIN">ADMIN</option><option value="DEVELOPER">DEVELOPER</option><option value="HEAD DEV">HEAD DEV</option><option value="FOUNDER">FOUNDER</option></select>
-        <label class="sub-text">Extra Badge Roles (Ctrl+Click for multiple):</label>
-        <select id="ed-extras" multiple class="tool-input" style="height:84px;"><option value="SUPPORTER">SUPPORTER</option><option value="VIP">VIP</option><option value="UPLOADER">UPLOADER</option><option value="DESIGNER">DESIGNER</option><option value="OG">OG MEMBER</option><option value="BETA">BETA</option></select>
+        <label class="sub-text">Extra Badge Roles (Click to toggle):</label>
+        <div id="ed-extras-wrap" style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px;">
+          ${extraBadgeChoices.map(r => {
+            const on = curExtras.includes(r);
+            return `<button type="button" class="${on ? 'btn-neon' : 'btn-outline'}" data-xrole="${r}" style="padding:4px 10px;font-size:0.76rem;">${on ? '✓ ' : '+ '}${r}</button>`;
+          }).join('')}
+        </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <input id="ed-cred-amt" type="number" class="tool-input" style="margin:0;flex:1;" value="500" placeholder="Z-Credits amount" />
           <button type="button" class="btn-outline" id="ed-add-cred">+ Add Credits</button>
@@ -283,9 +471,11 @@ async function renderAdminAndBeta() {
         </div>`;
 
       document.getElementById('ed-role').value = u.role || 'MEMBER';
-      Array.from(document.getElementById('ed-extras').options).forEach(opt => {
-        opt.selected = (u.extra_roles || []).includes(opt.value);
-      });
+      editor.querySelectorAll('[data-xrole]').forEach(btn => (btn.onclick = () => {
+        const isOn = btn.classList.contains('btn-neon');
+        btn.className = isOn ? 'btn-outline' : 'btn-neon';
+        btn.textContent = (isOn ? '+ ' : '✓ ') + btn.dataset.xrole;
+      }));
 
       document.getElementById('ed-add-cred').onclick = async () => {
         const add = parseInt(document.getElementById('ed-cred-amt').value, 10) || 0;
@@ -312,7 +502,7 @@ async function renderAdminAndBeta() {
         await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { last_daily: 0 }, window.authToken);
         await window.logAudit?.('RESET_DAILY', `@${u.username}`, `Skipped daily timer (Streak ${u.daily_streak || 0}d preserved)`);
         u.last_daily = 0;
-        window.notify(`Reset Daily Reward cooldown for @${u.username}! They can claim again & advance their streak.`);
+        window.notify(`Reset Daily Reward cooldown for @${u.username}!`);
         if (u.id === p.id) await window.refreshMyProfile();
       };
 
@@ -324,7 +514,7 @@ async function renderAdminAndBeta() {
 
       document.getElementById('ed-save-all').onclick = async () => {
         const role = document.getElementById('ed-role').value;
-        const extras = Array.from(document.getElementById('ed-extras').selectedOptions).map(o => o.value);
+        const extras = Array.from(editor.querySelectorAll('[data-xrole].btn-neon')).map(b => b.dataset.xrole);
         const is_beta = role === 'BETA' || role === 'FOUNDER' || extras.includes('BETA');
         await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { role, extra_roles: extras, is_beta }, window.authToken);
         await window.logAudit?.('EDIT_ROLES', `@${u.username}`, `Role: ${role} | Extras: ${extras.join(', ') || 'None'}`);
