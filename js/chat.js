@@ -64,6 +64,99 @@ window.logAudit = async function(action, target, details) {
   const actor = window.userProfile?.username || 'System';
   await window.sbRest('zynk_audit_logs', 'POST', { actor, action, target: target || '-', details: details || '' }, window.authToken).catch(() => {});
 };
+function formatDiscordMarkdown(raw) {
+  const codeBlocks = [];
+  const inlineCodes = [];
+  const escapes = [];
+
+  let text = String(raw || '').replace(/\r\n/g, '\n');
+
+  text = text.replace(/```([a-zA-Z0-9_-]*)\n?([\s\(\S\)]*?)```/g, (_, lang, code) => {
+    const idx = codeBlocks.length;
+    const safe = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const hdr = lang ? `<div class="mono-dim" style="font-size:0.68rem;margin-bottom:4px;text-transform:uppercase;">${lang}</div>` : '';
+    codeBlocks.push(`<pre class="md-pre">${hdr}<code>${safe}</code></pre>`);
+    return `\u0000CB${idx}\u0000`;
+  });
+
+  text = text.replace(/`([^`\n]+)`/g, (_, code) => {
+    const idx = inlineCodes.length;
+    const safe = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    inlineCodes.push(`<code class="md-code">${safe}</code>`);
+    return `\u0000IC${idx}\u0000`;
+  });
+
+  text = text.replace(/\\([\\*_~|`>#\-\[\]()<])/g, (_, ch) => {
+    const idx = escapes.length;
+    escapes.push(ch.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+    return `\u0000ES${idx}\u0000`;
+  });
+
+  text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const lines = text.split('\n');
+  const outLines = [];
+  let inMultiQuote = false;
+  let multiQuoteBuf = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const ln = lines[i];
+    if (inMultiQuote) {
+      multiQuoteBuf.push(ln);
+      continue;
+    }
+    if (ln.startsWith('&gt;&gt;&gt; ')) {
+      inMultiQuote = true;
+      multiQuoteBuf.push(ln.slice(13));
+      continue;
+    }
+    if (ln.startsWith('&gt; ')) {
+      outLines.push(`<div class="md-quote">${ln.slice(5)}</div>`);
+    } else if (ln.startsWith('### ')) {
+      outLines.push(`<div class="md-h3">${ln.slice(4)}</div>`);
+    } else if (ln.startsWith('## ')) {
+      outLines.push(`<div class="md-h2">${ln.slice(3)}</div>`);
+    } else if (ln.startsWith('# ')) {
+      outLines.push(`<div class="md-h1">${ln.slice(2)}</div>`);
+    } else if (ln.startsWith('-# ')) {
+      outLines.push(`<span class="md-subtext">${ln.slice(3)}</span>`);
+    } else if (/^(\s*)[-*]\s+(.+)$/.test(ln)) {
+      const m = ln.match(/^(\s*)[-*]\s+(.+)$/);
+      const pad = Math.min(48, (m[1]?.length || 0) * 10);
+      outLines.push(`<div style="padding-left:${14 + pad}px;">• ${m[2]}</div>`);
+    } else if (/^(\s*)(\d+)\.\s+(.+)$/.test(ln)) {
+      const m = ln.match(/^(\s*)(\d+)\.\s+(.+)$/);
+      const pad = Math.min(48, (m[1]?.length || 0) * 10);
+      outLines.push(`<div style="padding-left:${14 + pad}px;">${m[2]}. ${m[3]}</div>`);
+    } else {
+      outLines.push(ln);
+    }
+  }
+  if (inMultiQuote) {
+    outLines.push(`<div class="md-quote">${multiQuoteBuf.join('<br>')}</div>`);
+  }
+
+  let html = outLines.join('<br>').replace(/(<\/div>|<\/pre>|<\/span>)<br>/g, '$1');
+
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color:var(--neon-cyan);text-decoration:underline;">$1</a>');
+  html = html.replace(/&lt;(https?:\/\/[^\s&]+)&gt;/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:var(--neon-cyan);text-decoration:underline;">$1</a>');
+  html = html.replace(/(^|[^"'>])(https?:\/\/[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer" style="color:var(--neon-cyan);text-decoration:underline;">$2</a>');
+
+  html = html.replace(/\|\|([^|]+)\|\|/g, '<span class="md-spoiler" onclick="this.classList.toggle(\'revealed\')">$1</span>');
+  html = html.replace(/~~([^~]+)~~/g, '<s>$1</s>');
+  html = html.replace(/___([^_]+)___/g, '<u><em>$1</em></u>');
+  html = html.replace(/__([^_]+)__/g, '<u>$1</u>');
+  html = html.replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  html = html.replace(/(^|[^a-zA-Z0-9_])_([^_\n]+)_/g, '$1<em>$2</em>');
+  html = html.replace(/(@[a-zA-Z0-9_]+)/g, '<strong style="color:#10b981;">$1</strong>');
+
+  html = html.replace(/\u0000IC(\d+)\u0000/g, (_, i) => inlineCodes[Number(i)] || '');
+  html = html.replace(/\u0000CB(\d+)\u0000/g, (_, i) => codeBlocks[Number(i)] || '');
+  html = html.replace(/\u0000ES(\d+)\u0000/g, (_, i) => escapes[Number(i)] || '');
+  return html;
+}
 function compressChatImg(file, maxDim = 640) {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -106,6 +199,14 @@ function buildChannelBar() {
   }
 
   const p = window.userProfile;
+  const isFounder = p && p.role === 'FOUNDER';
+  if (chatInput) {
+    if (isFounder) chatInput.removeAttribute('maxlength');
+    else chatInput.setAttribute('maxlength', '2000');
+  }
+  const cc = document.getElementById('chat-char-count');
+  if (cc) cc.textContent = `${chatInput?.value.length || 0}/${isFounder ? '∞' : '2000'}`;
+
   const isBeta = canAccessChannel(p, 'beta');
   const isStaff = p && ['FOUNDER', 'HEAD DEV', 'DEVELOPER', 'ADMIN', 'MODERATOR'].includes((p.role || '').toUpperCase());
   const curSlow = channelSlowMode[activeChannel] || 0;
@@ -481,7 +582,7 @@ window.editChatMsg = function(msgId, oldText) {
   const save = async () => {
     const next = inp.value.trim();
     if (!next || next === oldText) return cancel();
-    textEl.innerHTML = `${next.replace(/</g, '&lt;')} <span class="mono-dim">(edited)</span>`;
+    textEl.innerHTML = `${formatDiscordMarkdown(next)} <span class="mono-dim">(edited)</span>`;
     await window.sbRest(`messages?id=eq.${msgId}`, 'PATCH', { content: next, edited: true }, window.authToken);
     lastChatHash = '';
     pollChatAndMembers();
@@ -522,7 +623,7 @@ function buildMsgEl(m) {
   const rawAv = matchedUser?.avatar || m.avatar;
   const av = rawAv && !String(rawAv).includes('dicebear') ? rawAv : 'logo.png';
   const timeStr = m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-  const safeText = String(m.content || '').replace(/</g, '&lt;').replace(/(@[a-zA-Z0-9_]+)/g, '<strong style="color:#10b981;">$1</strong>');
+  const safeText = formatDiscordMarkdown(m.content || '');
 
   const isOwner = me && m.user_id && String(m.user_id) === String(me.id);
   const canDel = canDeleteMsg(me, m);
@@ -670,8 +771,9 @@ async function pollChatAndMembers() {
 
 chatInput?.addEventListener('input', () => {
   const p = window.userProfile;
+  const isFounder = p && p.role === 'FOUNDER';
   const cc = document.getElementById('chat-char-count');
-  if (cc) cc.textContent = `${chatInput.value.length}/2000`;
+  if (cc) cc.textContent = `${chatInput.value.length}/${isFounder ? '∞' : '2000'}`;
 
   if (p && chatInput.value.length > 0 && Date.now() - lastTypingPing > 1000) {
     lastTypingPing = Date.now();
@@ -680,7 +782,6 @@ chatInput?.addEventListener('input', () => {
   if (!acBox) return;
   const val = chatInput.value;
   const isStaff = p && ['FOUNDER', 'HEAD DEV', 'DEVELOPER', 'ADMIN', 'MODERATOR'].includes((p.role || '').toUpperCase());
-  const isFounder = p && p.role === 'FOUNDER';
 
   if (val.startsWith('/')) {
     const q = val.toLowerCase();
@@ -742,15 +843,15 @@ chatForm?.addEventListener('submit', async (e) => {
   }
   lastSentByChannel[activeChannel] = Date.now();
 
+  const isFounder = p.role === 'FOUNDER';
   chatInput.value = '';
   const cc = document.getElementById('chat-char-count');
-  if (cc) cc.textContent = '0/2000';
+  if (cc) cc.textContent = `0/${isFounder ? '∞' : '2000'}`;
   window.clearPendingAttachment();
   const replyText = activeReply || '';
   window.clearChatReply();
 
   try {
-    const isFounder = p.role === 'FOUNDER';
     if (raw.startsWith('/')) {
       const parts = raw.split(' ');
       const cmd = parts.at(0).toLowerCase();
