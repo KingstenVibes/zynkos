@@ -240,17 +240,19 @@ async function renderMyProfileTab() {
     document.getElementById('custom-ban-inp').click();
   };
 
-  const compressProfileImg = (file, maxDim) => new Promise((res) => {
+  const compressProfileImg = (file, maxW, maxH) => new Promise((res, rej) => {
     const r = new FileReader();
+    r.onerror = () => rej(new Error('Could not read file'));
     r.onload = () => {
       const im = new Image();
+      im.onerror = () => rej(new Error('Invalid image file'));
       im.onload = () => {
-        const sc = Math.min(1, maxDim / Math.max(im.width, im.height));
+        const sc = Math.min(1, maxW / im.width, maxH / im.height);
         const cv = document.createElement('canvas');
-        cv.width = Math.round(im.width * sc);
-        cv.height = Math.round(im.height * sc);
+        cv.width = Math.max(1, Math.round(im.width * sc));
+        cv.height = Math.max(1, Math.round(im.height * sc));
         cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
-        res(cv.toDataURL('image/webp', 0.85));
+        res(cv.toDataURL('image/jpeg', 0.78));
       };
       im.src = r.result;
     };
@@ -259,20 +261,32 @@ async function renderMyProfileTab() {
 
   document.getElementById('custom-pfp-inp').onchange = async (e) => {
     const f = e.target.files?.at(0);
+    e.target.value = '';
     if (!f) return;
-    const dataUrl = await compressProfileImg(f, 256);
-    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { avatar: dataUrl }, window.authToken);
-    await window.refreshMyProfile();
-    window.notify('Custom Profile Picture uploaded! Keep it SFW.');
+    try {
+      window.notify('Uploading Custom PFP...');
+      const dataUrl = await compressProfileImg(f, 180, 180);
+      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { avatar: dataUrl }, window.authToken);
+      await window.refreshMyProfile();
+      window.notify('Custom Profile Picture uploaded! Keep it SFW.');
+    } catch (err) {
+      window.notify('PFP upload failed: ' + err.message, true);
+    }
   };
 
   document.getElementById('custom-ban-inp').onchange = async (e) => {
     const f = e.target.files?.at(0);
+    e.target.value = '';
     if (!f) return;
-    const dataUrl = await compressProfileImg(f, 720);
-    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { banner: dataUrl }, window.authToken);
-    await window.refreshMyProfile();
-    window.notify('Custom Profile Banner uploaded! Keep it SFW.');
+    try {
+      window.notify('Uploading Custom Banner...');
+      const dataUrl = await compressProfileImg(f, 640, 220);
+      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { banner: dataUrl }, window.authToken);
+      await window.refreshMyProfile();
+      window.notify('Custom Profile Banner uploaded! Keep it SFW.');
+    } catch (err) {
+      window.notify('Banner upload failed: ' + err.message, true);
+    }
   };
 
   const invGrid = document.getElementById('inv-visual-grid');
@@ -292,7 +306,7 @@ async function renderMyProfileTab() {
         if (it.item_type === 'avatar') up.avatar = isEq ? 'logo.png' : imgSrc;
         if (it.item_type === 'banner') up.banner = isEq ? 'linear-gradient(135deg,#064e3b,#0f172a)' : imgSrc;
         if (it.item_type === 'frame') up.avatar_frame = isEq ? 'none' : it.item_value;
-        if (it.item_type === 'theme') { const nextTh = isEq ? 'default' : it.item_value; up.profile_theme = nextTh; localStorage.setItem('zynk_theme', nextTh); }
+        if (it.item_type === 'theme') { const nextTh = isEq ? 'default' : it.item_value; up.profile_theme = nextTh; window.applySavedTheme?.(nextTh); }
         if (it.item_type === 'color') up.equipped_color = isEq ? '#10b981' : it.item_value;
         await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', up, window.authToken);
         await window.refreshMyProfile();
@@ -339,6 +353,7 @@ async function renderPartnersAndCredits() {
         </ul>
       </div>`;
   }
+
   const cBox = document.getElementById('credits-container');
   if (cBox) {
     const team = await window.sbRest('zynk_credits?order=id.asc').catch(() => []);
@@ -407,7 +422,8 @@ async function renderLeaderboardQuestsAndAnnouncements() {
   if (!aGrid) return;
 
   const msgs = p?.msg_count || 0;
-  const ownedCnt = (p?.owned_items || []).length;
+  const boughtCnt = Math.max(p?.items_bought || 0, (p?.owned_items || []).length);
+  const dailyCnt = Math.max(p?.dailies_claimed || 0, p?.daily_streak || 0);
   const stkCnt = Array.isArray(p?.stickers) ? p.stickers.length : 0;
   const friendCnt = Array.isArray(p?.friends) ? p.friends.length : 0;
   const streakCnt = p?.daily_streak || 0;
@@ -417,26 +433,27 @@ async function renderLeaderboardQuestsAndAnnouncements() {
   const equippedCnt = (hasCustomAv ? 1 : 0) + (p?.avatar_frame && p.avatar_frame !== 'none' ? 1 : 0) + (p?.banner && !p.banner.startsWith('linear-gradient') ? 1 : 0);
 
   const builtInQuests = [
-    { id: 'q_daily', cat: 'DAILY', title: 'Daily Mystery Card', desc: 'Pick 1 of 3 mystery cards every 24 hours & build your streak.', cred: 150, xp: 100, cur: Date.now() - (p?.last_daily || 0) >= 86400000 ? 1 : 0, max: 1, isDaily: true },
+    { id: 'q_daily', cat: 'DAILY', title: 'Daily Mystery Card', desc: 'Pick 1 of 3 mystery cards every 24 hours & build your streak (+5%/day bonus).', cred: 150, xp: 100, cur: Date.now() - (p?.last_daily || 0) >= 86400000 ? 1 : 0, max: 1, isDaily: true },
     { id: 'q_msg1', cat: 'DAILY', title: 'First Transmission', desc: 'Send at least 1 message in Zynk Chat.', cred: 75, xp: 100, cur: Math.min(1, msgs), max: 1 },
     { id: 'q_msg15', cat: 'DAILY', title: 'Daily Chatter', desc: 'Send 15 messages in Zynk Chat.', cred: 200, xp: 250, cur: Math.min(15, msgs), max: 15 },
     { id: 'q_bio', cat: 'DAILY', title: 'Identity Configured', desc: 'Customize your About Me bio on My Profile.', cred: 100, xp: 150, cur: p?.bio && !p.bio.startsWith('New ZynkOS') ? 1 : 0, max: 1 },
-    { id: 'q_av', cat: 'DAILY', title: 'New Look', desc: 'Equip a custom avatar from Zynk Store.', cred: 125, xp: 150, cur: hasCustomAv, max: 1 },
+    { id: 'q_av', cat: 'DAILY', title: 'New Look', desc: 'Equip a custom avatar on My Profile or Store.', cred: 125, xp: 150, cur: hasCustomAv, max: 1 },
     { id: 'q_stk1', cat: 'DAILY', title: 'Sticker Creator', desc: 'Upload 1 custom sticker in Zynk Chat.', cred: 150, xp: 200, cur: Math.min(1, stkCnt), max: 1 },
+    { id: 'q_buy1', cat: 'DAILY', title: 'First Store Purchase', desc: 'Buy any item or Power-Up from Zynk Store.', cred: 175, xp: 200, cur: Math.min(1, boughtCnt), max: 1 },
+    { id: 'q_daily3', cat: 'WEEKLY', title: 'Mystery Card Regular', desc: 'Claim 3 Daily Mystery Cards.', cred: 450, xp: 500, cur: Math.min(3, dailyCnt), max: 3 },
+    { id: 'q_daily10', cat: 'WEEKLY', title: 'Mystery Card Master', desc: 'Claim 10 Daily Mystery Cards.', cred: 1400, xp: 1600, cur: Math.min(10, dailyCnt), max: 10 },
+    { id: 'q_buy5', cat: 'WEEKLY', title: 'Store Spree', desc: 'Buy 5 items or Power-Ups from Zynk Store.', cred: 650, xp: 750, cur: Math.min(5, boughtCnt), max: 5 },
+    { id: 'q_buy12', cat: 'WEEKLY', title: 'Royal Armory', desc: 'Buy or own 12 items from Zynk Store.', cred: 1800, xp: 2200, cur: Math.min(12, boughtCnt), max: 12 },
     { id: 'q_msg50', cat: 'WEEKLY', title: 'Signal Regular', desc: 'Send 50 messages in Zynk Chat.', cred: 500, xp: 600, cur: Math.min(50, msgs), max: 50 },
     { id: 'q_msg150', cat: 'WEEKLY', title: 'Network Veteran', desc: 'Send 150 messages in Zynk Chat.', cred: 1200, xp: 1500, cur: Math.min(150, msgs), max: 150 },
     { id: 'q_msg500', cat: 'WEEKLY', title: 'Chat Legend', desc: 'Send 500 messages in Zynk Chat.', cred: 3500, xp: 4000, cur: Math.min(500, msgs), max: 500 },
     { id: 'q_dressed', cat: 'WEEKLY', title: 'Dressed Up', desc: 'Equip 2 cosmetic items (avatar, frame, or banner).', cred: 300, xp: 350, cur: Math.min(2, equippedCnt), max: 2 },
     { id: 'q_friends3', cat: 'WEEKLY', title: 'Social Butterfly', desc: 'Add 3 friends on ZynkOS.', cred: 450, xp: 500, cur: Math.min(3, friendCnt), max: 3 },
     { id: 'q_streak7', cat: 'WEEKLY', title: 'Daily Grind', desc: 'Reach a 7-day Daily Mystery Card streak.', cred: 700, xp: 800, cur: Math.min(7, streakCnt), max: 7 },
-    { id: 'q_shop2', cat: 'WEEKLY', title: 'Gear Buyer', desc: 'Own 2 items from Zynk Store.', cred: 250, xp: 300, cur: Math.min(2, ownedCnt), max: 2 },
-    { id: 'q_shop6', cat: 'WEEKLY', title: 'Vault Collector', desc: 'Own 6 items from Zynk Store.', cred: 750, xp: 900, cur: Math.min(6, ownedCnt), max: 6 },
-    { id: 'q_shop15', cat: 'WEEKLY', title: 'Royal Armory', desc: 'Own 15 items from Zynk Store.', cred: 2000, xp: 2500, cur: Math.min(15, ownedCnt), max: 15 },
     { id: 'q_lvl5', cat: 'WEEKLY', title: 'Neural Level 5', desc: 'Reach Level 5 (4,000+ XP).', cred: 600, xp: 750, cur: Math.min(5, myLvl), max: 5 },
     { id: 'q_lvl10', cat: 'WEEKLY', title: 'Neural Level 10', desc: 'Reach Level 10 (9,000+ XP).', cred: 1500, xp: 2000, cur: Math.min(10, myLvl), max: 10 },
     { id: 'q_rich5k', cat: 'WEEKLY', title: 'Credit Hoarder', desc: 'Hold 5,000+ Z-Credits at once.', cred: 600, xp: 750, cur: Math.min(5000, creds), max: 5000 },
     { id: 'q_rich25k', cat: 'WEEKLY', title: 'Zynk Tycoon', desc: 'Hold 25,000+ Z-Credits at once.', cred: 2500, xp: 3000, cur: Math.min(25000, creds), max: 25000 },
-    { id: 'q_rich50k', cat: 'WEEKLY', title: 'High Roller', desc: 'Hold 50,000+ Z-Credits at once.', cred: 5000, xp: 6000, cur: Math.min(50000, creds), max: 50000 },
     { id: 'sec_night', cat: 'SECRET', isSecret: true, title: 'Midnight Operator', desc: '??? [Secret Quest — Condition Hidden]', cred: 650, xp: 750, cur: new Date().getHours() <= 3 ? 1 : 0, max: 1 },
     { id: 'sec_cyber', cat: 'SECRET', isSecret: true, title: 'Cyan Overclock', desc: '??? [Secret Quest — Condition Hidden]', cred: 450, xp: 500, cur: document.body.classList.contains('theme-cyber') ? 1 : 0, max: 1 },
     { id: 'sec_24h', cat: 'SECRET', isSecret: true, title: 'Military Precision', desc: '??? [Secret Quest — Condition Hidden]', cred: 400, xp: 450, cur: localStorage.getItem('zynk_format') === '24' ? 1 : 0, max: 1 },
@@ -595,24 +612,25 @@ window.openDailyPickerModal = function() {
   const modal = document.getElementById('user-modal');
   const box = document.getElementById('user-modal-content');
   const nextStreak = (p.daily_streak || 0) + 1;
+  const streakMult = 1 + (nextStreak * 0.05);
   const hit = STREAK_LADDER.find(s => s.day === nextStreak) || (nextStreak > 30 ? { day: nextStreak, bonus: 3000 } : null);
   const streakBonus = hit ? hit.bonus : 0;
 
   const pool = [
-    { tier: 'COMMON', color: '#94a3b8', cred: 150, xp: 100 },
-    { tier: 'UNCOMMON', color: '#10b981', cred: 300, xp: 200 },
-    { tier: 'EPIC', color: '#a855f7', cred: 600, xp: 400 }
+    { tier: 'COMMON', color: '#94a3b8', cred: Math.round(150 * streakMult), xp: Math.round(100 * streakMult) },
+    { tier: 'UNCOMMON', color: '#10b981', cred: Math.round(300 * streakMult), xp: Math.round(200 * streakMult) },
+    { tier: 'EPIC', color: '#a855f7', cred: Math.round(600 * streakMult), xp: Math.round(400 * streakMult) }
   ].sort(() => Math.random() - 0.5);
 
   box.style.maxWidth = '500px';
   box.innerHTML = `
     <div style="padding:24px;text-align:center;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <span class="pill" style="color:#f59e0b;border-color:#f59e0b;">Day ${nextStreak} Streak</span>
+        <span class="pill" style="color:#f59e0b;border-color:#f59e0b;">Day ${nextStreak} Streak (+${nextStreak * 5}% Boost)</span>
         <button class="btn-ghost" onclick="document.getElementById('user-modal').classList.add('hidden')">✕</button>
       </div>
       <h2 style="margin-bottom:4px;">Pick a Daily Mystery Card!</h2>
-      <p class="sub-text" style="margin-bottom:14px;">Choose 1 of the 3 mystery cards below to reveal today's Z-Credits & XP:</p>
+      <p class="sub-text" style="margin-bottom:14px;">Your streak boosts every card by +${nextStreak * 5}% today!</p>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
         ${pool.map((c, i) => `
           <div class="glass-card" data-pick-card="${i}" style="padding:18px 10px;cursor:pointer;border-color:rgba(255,255,255,0.18);transition:0.2s;">
@@ -651,10 +669,12 @@ window.openDailyPickerModal = function() {
       credits: p.credits + totalCred,
       xp: (p.xp || 0) + chosen.xp,
       last_daily: Date.now(),
-      daily_streak: nextStreak
+      daily_streak: nextStreak,
+      saved_streak: Math.max(p.saved_streak || 0, nextStreak),
+      dailies_claimed: (p.dailies_claimed || 0) + 1
     }, window.authToken);
     await window.refreshMyProfile();
-    window.notify(`${chosen.tier}! +${totalCred} Z-Credits${streakBonus ? ` (Includes +${streakBonus} Z Day ${nextStreak} Milestone!)` : ''}`);
+    window.notify(`${chosen.tier}! +${totalCred} Z-Credits${streakBonus ? ` (+${streakBonus} Z Milestone!)` : ''}`);
   }));
 };
 
