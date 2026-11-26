@@ -99,43 +99,10 @@ window.openUserModal = async function(uid, fullMode = false) {
   const safeBio = String(u.bio || 'New ZynkOS Member.').replace(/</g, '&lt;').replace(/\n/g, '<br>');
 
   const mutualCount = isSelf ? 0 : myFriends.filter(id => (Array.isArray(u.friends) ? u.friends : []).includes(id)).length;
-  const fullStatsHtml = fullMode ? `
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px;">
-      <div style="padding:10px;border-radius:10px;background:#04070b;text-align:center;"><div class="mono-dim">CREDITS</div><strong>${u.credits}</strong></div>
-      <div style="padding:10px;border-radius:10px;background:#04070b;text-align:center;"><div class="mono-dim">MESSAGES</div><strong>${u.msg_count || 0}</strong></div>
-      <div style="padding:10px;border-radius:10px;background:#04070b;text-align:center;"><div class="mono-dim">FRIENDS</div><strong>${(u.friends || []).length}</strong></div>
-      <div style="padding:10px;border-radius:10px;background:#04070b;text-align:center;"><div class="mono-dim">STREAK</div><strong>${u.daily_streak || 0}d</strong></div>
-    </div>` : '';
+  const fullStatsHtml = fullMode ? `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px;"><div style="padding:10px;border-radius:10px;background:#04070b;text-align:center;"><div class="mono-dim">CREDITS</div><strong>${u.credits}</strong></div><div style="padding:10px;border-radius:10px;background:#04070b;text-align:center;"><div class="mono-dim">MESSAGES</div><strong>${u.msg_count || 0}</strong></div><div style="padding:10px;border-radius:10px;background:#04070b;text-align:center;"><div class="mono-dim">FRIENDS</div><strong>${(u.friends || []).length}</strong></div><div style="padding:10px;border-radius:10px;background:#04070b;text-align:center;"><div class="mono-dim">STREAK</div><strong>${u.daily_streak || 0}d</strong></div></div>` : '';
 
   box.style.maxWidth = fullMode ? '540px' : '420px';
-  box.innerHTML = `
-    <div class="banner-hero" style="background:${bannerBg}">
-      <button class="btn-outline" id="close-user-modal" style="position:absolute;top:10px;right:10px;background:rgba(4,7,11,0.75);padding:5px 10px;">✕</button>
-      <img class="banner-avatar" style="border-color:${u.equipped_color};${frameGlow}" src="${safeAvatar(u.avatar)}" />
-    </div>
-    <div class="profile-body">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
-        <div>
-          <h2 style="color:${u.equipped_color};font-size:1.35rem;">${u.username}</h2>
-          <div class="mono-dim" style="margin-top:2px;">${statusLine}</div>
-        </div>
-        <span class="pill" style="border-color:#10b981;color:#10b981;">LVL ${Math.floor((u.xp || 0) / 1000) + 1}</span>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
-        ${friendBtn}
-        ${dmBtn}
-        ${!fullMode ? `<button type="button" class="btn-outline" onclick="openUserModal('${u.id}', true)">View Full Profile</button>` : ''}
-      </div>
-      ${fullStatsHtml}
-      <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08);">
-        <div class="mono-dim" style="font-weight:700;margin-bottom:4px;">ABOUT ME</div>
-        <p class="sub-text">${safeBio}</p>
-      </div>
-      <div style="margin-top:12px;">
-        <div class="mono-dim" style="font-weight:700;margin-bottom:6px;">ROLES ${!isSelf && mutualCount ? `• ${mutualCount} MUTUAL FRIEND(S)` : ''}</div>
-        <div class="badges-row">${chipsHtml}</div>
-      </div>
-    </div>`;
+  box.innerHTML = `<div class="banner-hero" style="background:${bannerBg}"><button class="btn-outline" id="close-user-modal" style="position:absolute;top:10px;right:10px;background:rgba(4,7,11,0.75);padding:5px 10px;">✕</button><img class="banner-avatar" style="border-color:${u.equipped_color};${frameGlow}" src="${safeAvatar(u.avatar)}" /></div><div class="profile-body"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;"><div><h2 style="color:${u.equipped_color};font-size:1.35rem;">${u.username}</h2><div class="mono-dim" style="margin-top:2px;">${statusLine}</div></div><span class="pill" style="border-color:#10b981;color:#10b981;">LVL ${Math.floor((u.xp || 0) / 1000) + 1}</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">${friendBtn}${dmBtn}${!fullMode ? `<button type="button" class="btn-outline" onclick="openUserModal('${u.id}', true)">View Full Profile</button>` : ''}</div>${fullStatsHtml}<div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08);"><div class="mono-dim" style="font-weight:700;margin-bottom:4px;">ABOUT ME</div><p class="sub-text">${safeBio}</p></div><div style="margin-top:12px;"><div class="mono-dim" style="font-weight:700;margin-bottom:6px;">ROLES ${!isSelf && mutualCount ? `• ${mutualCount} MUTUAL FRIEND(S)` : ''}</div><div class="badges-row">${chipsHtml}</div></div></div>`;
   modal.classList.remove('hidden');
   document.getElementById('close-user-modal').onclick = () => modal.classList.add('hidden');
 };
@@ -186,34 +153,13 @@ async function renderMyProfileTab() {
           </div>
         </div>
       </div>
-
-      <div class="glass-card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-          <h3 style="display:flex;align-items:center;gap:8px;">${PROF_SVG.userCheck} Friends (${myFriends.length}) & Requests (${myReqs.length})</h3>
-        </div>
-        ${myReqs.length ? `<div style="margin-bottom:12px;"><div class="mono-dim" style="margin-bottom:6px;">INCOMING REQUESTS</div>${myReqs.map(r => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:#04070b;border-radius:8px;margin-bottom:6px;"><span><strong>@${r.username}</strong></span><button class="btn-neon" style="padding:4px 10px;font-size:0.78rem;" onclick="acceptFriendRequest('${r.id}')">Accept</button></div>`).join('')}</div>` : ''}
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;">
-          ${myFriends.map(f => `<div style="padding:10px;border-radius:10px;background:#04070b;display:flex;justify-content:space-between;align-items:center;"><div style="display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="openUserModal('${f.id}')"><img src="${safeAvatar(f.avatar)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" /><div><strong style="color:${f.equipped_color || '#f8fafc'}">${f.username}</strong><div class="mono-dim">${f.online ? 'Online' : 'Offline'}</div></div></div><button class="btn-ghost" style="color:#f43f5e;" title="Unfriend" onclick="removeFriend('${f.id}')">✕</button></div>`).join('') || '<p class="sub-text">No friends added yet—click any member in Zynk Chat to send a friend request!</p>'}
-        </div>
-      </div>
-
-      <div class="glass-card" style="border-color:${standingCol}55;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <h3 style="display:flex;align-items:center;gap:8px;">${PROF_SVG.shield} Account Standing: <span style="color:${standingCol}">${standingLabel}</span></h3>
-          <span class="pill" style="border-color:${standingCol};color:${standingCol};">${infList.length} Record(s)</span>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          ${infList.map(x => `<div style="padding:8px 12px;border-radius:8px;background:#04070b;display:flex;justify-content:space-between;"><span><strong style="color:#f59e0b">${x.type}:</strong> ${x.reason}</span><span class="mono-dim">by @${x.by} • ${x.at}</span></div>`).join('') || '<div class="mono-dim">Your account is in good standing. No active or expired infractions.</div>'}
-        </div>
-      </div>
-
-      <div class="glass-card">
-        <h3 style="display:flex;align-items:center;gap:8px;">${PROF_SVG.bag} My Visual Inventory (${ownedList.length} Items Owned)</h3>
-        <div class="cards-grid" id="inv-visual-grid" style="margin-top:12px;"></div>
-      </div>
+      <div class="glass-card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><h3 style="display:flex;align-items:center;gap:8px;">${PROF_SVG.userCheck} Friends (${myFriends.length}) & Requests (${myReqs.length})</h3></div>${myReqs.length ? `<div style="margin-bottom:12px;"><div class="mono-dim" style="margin-bottom:6px;">INCOMING REQUESTS</div>${myReqs.map(r => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:#04070b;border-radius:8px;margin-bottom:6px;"><span><strong>@${r.username}</strong></span><button class="btn-neon" style="padding:4px 10px;font-size:0.78rem;" onclick="acceptFriendRequest('${r.id}')">Accept</button></div>`).join('')}</div>` : ''}<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;">${myFriends.map(f => `<div style="padding:10px;border-radius:10px;background:#04070b;display:flex;justify-content:space-between;align-items:center;"><div style="display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="openUserModal('${f.id}')"><img src="${safeAvatar(f.avatar)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" /><div><strong style="color:${f.equipped_color || '#f8fafc'}">${f.username}</strong><div class="mono-dim">${f.online ? 'Online' : 'Offline'}</div></div></div><button class="btn-ghost" style="color:#f43f5e;" title="Unfriend" onclick="removeFriend('${f.id}')">✕</button></div>`).join('') || '<p class="sub-text">No friends added yet—click any member in Zynk Chat to send a friend request!</p>'}</div></div>
+      <div class="glass-card" style="border-color:${standingCol}55;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><h3 style="display:flex;align-items:center;gap:8px;">${PROF_SVG.shield} Account Standing: <span style="color:${standingCol}">${standingLabel}</span></h3><span class="pill" style="border-color:${standingCol};color:${standingCol};">${infList.length} Record(s)</span></div><div style="display:flex;flex-direction:column;gap:6px;">${infList.map(x => `<div style="padding:8px 12px;border-radius:8px;background:#04070b;display:flex;justify-content:space-between;"><span><strong style="color:#f59e0b">${x.type}:</strong> ${x.reason}</span><span class="mono-dim">by @${x.by} • ${x.at}</span></div>`).join('') || '<div class="mono-dim">Your account is in good standing. No active or expired infractions.</div>'}</div></div>
+      <div class="glass-card"><h3 style="display:flex;align-items:center;gap:8px;">${PROF_SVG.bag} My Visual Inventory (${ownedList.length} Items Owned)</h3><div class="cards-grid" id="inv-visual-grid" style="margin-top:12px;"></div></div>
     </div>`;
   document.getElementById('save-my-profile').onclick = async () => {
     await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { bio: document.getElementById('edit-bio').value }, window.authToken);
+    await window.logAudit?.('PROFILE_BIO', `@${p.username}`, 'Updated bio');
     await window.refreshMyProfile();
     window.notify('Profile bio saved!');
   };
@@ -225,18 +171,12 @@ async function renderMyProfileTab() {
   };
 
   document.getElementById('upload-pfp-btn').onclick = () => {
-    if (!canUploadPfp) {
-      window.notify('Unlock "Custom PFP Upload Pass" in Zynk Store first!', true);
-      return window.openTab?.('store-view');
-    }
+    if (!canUploadPfp) { window.notify('Unlock "Custom PFP Upload Pass" in Zynk Store first!', true); return window.openTab?.('store-view'); }
     document.getElementById('custom-pfp-inp').click();
   };
 
   document.getElementById('upload-ban-btn').onclick = () => {
-    if (!canUploadBanner) {
-      window.notify('Unlock "Custom Banner Upload Pass" in Zynk Store first!', true);
-      return window.openTab?.('store-view');
-    }
+    if (!canUploadBanner) { window.notify('Unlock "Custom Banner Upload Pass" in Zynk Store first!', true); return window.openTab?.('store-view'); }
     document.getElementById('custom-ban-inp').click();
   };
 
@@ -267,12 +207,10 @@ async function renderMyProfileTab() {
       window.notify('Uploading Custom PFP...');
       const dataUrl = await compressProfileImg(f, 150, 150);
       await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { avatar: dataUrl }, window.authToken);
-      await window.logAudit?.('PROFILE_PFP', `@${p.username}`, 'Updated custom profile picture');
+      await window.logAudit?.('PROFILE_PFP', `@${p.username}`, 'Updated custom PFP');
       await window.refreshMyProfile();
       window.notify('Custom Profile Picture saved!');
-    } catch (err) {
-      window.notify('PFP upload failed: ' + err.message, true);
-    }
+    } catch (err) { window.notify('PFP upload failed: ' + err.message, true); }
   };
 
   document.getElementById('custom-ban-inp').onchange = async (e) => {
@@ -283,120 +221,197 @@ async function renderMyProfileTab() {
       window.notify('Uploading Custom Banner...');
       const dataUrl = await compressProfileImg(f, 560, 180);
       await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { banner: dataUrl }, window.authToken);
-      await window.logAudit?.('PROFILE_BANNER', `@${p.username}`, 'Updated custom profile banner');
+      await window.logAudit?.('PROFILE_BANNER', `@${p.username}`, 'Updated custom banner');
       await window.refreshMyProfile();
       window.notify('Custom Profile Banner saved!');
-    } catch (err) {
-      window.notify('Banner upload failed: ' + err.message, true);
-    }
+    } catch (err) { window.notify('Banner upload failed: ' + err.message, true); }
   };
   const invGrid = document.getElementById('inv-visual-grid');
-  if (!ownedList.length) {
-    invGrid.innerHTML = '<p class="sub-text">No store items owned yet—visit Zynk Store to unlock avatars, frames & banners!</p>';
-  } else {
-    ownedList.forEach(it => {
-      const imgSrc = it.image_url || (String(it.item_value || '').startsWith('data:image') || String(it.item_value || '').startsWith('http') ? it.item_value : '');
-      const isEq = (it.item_type === 'avatar' && p.avatar === imgSrc) || (it.item_type === 'banner' && p.banner === imgSrc) || (it.item_type === 'frame' && p.avatar_frame === it.item_value) || (it.item_type === 'theme' && document.body.className === it.item_value) || (it.item_type === 'color' && p.equipped_color === it.item_value);
-      const vis = imgSrc ? `<div style="height:120px;border-radius:10px;overflow:hidden;margin-bottom:8px;background:#04070b;"><img src="${imgSrc}" style="width:100%;height:100%;object-fit:cover;" /></div>` : `<div style="height:120px;border-radius:10px;margin-bottom:8px;background:#04070b;display:flex;align-items:center;justify-content:center;"><span class="pill" style="border-color:${it.item_value || '#10b981'}">${it.name}</span></div>`;
-      const card = document.createElement('div');
-      card.className = 'glass-card';
-      card.style.padding = '12px';
-      card.innerHTML = `${vis}<div class="mono-dim">${it.item_type.toUpperCase()}</div><h4 style="margin:2px 0 8px;">${it.name}</h4><button class="${isEq ? 'btn-outline' : 'btn-neon'}" style="width:100%">${isEq ? 'Unequip' : 'Equip'}</button>`;
-      card.querySelector('button').onclick = async () => {
-        const up = {};
-        if (it.item_type === 'avatar') up.avatar = isEq ? 'logo.png' : imgSrc;
-        if (it.item_type === 'banner') up.banner = isEq ? 'linear-gradient(135deg,#064e3b,#0f172a)' : imgSrc;
-        if (it.item_type === 'frame') up.avatar_frame = isEq ? 'none' : it.item_value;
-        if (it.item_type === 'theme') { const nextTh = isEq ? 'default' : it.item_value; up.profile_theme = nextTh; window.applySavedTheme?.(nextTh); }
-        if (it.item_type === 'color') up.equipped_color = isEq ? '#10b981' : it.item_value;
-        await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', up, window.authToken);
-        await window.refreshMyProfile();
-        window.notify(isEq ? `Unequipped ${it.name}` : `Equipped ${it.name}!`);
-      };
-      invGrid.appendChild(card);
-    });
-  }
-}
+  ownedList.forEach(it => {
+    const t = it.item_type || 'avatar';
+    const val = it.item_value || it.image_url;
+    const isEq = (t === 'avatar' && p.avatar === val) || (t === 'frame' && p.avatar_frame === val) || (t === 'banner' && p.banner === val) || (t === 'theme' && p.profile_theme === val) || (t === 'color' && p.equipped_color === val);
+    let preview = `<img src="${safeAvatar(it.image_url)}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;margin-bottom:8px;" />`;
+    if (t === 'frame') preview = `<div style="width:64px;height:64px;border-radius:50%;margin:0 auto 8px;border:3px solid ${val};box-shadow:0 0 14px ${val};"></div>`;
+    if (t === 'banner') preview = `<div style="height:44px;border-radius:8px;margin-bottom:8px;background:${val.startsWith('http') || val.startsWith('data:') ? `url('${val}') center/cover` : val};"></div>`;
+    if (t === 'theme' || t === 'color') preview = `<div style="height:44px;border-radius:8px;margin-bottom:8px;background:${t === 'color' ? val : '#04070b'};border:1px solid var(--neon-emerald);display:flex;align-items:center;justify-content:center;font-weight:700;">${it.name}</div>`;
 
-async function renderPartnersAndCredits() {
-  if (!window.sbRest) return;
-  const pBox = document.getElementById('partners-container');
-  if (pBox) {
-    const partners = await window.sbRest('zynk_partners?order=id.asc').catch(() => []);
-    const list = (partners && partners.length) ? partners : [{ name: 'VortexOS', tag: 'PARTNER NETWORK', description: 'Vortex is a next-gen community and messaging platform built for instant collaboration.', url: 'https://vortexos.net', image_url: 'logo.png' }];
-    pBox.innerHTML = `<div class="cards-grid" style="margin-bottom:22px;">${list.map(pt => `<div class="glass-card" style="display:flex;flex-direction:column;justify-content:space-between;"><div><div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;"><img src="${safeAvatar(pt.image_url)}" style="width:48px;height:48px;border-radius:12px;object-fit:cover;border:1px solid var(--neon-emerald);" /><div><span class="rarity-tag">${pt.tag || 'PARTNER'}</span><h3>${pt.name}</h3></div></div><p class="sub-text" style="margin-bottom:14px;">${pt.description || 'Official ZynkOS Partner.'}</p></div>${pt.url ? `<button class="btn-neon" style="width:100%" onclick="window.open('${pt.url}','_blank')">Visit ${pt.name} ↗</button>` : ''}</div>`).join('')}</div>`;
-  }
-
-  const cBox = document.getElementById('credits-container');
-  if (cBox) {
-    const team = await window.sbRest('zynk_credits?order=id.asc').catch(() => []);
-    const ownerRow = await window.sbRest('users?username=ilike.KingstenVibes&select=id,username,avatar,bio').catch(() => []);
-    const owner = Array.isArray(ownerRow) ? ownerRow.at(0) : null;
-    const ownerCard = `<div class="glass-card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;border-color:rgba(245,158,11,0.45);"><div style="display:flex;align-items:center;gap:14px;"><img src="${safeAvatar(owner?.avatar)}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid #f59e0b;" /><div><div style="display:flex;align-items:center;gap:8px;"><strong style="font-size:1.1rem;color:#f59e0b;">KingstenVibes</strong><span class="role-chip"><span class="role-dot" style="background:#f59e0b"></span>Owner & Founder</span></div><p class="sub-text" style="margin-top:4px;">${owner?.bio || 'Creator, Lead Architect & Founder of ZynkOS.'}</p></div></div>${owner ? `<button class="btn-outline" onclick="openUserModal('${owner.id}')">View Profile</button>` : ''}</div>`;
-    const extraCards = (team || []).map(m => `<div class="glass-card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;"><div style="display:flex;align-items:center;gap:14px;"><img src="${safeAvatar(m.image_url)}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--neon-emerald);" /><div><div style="display:flex;align-items:center;gap:8px;"><strong style="font-size:1.05rem;">${m.name}</strong><span class="role-chip"><span class="role-dot" style="background:#10b981"></span>${m.role_label || 'Contributor'}</span></div><p class="sub-text" style="margin-top:4px;">${m.description || 'ZynkOS Contributor'}</p></div></div>${m.user_uid ? `<button class="btn-outline" onclick="openUserModal('${m.user_uid}')">View Profile</button>` : ''}</div>`).join('');
-    cBox.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px;max-width:780px;">${ownerCard}${extraCards}</div>`;
-  }
-}
-async function renderLeaderboardQuestsAndAnnouncements() {
-  if (!window.sbRest) return;
-  const p = window.userProfile;
-
-  const annBox = document.getElementById('dash-announcements-list');
-  if (annBox) {
-    const anns = await window.sbRest('announcements?order=id.desc&limit=25').catch(() => []);
-    annBox.innerHTML = (anns || []).length ? anns.map(a => `<div style="padding:12px;border-radius:12px;background:rgba(4,7,11,0.75);border:1px solid rgba(255,255,255,0.08);"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><strong>${a.title}</strong><span class="mono-dim">by @${a.author || 'Staff'}</span></div><p class="sub-text">${a.body}</p></div>`).join('') : '<p class="sub-text">No system broadcasts yet.</p>';
-  }
-
-  const lb = document.getElementById('leaderboard-list');
-  if (lb) {
-    const users = await window.sbRest('users?role=neq.FOUNDER&hide_leaderboard=neq.true&order=credits.desc,xp.desc&limit=30').catch(() => []);
-    lb.innerHTML = (users || []).length ? users.map((u, idx) => `<div onclick="openUserModal('${u.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;"><div style="display:flex;align-items:center;gap:12px;"><strong style="width:28px;color:${idx === 0 ? '#f59e0b' : '#94a3b8'}">#${idx + 1}</strong><img src="${safeAvatar(u.avatar)}" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid ${u.equipped_color || '#10b981'};background:#04070b;" /><div><strong style="color:${u.equipped_color || '#f8fafc'}">${u.username}</strong><div class="mono-dim">[${u.role}] • Level ${Math.floor((u.xp || 0) / 1000) + 1}</div></div></div><span class="pill">${u.credits} Z-Credits</span></div>`).join('') : '<p class="sub-text">No ranked members yet.</p>';
-  }
-
-  const aGrid = document.getElementById('achieve-grid');
-  if (!aGrid) return;
-  const msgs = p?.msg_count || 0;
-  const boughtCnt = Math.max(p?.items_bought || 0, (p?.owned_items || []).length);
-  const dailyCnt = Math.max(p?.dailies_claimed || 0, p?.daily_streak || 0);
-  const builtInQuests = [
-    { id: 'q_daily', cat: 'DAILY', title: 'Daily Mystery Card', desc: 'Pick 1 of 3 mystery cards every 24 hours.', cred: 150, xp: 100, cur: Date.now() - (p?.last_daily || 0) >= 86400000 ? 1 : 0, max: 1, isDaily: true },
-    { id: 'q_msg1', cat: 'DAILY', title: 'First Transmission', desc: 'Send 1 message in Zynk Chat.', cred: 75, xp: 100, cur: Math.min(1, msgs), max: 1 },
-    { id: 'q_msg15', cat: 'DAILY', title: 'Daily Chatter', desc: 'Send 15 messages in Zynk Chat.', cred: 200, xp: 250, cur: Math.min(15, msgs), max: 15 },
-    { id: 'q_buy1', cat: 'DAILY', title: 'First Store Purchase', desc: 'Buy any item from Zynk Store.', cred: 175, xp: 200, cur: Math.min(1, boughtCnt), max: 1 },
-    { id: 'q_daily3', cat: 'WEEKLY', title: 'Mystery Card Regular', desc: 'Claim 3 Daily Mystery Cards.', cred: 450, xp: 500, cur: Math.min(3, dailyCnt), max: 3 }
-  ];
-  aGrid.style.display = 'grid';
-  aGrid.innerHTML = '';
-  builtInQuests.forEach(q => {
-    const isDone = !q.isDaily && (p?.claimed || []).includes(q.id);
-    const canClaim = Boolean(p) && q.cur >= q.max && !isDone;
     const card = document.createElement('div');
     card.className = 'glass-card';
-    card.innerHTML = `<h3>${q.title}</h3><p class="sub-text" style="margin:6px 0 10px;">${q.desc}</p><button class="${canClaim ? 'btn-neon' : 'btn-outline'}" style="width:100%" ${q.isDaily ? 'id="daily-quest-btn"' : ''} ${canClaim ? '' : 'disabled'}>${isDone ? 'Completed' : canClaim ? 'Claim Reward' : 'In Progress'}</button>`;
+    card.style.padding = '12px';
+    card.innerHTML = `${preview}<div class="mono-dim">${t.toUpperCase()}</div><strong>${it.name}</strong><button class="${isEq ? 'btn-neon' : 'btn-outline'}" style="width:100%;margin-top:8px;">${isEq ? 'Equipped' : 'Equip'}</button>`;
     card.querySelector('button').onclick = async () => {
-      if (q.isDaily) return window.openDailyPickerModal?.();
-      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + q.cred, xp: (p.xp || 0) + q.xp, claimed: [...new Set([...(p.claimed || []), q.id])] }, window.authToken);
-      await window.logAudit?.('QUEST_CLAIM', `@${p.username}`, `Claimed ${q.title}`);
+      const patch = t === 'avatar' ? { avatar: val } : t === 'frame' ? { avatar_frame: val } : t === 'banner' ? { banner: val } : t === 'theme' ? { profile_theme: val } : { equipped_color: val };
+      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', patch, window.authToken);
+      if (t === 'theme') window.applySavedTheme?.(val);
       await window.refreshMyProfile();
+      window.notify(`Equipped ${it.name}!`);
     };
-    aGrid.appendChild(card);
+    invGrid.appendChild(card);
   });
 }
 
-let activeLegalTab = 'RULES';
-function renderRulesAndLegal() {
-  const box = document.getElementById('rules-container');
-  if (!box) return;
-  box.innerHTML = `<div class="glass-card" style="max-width:840px;margin:auto;"><h3>ZynkOS Rules, Terms & Privacy (13+ Required)</h3><p class="sub-text" style="margin-top:8px;">1. Must be 13+. 2. Zero harassment or hate speech. 3. Keep all uploads SFW. 4. No spam or exploiting.</p></div>`;
+function renderDailyMysteryCards() {
+  const host = document.getElementById('daily-cards-row');
+  if (!host) return;
+  const p = window.userProfile;
+  const streak = p?.daily_streak || 0;
+  const mult = Math.min(3, 1 + Math.floor(streak / 3) * 0.25);
+  const stEl = document.getElementById('daily-streak-badge');
+  if (stEl) stEl.textContent = `${streak} DAY STREAK (${mult}x)`;
+
+  const last = p?.last_daily || 0;
+  const onCooldown = p && (Date.now() - last) < 86400000;
+  const hrsLeft = onCooldown ? Math.ceil((86400000 - (Date.now() - last)) / 3600000) : 0;
+
+  if (onCooldown) {
+    host.innerHTML = `<div class="mystery-card flipped" style="grid-column:1/-1;"><strong style="color:#10b981;font-size:1.05rem;">Daily Mystery Card Claimed!</strong><p class="sub-text" style="margin-top:4px;">Streak: <strong>${streak} Day(s)</strong> (${mult}x Reward Multiplier) • Next draw in <strong>${hrsLeft} hour(s)</strong>.</p></div>`;
+    return;
+  }
+
+  host.innerHTML = [0, 1, 2].map(i => `<div class="mystery-card" data-cidx="${i}"><div style="color:#10b981;">${PROF_SVG.gift}</div><strong style="margin-top:6px;">Card #${i + 1}</strong><span class="mono-dim">Mystery Draw</span></div>`).join('');
+  host.querySelectorAll('.mystery-card').forEach(card => {
+    card.onclick = async () => {
+      if (!p) return window.notify('Sign in to claim your Daily Mystery Card!', true);
+      const roll = Math.random();
+      const base = roll < 0.15 ? { rarity: 'EPIC', col: '#a855f7', z: 450, xp: 300 } : roll < 0.45 ? { rarity: 'UNCOMMON', col: '#06b6d4', z: 250, xp: 175 } : { rarity: 'COMMON', col: '#10b981', z: 125, xp: 100 };
+      const finalZ = Math.round(base.z * mult);
+      const finalXp = Math.round(base.xp * mult);
+      const nextStreak = (Date.now() - last) < 172800000 ? streak + 1 : 1;
+      card.classList.add('flipped');
+      card.style.borderColor = base.col;
+      card.innerHTML = `<span class="pill" style="border-color:${base.col};color:${base.col};">${base.rarity} (${mult}x)</span><strong style="font-size:1.1rem;margin-top:6px;color:${base.col};">+${finalZ} Z</strong><span class="mono-dim">+${finalXp} XP • Day ${nextStreak}</span>`;
+      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + finalZ, xp: (p.xp || 0) + finalXp, last_daily: Date.now(), daily_streak: nextStreak, dailies_claimed: (p.dailies_claimed || 0) + 1 }, window.authToken);
+      setTimeout(() => window.refreshMyProfile(), 1400);
+    };
+  });
+}
+async function renderPartnersTab() {
+  const grid = document.getElementById('partners-grid');
+  if (!grid || !window.sbRest) return;
+  const rows = await window.sbRest('zynk_partners?order=id.asc').catch(() => []);
+  const list = Array.isArray(rows) ? rows : [];
+  grid.innerHTML = list.map(pt => `
+    <div class="glass-card" style="display:flex;flex-direction:column;justify-content:space-between;gap:12px;">
+      <div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+          <img src="${safeAvatar(pt.image_url)}" style="width:52px;height:52px;border-radius:12px;object-fit:cover;border:1px solid var(--neon-emerald);" />
+          <div>
+            <span class="pill" style="border-color:#06b6d4;color:#06b6d4;font-size:0.7rem;">${pt.tag || 'PARTNER'}</span>
+            <h3 style="margin-top:4px;">${pt.name}</h3>
+          </div>
+        </div>
+        <p class="sub-text">${pt.description || 'Official ZynkOS Network Partner.'}</p>
+      </div>
+      ${pt.url ? `<a href="${pt.url}" target="_blank" rel="noopener" class="btn-neon" style="text-align:center;text-decoration:none;">Visit ${pt.name} ↗</a>` : ''}
+    </div>`).join('') || `<div class="glass-card" style="grid-column:1/-1;"><p class="sub-text">Official partners will appear here soon!</p></div>`;
 }
 
-window.openDailyPickerModal = function() {
-  const p = window.userProfile;
-  if (!p || Date.now() - (p.last_daily || 0) < 86400000) return;
-  window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + 200, xp: (p.xp || 0) + 150, last_daily: Date.now(), daily_streak: (p.daily_streak || 0) + 1 }, window.authToken).then(() => window.refreshMyProfile());
-  window.notify('Daily Mystery Reward claimed! +200 Z-Credits & +150 XP');
-};
+async function renderCreditsTab() {
+  const grid = document.getElementById('credits-grid');
+  if (!grid || !window.sbRest) return;
+  const [customRows, staffUsers] = await Promise.all([
+    window.sbRest('zynk_credits?order=id.asc').catch(() => []),
+    window.sbRest('users?role=in.(FOUNDER,HEAD%20DEV,DEVELOPER,ADMIN,MODERATOR,DESIGNER,BETA)&select=id,username,avatar,role,equipped_color,bio&order=xp.desc').catch(() => [])
+  ]);
 
-document.addEventListener('click', (e) => { if (e.target.id === 'dash-daily-btn') window.openDailyPickerModal(); });
-window.addEventListener('zynk-profile-updated', () => { renderMyProfileTab(); renderLeaderboardQuestsAndAnnouncements(); renderPartnersAndCredits(); });
-window.addEventListener('DOMContentLoaded', () => { renderMyProfileTab(); renderLeaderboardQuestsAndAnnouncements(); renderPartnersAndCredits(); renderRulesAndLegal(); });
+  const seen = new Set();
+  const cards = [];
+
+  (Array.isArray(customRows) ? customRows : []).forEach(c => {
+    seen.add(c.name.toLowerCase());
+    cards.push(`
+      <div class="glass-card" style="display:flex;align-items:center;gap:14px;">
+        <img src="${safeAvatar(c.image_url)}" style="width:58px;height:58px;border-radius:50%;object-fit:cover;border:2px solid var(--neon-emerald);" />
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <strong>${c.name}</strong>
+            <span class="pill" style="border-color:#f59e0b;color:#f59e0b;font-size:0.7rem;">${c.role_label || 'Contributor'}</span>
+          </div>
+          <p class="sub-text" style="margin-top:4px;">${c.description || 'ZynkOS Contributor'}</p>
+        </div>
+        ${c.user_uid ? `<button class="btn-outline" style="padding:6px 12px;font-size:0.8rem;" onclick="openUserModal('${c.user_uid}')">View Profile</button>` : ''}
+      </div>`);
+  });
+
+  (Array.isArray(staffUsers) ? staffUsers : []).forEach(u => {
+    if (seen.has(u.username.toLowerCase())) return;
+    cards.push(`
+      <div class="glass-card" style="display:flex;align-items:center;gap:14px;cursor:pointer;" onclick="openUserModal('${u.id}')">
+        <img src="${safeAvatar(u.avatar)}" style="width:58px;height:58px;border-radius:50%;object-fit:cover;border:2px solid ${u.equipped_color || '#10b981'};" />
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <strong style="color:${u.equipped_color || '#10b981'}">${u.username}</strong>
+            <span class="pill" style="font-size:0.7rem;">${u.role}</span>
+          </div>
+          <p class="sub-text" style="margin-top:4px;">${String(u.bio || 'ZynkOS Staff & Team Member.').slice(0, 80)}</p>
+        </div>
+      </div>`);
+  });
+
+  grid.innerHTML = cards.join('');
+}
+let activeLegalTab = 'RULES';
+
+function renderRulesAndLegalTab() {
+  const host = document.getElementById('rules-legal-container');
+  if (!host) return;
+  if (window.activeLegalTabOverride) {
+    activeLegalTab = window.activeLegalTabOverride;
+    window.activeLegalTabOverride = null;
+  }
+
+  host.innerHTML = `
+    <div style="max-width:860px;margin:auto;">
+      <div class="view-topbar">
+        <div>
+          <h1 style="display:flex;align-items:center;gap:10px;">${PROF_SVG.scroll} Rules, Privacy Policy & Terms</h1>
+          <p class="sub-text">Community guidelines, 13+ age requirement & platform policies</p>
+        </div>
+      </div>
+      <div class="store-tabs" style="margin-bottom:16px;">
+        <button class="${activeLegalTab === 'RULES' ? 'btn-neon' : 'btn-outline'}" data-ltab="RULES">Community Rules</button>
+        <button class="${activeLegalTab === 'TOS' ? 'btn-neon' : 'btn-outline'}" data-ltab="TOS">Terms of Service</button>
+        <button class="${activeLegalTab === 'PRIVACY' ? 'btn-neon' : 'btn-outline'}" data-ltab="PRIVACY">Privacy Policy</button>
+      </div>
+      <div class="glass-card" id="legal-doc-body" style="line-height:1.7;"></div>
+    </div>`;
+
+  host.querySelectorAll('[data-ltab]').forEach(b => (b.onclick = () => { activeLegalTab = b.dataset.ltab; renderRulesAndLegalTab(); }));
+  const body = document.getElementById('legal-doc-body');
+
+  if (activeLegalTab === 'RULES') {
+    body.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h2>ZynkOS Community Guidelines</h2>
+        <span class="pill" style="border-color:#10b981;color:#10b981;">13+ REQUIRED • ENFORCED BY STAFF</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="padding:12px 14px;border-radius:10px;background:#04070b;"><strong style="color:#10b981;">RULE 01 — Minimum Age Requirement (13+)</strong><p class="sub-text">You must be at least 13 years old to create an account, participate in Zynk Chat, or use ZynkOS services. Underage accounts will be suspended immediately.</p></div>
+        <div style="padding:12px 14px;border-radius:10px;background:#04070b;"><strong style="color:#10b981;">RULE 02 — Be Respectful — Zero Harassment or Hate Speech</strong><p class="sub-text">Treat every member with respect. Harassment, bullying, slurs, discrimination, doxxing, or threats of any kind are strictly prohibited.</p></div>
+        <div style="padding:12px 14px;border-radius:10px;background:#04070b;"><strong style="color:#10b981;">RULE 03 — Keep It Safe For Work (No NSFW or Gore)</strong><p class="sub-text">Do not post, upload, or link sexually explicit content, graphic violence, or disturbing media in Zynk Chat, avatars, banners, or custom stickers.</p></div>
+        <div style="padding:12px 14px;border-radius:10px;background:#04070b;"><strong style="color:#10b981;">RULE 04 — No Spam, Flooding, or Unsolicited Self-Promo</strong><p class="sub-text">Avoid message spamming, copypasta flooding, ping abuse (mass @mentions), or advertising external servers/links without Founder or Staff approval.</p></div>
+        <div style="padding:12px 14px;border-radius:10px;background:#04070b;"><strong style="color:#10b981;">RULE 05 — No Exploiting, Alt-Farming, or Economy Abuse</strong><p class="sub-text">Do not use scripts, bugs, or alternate accounts to farm Z-Credits, XP, Daily Mystery Cards, or leaderboard ranks.</p></div>
+        <div style="padding:12px 14px;border-radius:10px;background:#04070b;"><strong style="color:#10b981;">RULE 06 — Follow Staff Instructions & Ban Evasion Policy</strong><p class="sub-text">Listen to Moderators, Admins, Developers, and the Founder. Creating new accounts to bypass a mute or ban will result in a permanent ban.</p></div>
+      </div>`;
+  } else if (activeLegalTab === 'TOS') {
+    body.innerHTML = `
+      <h2 style="margin-bottom:10px;">Terms of Service</h2>
+      <p class="sub-text" style="margin-bottom:12px;">Last Updated: November 2026 • By accessing ZynkOS (<strong>zynkos.linkpc.net</strong>), you agree to these Terms.</p>
+      <p style="margin-bottom:10px;"><strong>1. Eligibility (13+ Only):</strong> ZynkOS is intended strictly for users aged 13 and older. By registering an account, you confirm that you meet this minimum age requirement.</p>
+      <p style="margin-bottom:10px;"><strong>2. Virtual Currency & Items:</strong> Z-Credits, XP, Ranks, Mystery Cards, and Store items are virtual platform rewards with zero real-world monetary value and cannot be exchanged for real currency.</p>
+      <p style="margin-bottom:10px;"><strong>3. User Content & Moderation:</strong> You are responsible for all messages, custom avatars, banners, and stickers you upload. Staff reserve the right to remove content, mute, or suspend accounts that violate Community Rules.</p>
+      <p><strong>4. Service Availability:</strong> ZynkOS is provided "as is" and features may be updated, balanced, or reset at the discretion of the Founder.</p>`;
+  } else {
+    body.innerHTML = `
+      <h2 style="margin-bottom:10px;">Privacy Policy</h2>
+      <p class="sub-text" style="margin-bottom:12px;">Last Updated: November 2026 • Your privacy matters on ZynkOS.</p>
+      <p style="margin-bottom:10px;"><strong>1. Information We Collect:</strong> We store your email address (used solely for authentication), chosen username, encrypted password hash, profile customizations, chat messages, and virtual Z-Credit/XP progress.</p>
+      <p style="margin-bottom:10px;"><strong>2. How We Use Data:</strong> Your data is used exclusively to operate ZynkOS features, sync your profile across sessions, and enforce community safety.</p>
+      <p style="margin-bottom:10px;"><strong>3. Third-Party Services:</strong> Authentication and database storage are powered by Supabase. Optional Vortex Guild chat connects via VortexOS when you explicitly sign in with Vortex.</p>
+      <p><strong>4. Account Deletion:</strong> You may permanently delete your account and associated profile data at any time inside <strong>Settings → Account & Danger Zone</strong>.</p>`;
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => { renderMyProfileTab(); renderDailyMysteryCards(); renderPartnersTab(); renderCreditsTab(); renderRulesAndLegalTab(); });
+window.addEventListener('zynk-profile-updated', () => { renderMyProfileTab(); renderDailyMysteryCards(); renderPartnersTab(); renderCreditsTab(); renderRulesAndLegalTab(); });
