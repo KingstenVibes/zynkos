@@ -161,12 +161,13 @@ function buildChannelBar() {
 
   const p = window.userProfile;
   const isFounder = p && p.role === 'FOUNDER';
-  if (chatInput) {
-    if (isFounder) chatInput.removeAttribute('maxlength');
-    else chatInput.setAttribute('maxlength', '2000');
+  const inp = document.getElementById('chat-input');
+  if (inp) {
+    if (isFounder) inp.removeAttribute('maxlength');
+    else inp.setAttribute('maxlength', '2000');
   }
   const cc = document.getElementById('chat-char-count');
-  if (cc) cc.textContent = `${chatInput?.value.length || 0}/${isFounder ? '∞' : '2000'}`;
+  if (cc) cc.textContent = `${inp?.value.length || 0}/${isFounder ? '∞' : '2000'}`;
 
   const isBeta = canAccessChannel(p, 'beta');
   const isStaff = p && ['FOUNDER', 'HEAD DEV', 'DEVELOPER', 'ADMIN', 'MODERATOR'].includes((p.role || '').toUpperCase());
@@ -248,9 +249,18 @@ window.switchChatChannel = function(chId, label) {
   const h2 = document.querySelector('#chat-view .view-topbar h2');
   if (h2) h2.textContent = window.activeChatLabel;
   buildChannelBar();
-  if (chatInput) chatInput.placeholder = `Message ${window.activeChatLabel}... (Type / or @)`;
+  const inp = document.getElementById('chat-input');
+  if (inp) inp.placeholder = `Message ${window.activeChatLabel}... (Type / or @)`;
   pollChatAndMembers();
-};if (chatForm && !document.getElementById('chat-file-inp')) {
+};
+if (chatForm && !document.getElementById('chat-file-inp')) {
+  const ta = document.createElement('textarea');
+  ta.id = 'chat-input';
+  ta.rows = 1;
+  ta.placeholder = chatInput?.placeholder || 'Message #zynk-global... (Type / or @)';
+  ta.style.cssText = 'flex:1;background:transparent;border:none;color:var(--text-main);font:inherit;resize:none;outline:none;max-height:130px;overflow-y:auto;line-height:1.4;padding:4px 0;';
+  chatInput?.replaceWith(ta);
+
   const fileInp = document.createElement('input');
   fileInp.type = 'file';
   fileInp.id = 'chat-file-inp';
@@ -277,9 +287,9 @@ window.switchChatChannel = function(chId, label) {
   charCount.style.cssText = 'font-size:0.72rem;white-space:nowrap;';
   charCount.textContent = '0/2000';
 
-  chatForm.insertBefore(fileInp, chatInput);
-  chatForm.insertBefore(imgBtn, chatInput);
-  chatForm.insertBefore(stkBtn, chatInput);
+  chatForm.insertBefore(fileInp, ta);
+  chatForm.insertBefore(imgBtn, ta);
+  chatForm.insertBefore(stkBtn, ta);
   chatForm.insertBefore(charCount, chatForm.querySelector('button[type="submit"]'));
 }
 
@@ -355,16 +365,7 @@ window.openNewDmModal = function() {
   const box = document.getElementById('user-modal-content');
   const others = cachedUsers.filter(u => String(u.id) !== String(p.id));
   box.style.maxWidth = '420px';
-  box.innerHTML = `
-    <div style="padding:20px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <h3>Start Private DM</h3>
-        <button class="btn-ghost" onclick="document.getElementById('user-modal').classList.add('hidden')">✕</button>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;">
-        ${others.map(u => `<div class="ac-item" data-dm-uid="${u.id}" data-dm-name="${u.username}" style="border-radius:8px;background:rgba(4,7,11,0.75);"><strong style="color:${u.equipped_color || '#10b981'}">@${u.username}</strong><span class="mono-dim">[${u.role}]</span></div>`).join('') || '<p class="sub-text">No other members available yet.</p>'}
-      </div>
-    </div>`;
+  box.innerHTML = `<div style="padding:20px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><h3>Start Private DM</h3><button class="btn-ghost" onclick="document.getElementById('user-modal').classList.add('hidden')">✕</button></div><div style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;">${others.map(u => `<div class="ac-item" data-dm-uid="${u.id}" data-dm-name="${u.username}" style="border-radius:8px;background:rgba(4,7,11,0.75);"><strong style="color:${u.equipped_color || '#10b981'}">@${u.username}</strong><span class="mono-dim">[${u.role}]</span></div>`).join('') || '<p class="sub-text">No other members available yet.</p>'}</div></div>`;
   modal.classList.remove('hidden');
   box.querySelectorAll('[data-dm-uid]').forEach(el => (el.onclick = () => {
     modal.classList.add('hidden');
@@ -391,22 +392,7 @@ window.toggleChatDrawer = function() {
   const p = window.userProfile;
   const limit = getStickerLimit(p);
   const myStickers = Array.isArray(p?.stickers) ? p.stickers : [];
-  drawerBox.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <strong style="font-size:0.84rem;color:#10b981;">Stickers (${myStickers.length}/${limit}) & Emojis</strong>
-      <div style="display:flex;gap:6px;">
-        <button type="button" class="btn-outline" style="padding:4px 10px;font-size:0.78rem;" id="add-sticker-btn">+ Upload Sticker</button>
-        <button type="button" class="btn-ghost" onclick="drawerBox.classList.add('hidden')">✕</button>
-      </div>
-    </div>
-    <input type="file" id="sticker-file-inp" accept="image/*" style="position:fixed;left:-9999px;opacity:0;width:1px;height:1px;" />
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-      ${myStickers.map((src, i) => `<img src="${src}" style="width:58px;height:58px;border-radius:8px;object-fit:cover;cursor:pointer;border:1px solid rgba(255,255,255,0.12);" onclick="sendStickerImg(${i})" />`).join('') || '<span class="mono-dim">No custom stickers uploaded yet.</span>'}
-    </div>
-    <div style="display:flex;flex-wrap:wrap;gap:4px;border-top:1px solid rgba(255,255,255,0.08);padding-top:8px;">
-      ${ALL_EMOJIS.map(em => `<button type="button" class="react-choice" onclick="chatInput.value+='${em}';chatInput.focus();">${em}</button>`).join('')}
-    </div>`;
-
+  drawerBox.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><strong style="font-size:0.84rem;color:#10b981;">Stickers (${myStickers.length}/${limit}) & Emojis</strong><div style="display:flex;gap:6px;"><button type="button" class="btn-outline" style="padding:4px 10px;font-size:0.78rem;" id="add-sticker-btn">+ Upload Sticker</button><button type="button" class="btn-ghost" onclick="drawerBox.classList.add('hidden')">✕</button></div></div><input type="file" id="sticker-file-inp" accept="image/*" style="position:fixed;left:-9999px;opacity:0;width:1px;height:1px;" /><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">${myStickers.map((src, i) => `<img src="${src}" style="width:58px;height:58px;border-radius:8px;object-fit:cover;cursor:pointer;border:1px solid rgba(255,255,255,0.12);" onclick="sendStickerImg(${i})" />`).join('') || '<span class="mono-dim">No custom stickers uploaded yet.</span>'}</div><div style="display:flex;flex-wrap:wrap;gap:4px;border-top:1px solid rgba(255,255,255,0.08);padding-top:8px;">${ALL_EMOJIS.map(em => `<button type="button" class="react-choice" onclick="const i=document.getElementById('chat-input');i.value+='${em}';i.focus();">${em}</button>`).join('')}</div>`;
   document.getElementById('add-sticker-btn').onclick = () => {
     if (!p) return window.notify?.('Sign in to upload stickers!', true);
     if (myStickers.length >= limit) return window.notify?.(`Sticker limit reached (${limit} max).`, true);
@@ -416,8 +402,7 @@ window.toggleChatDrawer = function() {
     const f = e.target.files?.at(0);
     if (!f) return;
     const compressed = await compressChatImg(f, 220);
-    const next = [...myStickers, compressed];
-    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { stickers: next }, window.authToken);
+    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { stickers: [...myStickers, compressed] }, window.authToken);
     await window.refreshMyProfile();
     window.notify('Sticker saved!');
     window.toggleChatDrawer();
@@ -450,12 +435,11 @@ document.getElementById('chat-file-inp')?.addEventListener('change', async (e) =
   if (sizeMB > limitInfo.mb) return window.notify?.(`File too large (${sizeMB.toFixed(1)} MB). Your limit is ${limitInfo.label}.`, true);
   const compressed = await compressChatImg(f, 680);
   pendingAttachment = { name: f.name, dataUrl: compressed, sizeLabel: `${sizeMB.toFixed(2)} MB`, isVid: f.type.startsWith('video/') };
-
   let prev = document.getElementById('chat-attach-preview');
   if (!prev) { prev = document.createElement('div'); prev.id = 'chat-attach-preview'; prev.className = 'reply-banner'; chatForm?.before(prev); }
   const thumb = pendingAttachment.isVid ? `<div style="width:44px;height:44px;border-radius:8px;background:#04070b;display:flex;align-items:center;justify-content:center;border:1px solid var(--neon-emerald);font-size:0.7rem;">VID</div>` : `<img src="${compressed}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--neon-emerald);" />`;
   prev.innerHTML = `<div style="display:flex;align-items:center;gap:10px;">${thumb}<div><strong>${f.name}</strong><div class="mono-dim">${pendingAttachment.sizeLabel} • Ready to send</div></div></div><button type="button" class="btn-ghost" onclick="clearPendingAttachment()">✕</button>`;
-  chatInput?.focus();
+  document.getElementById('chat-input')?.focus();
 });
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.msg-actions')) {
@@ -482,42 +466,32 @@ window.toggleReaction = async function(msgId, emoji) {
     await window.sbRest(`messages?id=eq.${msgId}`, 'PATCH', { reactions: reacts }, window.authToken);
     lastChatHash = '';
     pollChatAndMembers();
-  } catch (err) {
-    window.notify?.('Reaction error: ' + err.message, true);
-  }
+  } catch (err) { window.notify?.('Reaction error: ' + err.message, true); }
 };
 
 window.deleteChatMsg = async function(msgId) {
   document.querySelector(`[data-mid="${msgId}"]`)?.remove();
-  try {
-    await window.sbRest(`messages?id=eq.${msgId}`, 'DELETE', null, window.authToken);
-    lastChatHash = '';
-  } catch (err) {
-    window.notify?.('Delete failed: ' + err.message, true);
-  }
+  await window.sbRest(`messages?id=eq.${msgId}`, 'DELETE', null, window.authToken).catch(() => {});
+  lastChatHash = '';
 };
 
 window.reportChatMsg = async function(msgId, targetUser, msgText) {
   const me = window.userProfile;
   if (!me) return window.notify?.('Sign in to report messages!', true);
-  const reason = prompt(`Report @${targetUser} — Enter reason (e.g. Spam, Harassment, NSFW):`);
+  const reason = prompt(`Report @${targetUser} — Enter reason:`);
   if (!reason || !reason.trim()) return;
   await window.sbRest('zynk_reports', 'POST', { reporter: me.username, target_user: targetUser, message_id: msgId, message_text: msgText, channel: activeChannel, reason: reason.trim() }, window.authToken);
-  window.notify?.('Report submitted to Moderation Queue!');
+  window.notify?.('Report submitted!');
 };
 
 window.editChatMsg = function(msgId, oldText) {
   const row = document.querySelector(`[data-mid="${msgId}"]`);
   const textEl = row?.querySelector('.msg-text-body');
   if (!textEl || row.querySelector('.inline-edit-wrap')) return;
-
   const prevHtml = textEl.innerHTML;
   textEl.innerHTML = `<div class="inline-edit-wrap" style="margin-top:4px;"><input type="text" class="tool-input inline-edit-inp" style="margin:0;padding:7px 10px;font-size:0.9rem;" value="${oldText.replace(/"/g, '&quot;')}" /><div class="mono-dim" style="font-size:0.72rem;margin-top:4px;">escape to <span class="inline-cancel" style="color:#06b6d4;cursor:pointer;text-decoration:underline;">cancel</span> • enter to <span class="inline-save" style="color:#10b981;cursor:pointer;text-decoration:underline;">save</span></div></div>`;
-
   const inp = textEl.querySelector('.inline-edit-inp');
   inp.focus();
-  inp.setSelectionRange(inp.value.length, inp.value.length);
-
   const cancel = () => { textEl.innerHTML = prevHtml; };
   const save = async () => {
     const next = inp.value.trim();
@@ -527,20 +501,16 @@ window.editChatMsg = function(msgId, oldText) {
     lastChatHash = '';
     pollChatAndMembers();
   };
-
   textEl.querySelector('.inline-cancel').onclick = cancel;
   textEl.querySelector('.inline-save').onclick = save;
-  inp.onkeydown = (ev) => {
-    if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
-    if (ev.key === 'Enter') { ev.preventDefault(); save(); }
-  };
+  inp.onkeydown = (ev) => { if (ev.key === 'Escape') cancel(); if (ev.key === 'Enter') save(); };
 };
 window.setChatReply = function(username, text) {
   activeReply = `@${username}: ${text.slice(0, 65)}`;
   let bar = document.getElementById('reply-preview-bar');
   if (!bar) { bar = document.createElement('div'); bar.id = 'reply-preview-bar'; bar.className = 'reply-banner'; chatForm?.before(bar); }
   bar.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;">${CHAT_SVG.reply} Replying to <strong>${activeReply}</strong></span><button type="button" class="btn-ghost" onclick="clearChatReply()">✕</button>`;
-  chatInput?.focus();
+  document.getElementById('chat-input')?.focus();
 };
 
 window.clearChatReply = function() {
@@ -611,7 +581,6 @@ async function pollChatAndMembers() {
   if (!window.sbRest) return;
   const me = window.userProfile;
   if (!canAccessChannel(me, activeChannel)) { activeChannel = 'global'; window.activeChatLabel = '#zynk-global'; buildChannelBar(); }
-
   try {
     const cols = 'id,user_id,username,role,color,content,reply_to,edited,reactions,is_beta,created_at,image_url,channel';
     const filter = activeChannel === 'global' ? 'or=(channel.eq.global,channel.is.null)' : `channel=eq.${encodeURIComponent(activeChannel)}`;
@@ -638,30 +607,76 @@ async function pollChatAndMembers() {
   }
 }
 
-chatInput?.addEventListener('input', () => {
+document.addEventListener('keydown', (e) => {
+  if (e.target.id === 'chat-input' && e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    chatForm?.dispatchEvent(new Event('submit', { cancelable: true }));
+  }
+});
+
+document.addEventListener('input', (e) => {
+  if (e.target.id !== 'chat-input') return;
+  const inp = e.target;
+  inp.style.height = 'auto';
+  inp.style.height = Math.min(130, inp.scrollHeight) + 'px';
   const p = window.userProfile;
   const isFounder = p && p.role === 'FOUNDER';
   const cc = document.getElementById('chat-char-count');
-  if (cc) cc.textContent = `${chatInput.value.length}/${isFounder ? '∞' : '2000'}`;
-  if (p && chatInput.value.length > 0 && Date.now() - lastTypingPing > 1000) {
+  if (cc) cc.textContent = `${inp.value.length}/${isFounder ? '∞' : '2000'}`;
+  if (p && inp.value.length > 0 && Date.now() - lastTypingPing > 1000) {
     lastTypingPing = Date.now();
     window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { typing_until: Date.now() + 5500 }, window.authToken).catch(() => {});
   }
+  if (!acBox) return;
+  const val = inp.value;
+  const isStaff = p && ['FOUNDER', 'HEAD DEV', 'DEVELOPER', 'ADMIN', 'MODERATOR'].includes((p.role || '').toUpperCase());
+  if (val.startsWith('/')) {
+    const q = val.toLowerCase().split(' ').at(0);
+    const matches = SLASH_CMDS.filter(c => (!c.staff || isStaff) && (!c.founder || isFounder) && c.cmd.startsWith(q));
+    if (!matches.length) return acBox.classList.add('hidden');
+    acBox.innerHTML = matches.map(c => `<div class="ac-item" data-fill="${c.cmd.split(' ').slice(0, 2).join(' ')} "><strong>${c.cmd}</strong><span class="mono-dim">${c.desc}</span></div>`).join('');
+    acBox.classList.remove('hidden');
+    acBox.querySelectorAll('.ac-item').forEach(el => (el.onclick = () => { inp.value = el.dataset.fill; acBox.classList.add('hidden'); inp.focus(); }));
+    return;
+  }
+  acBox.classList.add('hidden');
 });
 
 chatForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const raw = chatInput.value.trim();
+  const inp = document.getElementById('chat-input');
+  const raw = inp?.value.trim() || '';
   const att = pendingAttachment;
   const p = window.userProfile;
   if ((!raw && !att) || !p) return;
   const isFounder = p.role === 'FOUNDER';
-  chatInput.value = '';
+  inp.value = '';
+  inp.style.height = 'auto';
   const cc = document.getElementById('chat-char-count');
   if (cc) cc.textContent = `0/${isFounder ? '∞' : '2000'}`;
   window.clearPendingAttachment();
   const replyText = activeReply || '';
   window.clearChatReply();
+
+  if (raw.startsWith('/')) {
+    const parts = raw.split(' ');
+    const cmd = parts.at(0).toLowerCase();
+    const targetName = parts.at(1)?.replace(/^@/, '');
+    if (cmd === '/help') return appendSingleMsg({ id: Date.now(), username: 'ZynkBot', role: 'SYSTEM', color: '#06b6d4', content: 'Member Commands: `/help`, `/credits`, `/pay @user <amount>`' });
+    if (cmd === '/credits') return appendSingleMsg({ id: Date.now(), username: 'ZynkBot', role: 'SYSTEM', color: '#06b6d4', content: `@${p.username}: **${p.credits} Z-Credits** (Level ${Math.floor((p.xp || 0) / 1000) + 1})` });
+    if (cmd === '/pay' && targetName) {
+      const amt = parseInt(parts.at(2), 10);
+      if (!(amt > 0) || p.credits < amt) return window.notify('Invalid or insufficient Z-Credits.', true);
+      const found = await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`);
+      const u = Array.isArray(found) ? found.at(0) : null;
+      if (!u) return window.notify(`User @${targetName} not found.`, true);
+      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits - amt }, window.authToken);
+      await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { credits: u.credits + amt }, window.authToken);
+      await window.logAudit?.('PAY_CREDITS', `@${u.username}`, `Sent ${amt} Z-Credits`);
+      await window.refreshMyProfile();
+      return appendSingleMsg({ id: Date.now(), username: 'ZynkBot', role: 'SYSTEM', color: '#06b6d4', content: `@${p.username} sent **${amt} Z-Credits** to @${u.username}!` });
+    }
+  }
 
   const mult = (p.boost_until && p.boost_until > Date.now()) ? 2 : 1;
   appendSingleMsg({ id: Date.now(), user_id: p.id, username: p.username, avatar: p.avatar, role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: raw, image_url: att?.dataUrl || '', reply_to: replyText, created_at: new Date().toISOString() });
@@ -673,4 +688,4 @@ chatForm?.addEventListener('submit', async (e) => {
 window.addEventListener('zynk-profile-updated', buildChannelBar);
 setInterval(pollChatAndMembers, 2000);
 pollChatAndMembers();
-
+]
