@@ -45,6 +45,7 @@ window.sbRest = async function(path, method = 'GET', body = null, token = null) 
   if (res.status === 204) return [];
   return res.json().catch(() => []);
 };
+
 function applyNavPermissions() {
   const p = window.userProfile;
   const isFounder = p && p.role === 'FOUNDER';
@@ -63,7 +64,7 @@ function applyNavPermissions() {
   if (topBtn) topBtn.textContent = p ? 'Sign Out' : 'Sign In';
 }
 
-const SAFE_USER_COLS = 'id,username,avatar,banner,bio,role,extra_roles,rank_index,credits,xp,online,equipped_color,equipped_badge,owned_items,claimed,friends,friend_requests,following,is_beta,avatar_frame,profile_theme,last_daily,daily_streak,saved_streak,last_surge,last_restore,last_staff_stipend,staff_streak,boost_until,msg_count,items_bought,dailies_claimed,stickers,hide_leaderboard,infractions,activity_text,last_channel,last_seen,typing_until,is_muted,mute_until,mute_reason,ban_until,ban_reason,created_at';
+const SAFE_USER_COLS = 'id,username,avatar,banner,bio,role,extra_roles,rank_index,credits,xp,online,equipped_color,equipped_badge,owned_items,claimed,friends,following,is_beta,avatar_frame,profile_theme,last_daily,daily_streak,saved_streak,last_surge,last_restore,last_staff_stipend,staff_streak,boost_until,msg_count,items_bought,dailies_claimed,stickers,hide_leaderboard,activity_text,last_channel,last_seen,typing_until,is_muted,mute_until,ban_until,created_at';
 
 window.refreshMyProfile = async function() {
   if (!window.authToken) return null;
@@ -73,17 +74,19 @@ window.refreshMyProfile = async function() {
     });
     if (!uRes.ok) return null;
     const authUser = await uRes.json();
-    const rows = await window.sbRest(`users?id=eq.${authUser.id}&select=${SAFE_USER_COLS}`);
+    const rows = await window.sbRest(`users?id=eq.${authUser.id}&select=${SAFE_USER_COLS}`, 'GET', null, window.authToken);
     let prof = Array.isArray(rows) ? rows.at(0) : null;
     if (!prof) {
       const uname = authUser.user_metadata?.username || authUser.email.split('@').at(0);
       await window.sbRest('users', 'POST', {
         id: authUser.id, email: authUser.email, username: uname, role: 'MEMBER', credits: 150, xp: 0, online: true
       }, window.authToken);
-      const created = await window.sbRest(`users?id=eq.${authUser.id}&select=${SAFE_USER_COLS}`);
+      const created = await window.sbRest(`users?id=eq.${authUser.id}&select=${SAFE_USER_COLS}`, 'GET', null, window.authToken);
       prof = Array.isArray(created) ? created.at(0) : null;
     }
     if (prof) {
+      const privRows = await window.sbRest(`users?id=eq.${authUser.id}&select=friend_requests,infractions,mute_reason,ban_reason`, 'GET', null, window.authToken).catch(() => []);
+      if (Array.isArray(privRows) && privRows.at(0)) Object.assign(prof, privRows.at(0));
       prof.email = authUser.email;
       if (prof.ban_until && prof.ban_until > Date.now()) {
         localStorage.removeItem('zynk_session');
@@ -239,4 +242,3 @@ window.addEventListener('beforeunload', () => {
     }).catch(() => {});
   }
 });
-
