@@ -252,7 +252,7 @@ async function renderMyProfileTab() {
         cv.width = Math.max(1, Math.round(im.width * sc));
         cv.height = Math.max(1, Math.round(im.height * sc));
         cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
-        res(cv.toDataURL('image/jpeg', 0.78));
+        res(cv.toDataURL('image/webp', 0.8));
       };
       im.src = r.result;
     };
@@ -265,10 +265,11 @@ async function renderMyProfileTab() {
     if (!f) return;
     try {
       window.notify('Uploading Custom PFP...');
-      const dataUrl = await compressProfileImg(f, 180, 180);
+      const dataUrl = await compressProfileImg(f, 150, 150);
       await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { avatar: dataUrl }, window.authToken);
+      await window.logAudit?.('PROFILE_PFP', `@${p.username}`, 'Updated custom profile picture');
       await window.refreshMyProfile();
-      window.notify('Custom Profile Picture uploaded! Keep it SFW.');
+      window.notify('Custom Profile Picture saved!');
     } catch (err) {
       window.notify('PFP upload failed: ' + err.message, true);
     }
@@ -280,15 +281,15 @@ async function renderMyProfileTab() {
     if (!f) return;
     try {
       window.notify('Uploading Custom Banner...');
-      const dataUrl = await compressProfileImg(f, 640, 220);
+      const dataUrl = await compressProfileImg(f, 560, 180);
       await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { banner: dataUrl }, window.authToken);
+      await window.logAudit?.('PROFILE_BANNER', `@${p.username}`, 'Updated custom profile banner');
       await window.refreshMyProfile();
-      window.notify('Custom Profile Banner uploaded! Keep it SFW.');
+      window.notify('Custom Profile Banner saved!');
     } catch (err) {
       window.notify('Banner upload failed: ' + err.message, true);
     }
   };
-
   const invGrid = document.getElementById('inv-visual-grid');
   if (!ownedList.length) {
     invGrid.innerHTML = '<p class="sub-text">No store items owned yet—visit Zynk Store to unlock avatars, frames & banners!</p>';
@@ -316,42 +317,14 @@ async function renderMyProfileTab() {
     });
   }
 }
+
 async function renderPartnersAndCredits() {
   if (!window.sbRest) return;
-
   const pBox = document.getElementById('partners-container');
   if (pBox) {
     const partners = await window.sbRest('zynk_partners?order=id.asc').catch(() => []);
-    const defaults = [
-      { name: 'VortexOS', tag: 'PARTNER NETWORK', description: 'Vortex is a next-gen community and messaging platform built for instant collaboration.', url: 'https://vortexos.net', image_url: 'logo.png' }
-    ];
-    const list = (partners && partners.length) ? partners : defaults;
-
-    pBox.innerHTML = `
-      <div class="cards-grid" style="margin-bottom:22px;">
-        ${list.map(pt => `
-          <div class="glass-card" style="display:flex;flex-direction:column;justify-content:space-between;">
-            <div>
-              <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
-                <img src="${safeAvatar(pt.image_url)}" style="width:48px;height:48px;border-radius:12px;object-fit:cover;border:1px solid var(--neon-emerald);" />
-                <div>
-                  <span class="rarity-tag">${pt.tag || 'PARTNER'}</span>
-                  <h3>${pt.name}</h3>
-                </div>
-              </div>
-              <p class="sub-text" style="margin-bottom:14px;">${pt.description || 'Official ZynkOS Partner.'}</p>
-            </div>
-            ${pt.url ? `<button class="btn-neon" style="width:100%" onclick="window.open('${pt.url}','_blank')">Visit ${pt.name} ↗</button>` : ''}
-          </div>`).join('')}
-      </div>
-      <div class="glass-card" style="max-width:520px;">
-        <h3 style="display:flex;align-items:center;gap:8px;">${PROF_SVG.scroll} Partner Requirements</h3>
-        <ul style="margin:10px 0 0 18px;color:var(--text-dim);line-height:1.8;font-size:0.88rem;">
-          <li>Active ZynkOS Account & verified community presence</li>
-          <li>Active website, web app, or community server</li>
-          <li>Mutual link or banner placement with ZynkOS</li>
-        </ul>
-      </div>`;
+    const list = (partners && partners.length) ? partners : [{ name: 'VortexOS', tag: 'PARTNER NETWORK', description: 'Vortex is a next-gen community and messaging platform built for instant collaboration.', url: 'https://vortexos.net', image_url: 'logo.png' }];
+    pBox.innerHTML = `<div class="cards-grid" style="margin-bottom:22px;">${list.map(pt => `<div class="glass-card" style="display:flex;flex-direction:column;justify-content:space-between;"><div><div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;"><img src="${safeAvatar(pt.image_url)}" style="width:48px;height:48px;border-radius:12px;object-fit:cover;border:1px solid var(--neon-emerald);" /><div><span class="rarity-tag">${pt.tag || 'PARTNER'}</span><h3>${pt.name}</h3></div></div><p class="sub-text" style="margin-bottom:14px;">${pt.description || 'Official ZynkOS Partner.'}</p></div>${pt.url ? `<button class="btn-neon" style="width:100%" onclick="window.open('${pt.url}','_blank')">Visit ${pt.name} ↗</button>` : ''}</div>`).join('')}</div>`;
   }
 
   const cBox = document.getElementById('credits-container');
@@ -359,31 +332,8 @@ async function renderPartnersAndCredits() {
     const team = await window.sbRest('zynk_credits?order=id.asc').catch(() => []);
     const ownerRow = await window.sbRest('users?username=ilike.KingstenVibes&select=id,username,avatar,bio').catch(() => []);
     const owner = Array.isArray(ownerRow) ? ownerRow.at(0) : null;
-
-    const ownerCard = `
-      <div class="glass-card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;border-color:rgba(245,158,11,0.45);">
-        <div style="display:flex;align-items:center;gap:14px;">
-          <img src="${safeAvatar(owner?.avatar)}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid #f59e0b;" />
-          <div>
-            <div style="display:flex;align-items:center;gap:8px;"><strong style="font-size:1.1rem;color:#f59e0b;">KingstenVibes</strong><span class="role-chip"><span class="role-dot" style="background:#f59e0b"></span>Owner & Founder</span></div>
-            <p class="sub-text" style="margin-top:4px;">${owner?.bio || 'Creator, Lead Architect & Founder of ZynkOS.'}</p>
-          </div>
-        </div>
-        ${owner ? `<button class="btn-outline" onclick="openUserModal('${owner.id}')">View Profile</button>` : ''}
-      </div>`;
-
-    const extraCards = (team || []).map(m => `
-      <div class="glass-card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
-        <div style="display:flex;align-items:center;gap:14px;">
-          <img src="${safeAvatar(m.image_url)}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--neon-emerald);" />
-          <div>
-            <div style="display:flex;align-items:center;gap:8px;"><strong style="font-size:1.05rem;">${m.name}</strong><span class="role-chip"><span class="role-dot" style="background:#10b981"></span>${m.role_label || 'Contributor'}</span></div>
-            <p class="sub-text" style="margin-top:4px;">${m.description || 'ZynkOS Contributor'}</p>
-          </div>
-        </div>
-        ${m.user_uid ? `<button class="btn-outline" onclick="openUserModal('${m.user_uid}')">View Profile</button>` : ''}
-      </div>`).join('');
-
+    const ownerCard = `<div class="glass-card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;border-color:rgba(245,158,11,0.45);"><div style="display:flex;align-items:center;gap:14px;"><img src="${safeAvatar(owner?.avatar)}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid #f59e0b;" /><div><div style="display:flex;align-items:center;gap:8px;"><strong style="font-size:1.1rem;color:#f59e0b;">KingstenVibes</strong><span class="role-chip"><span class="role-dot" style="background:#f59e0b"></span>Owner & Founder</span></div><p class="sub-text" style="margin-top:4px;">${owner?.bio || 'Creator, Lead Architect & Founder of ZynkOS.'}</p></div></div>${owner ? `<button class="btn-outline" onclick="openUserModal('${owner.id}')">View Profile</button>` : ''}</div>`;
+    const extraCards = (team || []).map(m => `<div class="glass-card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;"><div style="display:flex;align-items:center;gap:14px;"><img src="${safeAvatar(m.image_url)}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--neon-emerald);" /><div><div style="display:flex;align-items:center;gap:8px;"><strong style="font-size:1.05rem;">${m.name}</strong><span class="role-chip"><span class="role-dot" style="background:#10b981"></span>${m.role_label || 'Contributor'}</span></div><p class="sub-text" style="margin-top:4px;">${m.description || 'ZynkOS Contributor'}</p></div></div>${m.user_uid ? `<button class="btn-outline" onclick="openUserModal('${m.user_uid}')">View Profile</button>` : ''}</div>`).join('');
     cBox.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px;max-width:780px;">${ownerCard}${extraCards}</div>`;
   }
 }
@@ -394,340 +344,59 @@ async function renderLeaderboardQuestsAndAnnouncements() {
   const annBox = document.getElementById('dash-announcements-list');
   if (annBox) {
     const anns = await window.sbRest('announcements?order=id.desc&limit=25').catch(() => []);
-    annBox.innerHTML = (anns || []).length ? anns.map(a => `
-      <div style="padding:12px;border-radius:12px;background:rgba(4,7,11,0.75);border:1px solid rgba(255,255,255,0.08);">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-          <strong>${a.title}</strong>
-          <span class="mono-dim">by @${a.author || 'Staff'}</span>
-        </div>
-        <p class="sub-text">${a.body}</p>
-      </div>`).join('') : '<p class="sub-text">No system broadcasts yet.</p>';
+    annBox.innerHTML = (anns || []).length ? anns.map(a => `<div style="padding:12px;border-radius:12px;background:rgba(4,7,11,0.75);border:1px solid rgba(255,255,255,0.08);"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><strong>${a.title}</strong><span class="mono-dim">by @${a.author || 'Staff'}</span></div><p class="sub-text">${a.body}</p></div>`).join('') : '<p class="sub-text">No system broadcasts yet.</p>';
   }
 
   const lb = document.getElementById('leaderboard-list');
   if (lb) {
     const users = await window.sbRest('users?role=neq.FOUNDER&hide_leaderboard=neq.true&order=credits.desc,xp.desc&limit=30').catch(() => []);
-    lb.innerHTML = (users || []).length ? users.map((u, idx) => `
-      <div onclick="openUserModal('${u.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <strong style="width:28px;color:${idx === 0 ? '#f59e0b' : '#94a3b8'}">#${idx + 1}</strong>
-          <img src="${safeAvatar(u.avatar)}" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid ${u.equipped_color || '#10b981'};background:#04070b;" />
-          <div><strong style="color:${u.equipped_color || '#f8fafc'}">${u.username}</strong><div class="mono-dim">[${u.role}] • Level ${Math.floor((u.xp || 0) / 1000) + 1}</div></div>
-        </div>
-        <span class="pill">${u.credits} Z-Credits</span>
-      </div>`).join('') : '<p class="sub-text">No ranked members yet.</p>';
+    lb.innerHTML = (users || []).length ? users.map((u, idx) => `<div onclick="openUserModal('${u.id}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;"><div style="display:flex;align-items:center;gap:12px;"><strong style="width:28px;color:${idx === 0 ? '#f59e0b' : '#94a3b8'}">#${idx + 1}</strong><img src="${safeAvatar(u.avatar)}" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid ${u.equipped_color || '#10b981'};background:#04070b;" /><div><strong style="color:${u.equipped_color || '#f8fafc'}">${u.username}</strong><div class="mono-dim">[${u.role}] • Level ${Math.floor((u.xp || 0) / 1000) + 1}</div></div></div><span class="pill">${u.credits} Z-Credits</span></div>`).join('') : '<p class="sub-text">No ranked members yet.</p>';
   }
 
   const aGrid = document.getElementById('achieve-grid');
   if (!aGrid) return;
-
   const msgs = p?.msg_count || 0;
   const boughtCnt = Math.max(p?.items_bought || 0, (p?.owned_items || []).length);
   const dailyCnt = Math.max(p?.dailies_claimed || 0, p?.daily_streak || 0);
-  const stkCnt = Array.isArray(p?.stickers) ? p.stickers.length : 0;
-  const friendCnt = Array.isArray(p?.friends) ? p.friends.length : 0;
-  const streakCnt = p?.daily_streak || 0;
-  const myLvl = Math.floor((p?.xp || 0) / 1000) + 1;
-  const creds = p?.credits || 0;
-  const hasCustomAv = p?.avatar && p.avatar !== 'logo.png' && !p.avatar.includes('dicebear') ? 1 : 0;
-  const equippedCnt = (hasCustomAv ? 1 : 0) + (p?.avatar_frame && p.avatar_frame !== 'none' ? 1 : 0) + (p?.banner && !p.banner.startsWith('linear-gradient') ? 1 : 0);
-
   const builtInQuests = [
-    { id: 'q_daily', cat: 'DAILY', title: 'Daily Mystery Card', desc: 'Pick 1 of 3 mystery cards every 24 hours & build your streak (+5%/day bonus).', cred: 150, xp: 100, cur: Date.now() - (p?.last_daily || 0) >= 86400000 ? 1 : 0, max: 1, isDaily: true },
-    { id: 'q_msg1', cat: 'DAILY', title: 'First Transmission', desc: 'Send at least 1 message in Zynk Chat.', cred: 75, xp: 100, cur: Math.min(1, msgs), max: 1 },
+    { id: 'q_daily', cat: 'DAILY', title: 'Daily Mystery Card', desc: 'Pick 1 of 3 mystery cards every 24 hours.', cred: 150, xp: 100, cur: Date.now() - (p?.last_daily || 0) >= 86400000 ? 1 : 0, max: 1, isDaily: true },
+    { id: 'q_msg1', cat: 'DAILY', title: 'First Transmission', desc: 'Send 1 message in Zynk Chat.', cred: 75, xp: 100, cur: Math.min(1, msgs), max: 1 },
     { id: 'q_msg15', cat: 'DAILY', title: 'Daily Chatter', desc: 'Send 15 messages in Zynk Chat.', cred: 200, xp: 250, cur: Math.min(15, msgs), max: 15 },
-    { id: 'q_bio', cat: 'DAILY', title: 'Identity Configured', desc: 'Customize your About Me bio on My Profile.', cred: 100, xp: 150, cur: p?.bio && !p.bio.startsWith('New ZynkOS') ? 1 : 0, max: 1 },
-    { id: 'q_av', cat: 'DAILY', title: 'New Look', desc: 'Equip a custom avatar on My Profile or Store.', cred: 125, xp: 150, cur: hasCustomAv, max: 1 },
-    { id: 'q_stk1', cat: 'DAILY', title: 'Sticker Creator', desc: 'Upload 1 custom sticker in Zynk Chat.', cred: 150, xp: 200, cur: Math.min(1, stkCnt), max: 1 },
-    { id: 'q_buy1', cat: 'DAILY', title: 'First Store Purchase', desc: 'Buy any item or Power-Up from Zynk Store.', cred: 175, xp: 200, cur: Math.min(1, boughtCnt), max: 1 },
-    { id: 'q_daily3', cat: 'WEEKLY', title: 'Mystery Card Regular', desc: 'Claim 3 Daily Mystery Cards.', cred: 450, xp: 500, cur: Math.min(3, dailyCnt), max: 3 },
-    { id: 'q_daily10', cat: 'WEEKLY', title: 'Mystery Card Master', desc: 'Claim 10 Daily Mystery Cards.', cred: 1400, xp: 1600, cur: Math.min(10, dailyCnt), max: 10 },
-    { id: 'q_buy5', cat: 'WEEKLY', title: 'Store Spree', desc: 'Buy 5 items or Power-Ups from Zynk Store.', cred: 650, xp: 750, cur: Math.min(5, boughtCnt), max: 5 },
-    { id: 'q_buy12', cat: 'WEEKLY', title: 'Royal Armory', desc: 'Buy or own 12 items from Zynk Store.', cred: 1800, xp: 2200, cur: Math.min(12, boughtCnt), max: 12 },
-    { id: 'q_msg50', cat: 'WEEKLY', title: 'Signal Regular', desc: 'Send 50 messages in Zynk Chat.', cred: 500, xp: 600, cur: Math.min(50, msgs), max: 50 },
-    { id: 'q_msg150', cat: 'WEEKLY', title: 'Network Veteran', desc: 'Send 150 messages in Zynk Chat.', cred: 1200, xp: 1500, cur: Math.min(150, msgs), max: 150 },
-    { id: 'q_msg500', cat: 'WEEKLY', title: 'Chat Legend', desc: 'Send 500 messages in Zynk Chat.', cred: 3500, xp: 4000, cur: Math.min(500, msgs), max: 500 },
-    { id: 'q_dressed', cat: 'WEEKLY', title: 'Dressed Up', desc: 'Equip 2 cosmetic items (avatar, frame, or banner).', cred: 300, xp: 350, cur: Math.min(2, equippedCnt), max: 2 },
-    { id: 'q_friends3', cat: 'WEEKLY', title: 'Social Butterfly', desc: 'Add 3 friends on ZynkOS.', cred: 450, xp: 500, cur: Math.min(3, friendCnt), max: 3 },
-    { id: 'q_streak7', cat: 'WEEKLY', title: 'Daily Grind', desc: 'Reach a 7-day Daily Mystery Card streak.', cred: 700, xp: 800, cur: Math.min(7, streakCnt), max: 7 },
-    { id: 'q_lvl5', cat: 'WEEKLY', title: 'Neural Level 5', desc: 'Reach Level 5 (4,000+ XP).', cred: 600, xp: 750, cur: Math.min(5, myLvl), max: 5 },
-    { id: 'q_lvl10', cat: 'WEEKLY', title: 'Neural Level 10', desc: 'Reach Level 10 (9,000+ XP).', cred: 1500, xp: 2000, cur: Math.min(10, myLvl), max: 10 },
-    { id: 'q_rich5k', cat: 'WEEKLY', title: 'Credit Hoarder', desc: 'Hold 5,000+ Z-Credits at once.', cred: 600, xp: 750, cur: Math.min(5000, creds), max: 5000 },
-    { id: 'q_rich25k', cat: 'WEEKLY', title: 'Zynk Tycoon', desc: 'Hold 25,000+ Z-Credits at once.', cred: 2500, xp: 3000, cur: Math.min(25000, creds), max: 25000 },
-    { id: 'sec_night', cat: 'SECRET', isSecret: true, title: 'Midnight Operator', desc: '??? [Secret Quest — Condition Hidden]', cred: 650, xp: 750, cur: new Date().getHours() <= 3 ? 1 : 0, max: 1 },
-    { id: 'sec_cyber', cat: 'SECRET', isSecret: true, title: 'Cyan Overclock', desc: '??? [Secret Quest — Condition Hidden]', cred: 450, xp: 500, cur: document.body.classList.contains('theme-cyber') ? 1 : 0, max: 1 },
-    { id: 'sec_24h', cat: 'SECRET', isSecret: true, title: 'Military Precision', desc: '??? [Secret Quest — Condition Hidden]', cred: 400, xp: 450, cur: localStorage.getItem('zynk_format') === '24' ? 1 : 0, max: 1 },
-    { id: 'sec_cloak', cat: 'SECRET', isSecret: true, title: 'Ghost Protocol', desc: '??? [Secret Quest — Condition Hidden]', cred: 500, xp: 600, cur: ['clever', 'classroom', 'drive', 'docs'].includes(localStorage.getItem('zynk_cloak')) ? 1 : 0, max: 1 },
-    { id: 'sec_violet', cat: 'SECRET', isSecret: true, title: 'Void Resonance', desc: '??? [Secret Quest — Condition Hidden]', cred: 500, xp: 600, cur: document.body.classList.contains('theme-violet') ? 1 : 0, max: 1 },
-    { id: 'sec_zoom', cat: 'SECRET', isSecret: true, title: 'Micro Vision', desc: '??? [Secret Quest — Condition Hidden]', cred: 350, xp: 400, cur: localStorage.getItem('zynk_zoom') === '0.9' ? 1 : 0, max: 1 }
+    { id: 'q_buy1', cat: 'DAILY', title: 'First Store Purchase', desc: 'Buy any item from Zynk Store.', cred: 175, xp: 200, cur: Math.min(1, boughtCnt), max: 1 },
+    { id: 'q_daily3', cat: 'WEEKLY', title: 'Mystery Card Regular', desc: 'Claim 3 Daily Mystery Cards.', cred: 450, xp: 500, cur: Math.min(3, dailyCnt), max: 3 }
   ];
-  const customQuests = await window.sbRest('achievements_list?order=id.asc').catch(() => []);
-  const allQuests = [
-    ...builtInQuests,
-    ...(customQuests || []).map(q => ({ id: `db_${q.id}`, cat: q.is_secret ? 'SECRET' : 'WEEKLY', title: q.title, desc: q.is_secret ? '??? [Secret Quest — Condition Hidden]' : q.description, cred: q.reward_credits, xp: q.reward_xp, isSecret: q.is_secret, cur: 1, max: 1 }))
-  ];
-
-  const isClaimed = (q) => !q.isDaily && (p?.claimed || []).includes(q.id);
-  const dailyList = allQuests.filter(q => q.cat === 'DAILY' && !isClaimed(q));
-  const weeklyList = allQuests.filter(q => q.cat === 'WEEKLY' && !isClaimed(q));
-  const secretList = allQuests.filter(q => q.cat === 'SECRET' && !isClaimed(q));
-  const doneList = allQuests.filter(q => isClaimed(q));
-
-  aGrid.style.display = 'block';
-  aGrid.innerHTML = `
-    <h3 style="color:#10b981;margin-bottom:10px;">Daily Quests (${dailyList.length})</h3>
-    <div class="cards-grid" id="q-sec-daily" style="margin-bottom:24px;"></div>
-    <h3 style="color:#06b6d4;margin-bottom:10px;">Weekly & Milestone Quests (${weeklyList.length})</h3>
-    <div class="cards-grid" id="q-sec-weekly" style="margin-bottom:24px;"></div>
-    <h3 style="color:#a855f7;margin-bottom:10px;">Secret Quests (${secretList.length})</h3>
-    <div class="cards-grid" id="q-sec-secret" style="margin-bottom:24px;"></div>
-    <h3 style="color:#94a3b8;margin-bottom:10px;">Completed Quests (${doneList.length})</h3>
-    <div class="cards-grid" id="q-sec-done"></div>`;
-
-  const renderCard = (q, targetId, isDone) => {
-    const box = document.getElementById(targetId);
-    if (!box) return;
+  aGrid.style.display = 'grid';
+  aGrid.innerHTML = '';
+  builtInQuests.forEach(q => {
+    const isDone = !q.isDaily && (p?.claimed || []).includes(q.id);
     const canClaim = Boolean(p) && q.cur >= q.max && !isDone;
-    const pct = Math.min(100, Math.round((q.cur / q.max) * 100));
     const card = document.createElement('div');
     card.className = 'glass-card';
-    card.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <span class="pill" style="padding:3px 9px;font-size:0.74rem;color:#10b981;">+${q.cred} Z-Credits</span>
-        <span class="pill" style="padding:3px 9px;font-size:0.74rem;color:#06b6d4;">+${q.xp} XP</span>
-      </div>
-      <h3>${q.title}</h3>
-      <p class="sub-text" style="margin:6px 0 10px;">${q.desc}</p>
-      ${!q.isSecret ? `<div class="xp-labels"><span>Progress</span><span>${q.cur} / ${q.max}</span></div><div class="xp-track" style="margin-bottom:12px;"><div class="xp-fill" style="width:${pct}%"></div></div>` : ''}
-      <button class="${canClaim ? 'btn-neon' : 'btn-outline'}" style="width:100%" ${q.isDaily ? 'id="daily-quest-btn"' : ''} ${canClaim ? '' : 'disabled'}>${isDone ? 'Completed' : canClaim ? (q.isDaily ? 'Pick Daily Mystery Card' : 'Claim Reward') : q.isSecret ? 'Discover Secret' : 'In Progress'}</button>`;
-
-    const btn = card.querySelector('button');
-    btn.onclick = async () => {
-      if (q.isDaily) return window.openDailyPickerModal();
-      if (!p || !canClaim || btn.disabled) return;
-      btn.disabled = true;
-      btn.textContent = 'Claiming...';
-      const patch = { credits: p.credits + q.cred, xp: (p.xp || 0) + q.xp, claimed: [...new Set([...(p.claimed || []), q.id])] };
-      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', patch, window.authToken);
+    card.innerHTML = `<h3>${q.title}</h3><p class="sub-text" style="margin:6px 0 10px;">${q.desc}</p><button class="${canClaim ? 'btn-neon' : 'btn-outline'}" style="width:100%" ${q.isDaily ? 'id="daily-quest-btn"' : ''} ${canClaim ? '' : 'disabled'}>${isDone ? 'Completed' : canClaim ? 'Claim Reward' : 'In Progress'}</button>`;
+    card.querySelector('button').onclick = async () => {
+      if (q.isDaily) return window.openDailyPickerModal?.();
+      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + q.cred, xp: (p.xp || 0) + q.xp, claimed: [...new Set([...(p.claimed || []), q.id])] }, window.authToken);
+      await window.logAudit?.('QUEST_CLAIM', `@${p.username}`, `Claimed ${q.title}`);
       await window.refreshMyProfile();
-      window.notify(`Quest Complete! +${q.cred} Z-Credits & +${q.xp} XP`);
     };
-    box.appendChild(card);
-  };
-
-  dailyList.forEach(q => renderCard(q, 'q-sec-daily', false));
-  weeklyList.forEach(q => renderCard(q, 'q-sec-weekly', false));
-  secretList.forEach(q => renderCard(q, 'q-sec-secret', false));
-  doneList.forEach(q => renderCard(q, 'q-sec-done', true));
+    aGrid.appendChild(card);
+  });
 }
-let activeLegalTab = 'RULES';
 
+let activeLegalTab = 'RULES';
 function renderRulesAndLegal() {
   const box = document.getElementById('rules-container');
   if (!box) return;
-
-  const tabs = [
-    { id: 'RULES', label: 'Community Rules' },
-    { id: 'TOS', label: 'Terms of Service' },
-    { id: 'PRIVACY', label: 'Privacy Policy' }
-  ];
-
-  const cardStyle = 'padding:14px 16px;border-radius:12px;background:rgba(4,7,11,0.75);border:1px solid rgba(255,255,255,0.08);margin-bottom:10px;';
-
-  let contentHtml = '';
-  if (activeLegalTab === 'RULES') {
-    const rules = [
-      { num: '01', title: 'Minimum Age Requirement (13+)', desc: 'You must be at least 13 years old to create an account, participate in Zynk Chat, or use ZynkOS services. Underage accounts will be suspended immediately.' },
-      { num: '02', title: 'Be Respectful — Zero Harassment or Hate Speech', desc: 'Treat every member with respect. Harassment, bullying, slurs, discrimination, doxxing, or threats of any kind are strictly prohibited.' },
-      { num: '03', title: 'Keep It Safe for Work (No NSFW or Gore)', desc: 'Do not post, upload, or link sexually explicit content, graphic violence, or disturbing media in Zynk Chat, avatars, banners, or custom stickers.' },
-      { num: '04', title: 'No Spam, Flooding, or Unsolicited Self-Promo', desc: 'Avoid message spamming, copypasta flooding, ping abuse (@mentions), or advertising external servers/links without Founder or Staff approval.' },
-      { num: '05', title: 'No Exploiting, Alt Farming, or Scamming', desc: 'Do not exploit bugs, farm Z-Credits/XP with alternate accounts, or attempt to scam other members during trades or gifts. Report bugs to Staff.' },
-      { num: '06', title: 'Follow Staff Instructions & Channel Topics', desc: 'Listen to Moderators, Admins, and the Founder. Use #updates only for official broadcasts and keep conversations civil.' }
-    ];
-    contentHtml = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
-        <h3 style="display:flex;align-items:center;gap:8px;">${PROF_SVG.shield} ZynkOS Community Guidelines</h3>
-        <span class="pill" style="border-color:#f59e0b;color:#f59e0b;">13+ REQUIRED • ENFORCED BY STAFF</span>
-      </div>
-      ${rules.map(r => `<div style="${cardStyle}"><div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;"><span class="mono-dim" style="color:var(--neon-emerald);font-weight:700;">RULE ${r.num}</span><strong>${r.title}</strong></div><p class="sub-text">${r.desc}</p></div>`).join('')}`;
-  }
-
-  if (activeLegalTab === 'TOS') {
-    contentHtml = `
-      <h3 style="margin-bottom:12px;">Terms of Service</h3>
-      <div style="${cardStyle}"><strong>1. Acceptance of Terms</strong><p class="sub-text" style="margin-top:4px;">By accessing or creating an account on ZynkOS, you confirm that you are at least 13 years of age and agree to abide by these Terms of Service and our Community Rules.</p></div>
-      <div style="${cardStyle}"><strong>2. Accounts & Security</strong><p class="sub-text" style="margin-top:4px;">You are responsible for keeping your login credentials secure and for all activity under your account. Sharing or selling accounts is not permitted.</p></div>
-      <div style="${cardStyle}"><strong>3. Virtual Currency & Store Items (Z-Credits)</strong><p class="sub-text" style="margin-top:4px;">Z-Credits, XP, badges, avatars, and themes are virtual items with no real-world monetary value and cannot be exchanged for cash. Staff may adjust balances if obtained through exploits.</p></div>
-      <div style="${cardStyle}"><strong>4. User-Generated Content</strong><p class="sub-text" style="margin-top:4px;">You retain ownership of content you upload, but grant ZynkOS permission to display it within the platform. Staff reserve the right to remove content or mute/ban accounts that violate our rules.</p></div>
-      <div style="${cardStyle}"><strong>5. Service Availability</strong><p class="sub-text" style="margin-top:4px;">ZynkOS is provided "as is" and may be updated, modified, or temporarily offline for maintenance at any time.</p></div>`;
-  }
-
-  if (activeLegalTab === 'PRIVACY') {
-    contentHtml = `
-      <h3 style="margin-bottom:12px;">Privacy Policy</h3>
-      <div style="${cardStyle}"><strong>1. Information We Collect</strong><p class="sub-text" style="margin-top:4px;">We store your chosen username, email address (for authentication), encrypted password hash, profile customizations, and chat messages needed to operate ZynkOS.</p></div>
-      <div style="${cardStyle}"><strong>2. How We Use Your Data</strong><p class="sub-text" style="margin-top:4px;">Your data is used strictly to run platform features such as Zynk Chat, Private DMs, Quests, Leaderboards, and Store Inventory. We never sell your personal information to third parties.</p></div>
-      <div style="${cardStyle}"><strong>3. Private Direct Messages & Controls</strong><p class="sub-text" style="margin-top:4px;">Private DMs are restricted via database security policies so only participants can access them. You can hide yourself from the Global Leaderboard anytime in Settings -> Privacy & Safety.</p></div>
-      <div style="${cardStyle}"><strong>4. Local Storage & Preferences</strong><p class="sub-text" style="margin-top:4px;">ZynkOS uses browser local storage to remember your active session, steady page theme, clock format, and tab cloaking settings.</p></div>`;
-  }
-
-  box.innerHTML = `
-    <div style="max-width:840px;margin:auto;">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
-        ${tabs.map(t => `<button type="button" class="${activeLegalTab === t.id ? 'btn-neon' : 'btn-outline'}" data-ltab="${t.id}">${t.label}</button>`).join('')}
-      </div>
-      <div class="glass-card">${contentHtml}</div>
-    </div>`;
-
-  box.querySelectorAll('[data-ltab]').forEach(b => (b.onclick = () => {
-    activeLegalTab = b.dataset.ltab;
-    renderRulesAndLegal();
-  }));
+  box.innerHTML = `<div class="glass-card" style="max-width:840px;margin:auto;"><h3>ZynkOS Rules, Terms & Privacy (13+ Required)</h3><p class="sub-text" style="margin-top:8px;">1. Must be 13+. 2. Zero harassment or hate speech. 3. Keep all uploads SFW. 4. No spam or exploiting.</p></div>`;
 }
-window.launchConfetti = function() {
-  const colors = ['#10b981', '#06b6d4', '#a855f7', '#f59e0b', '#f43f5e'];
-  for (let i = 0; i < 42; i++) {
-    const c = document.createElement('div');
-    c.className = 'zynk-confetti';
-    c.style.left = Math.random() * 100 + 'vw';
-    c.style.background = colors[i % colors.length];
-    c.style.animationDelay = (Math.random() * 0.4) + 's';
-    document.body.appendChild(c);
-    setTimeout(() => c.remove(), 2900);
-  }
-};
-
-const STREAK_LADDER = [
-  { day: 1, bonus: 50 }, { day: 2, bonus: 75 }, { day: 3, bonus: 100 },
-  { day: 5, bonus: 175 }, { day: 7, bonus: 300 }, { day: 10, bonus: 500 },
-  { day: 14, bonus: 800 }, { day: 15, bonus: 1000 }, { day: 20, bonus: 1500 },
-  { day: 30, bonus: 3000 }
-];
 
 window.openDailyPickerModal = function() {
   const p = window.userProfile;
-  if (!p) return window.notify('Sign in to claim your Daily Reward!', true);
-  if (Date.now() - (p.last_daily || 0) < 86400000) return window.notify('Daily reward is still on cooldown!', true);
-
-  const modal = document.getElementById('user-modal');
-  const box = document.getElementById('user-modal-content');
-  const nextStreak = (p.daily_streak || 0) + 1;
-  const streakMult = 1 + (nextStreak * 0.05);
-  const hit = STREAK_LADDER.find(s => s.day === nextStreak) || (nextStreak > 30 ? { day: nextStreak, bonus: 3000 } : null);
-  const streakBonus = hit ? hit.bonus : 0;
-
-  const pool = [
-    { tier: 'COMMON', color: '#94a3b8', cred: Math.round(150 * streakMult), xp: Math.round(100 * streakMult) },
-    { tier: 'UNCOMMON', color: '#10b981', cred: Math.round(300 * streakMult), xp: Math.round(200 * streakMult) },
-    { tier: 'EPIC', color: '#a855f7', cred: Math.round(600 * streakMult), xp: Math.round(400 * streakMult) }
-  ].sort(() => Math.random() - 0.5);
-
-  box.style.maxWidth = '500px';
-  box.innerHTML = `
-    <div style="padding:24px;text-align:center;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <span class="pill" style="color:#f59e0b;border-color:#f59e0b;">Day ${nextStreak} Streak (+${nextStreak * 5}% Boost)</span>
-        <button class="btn-ghost" onclick="document.getElementById('user-modal').classList.add('hidden')">✕</button>
-      </div>
-      <h2 style="margin-bottom:4px;">Pick a Daily Mystery Card!</h2>
-      <p class="sub-text" style="margin-bottom:14px;">Your streak boosts every card by +${nextStreak * 5}% today!</p>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
-        ${pool.map((c, i) => `
-          <div class="glass-card" data-pick-card="${i}" style="padding:18px 10px;cursor:pointer;border-color:rgba(255,255,255,0.18);transition:0.2s;">
-            <div style="color:var(--neon-emerald);display:flex;justify-content:center;margin-bottom:6px;">${PROF_SVG.gift}</div>
-            <strong style="font-size:0.85rem;">Mystery #${i + 1}</strong>
-            <div class="mono-dim" style="margin-top:4px;">Click to Reveal</div>
-          </div>`).join('')}
-      </div>
-      <div class="mono-dim" style="text-align:left;font-weight:700;margin-bottom:6px;">STREAK MILESTONE LADDER</div>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;">
-        ${STREAK_LADDER.map(s => {
-          const done = nextStreak >= s.day;
-          return `<div style="padding:6px 4px;border-radius:8px;background:${done ? 'rgba(16,185,129,0.18)' : '#04070b'};border:1px solid ${done ? '#10b981' : 'rgba(255,255,255,0.08)'};font-size:0.72rem;">
-            <strong style="color:${done ? '#10b981' : '#f8fafc'}">Day ${s.day}</strong><div class="mono-dim">+${s.bonus} Z</div>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`;
-  modal.classList.remove('hidden');
-
-  let picked = false;
-  box.querySelectorAll('[data-pick-card]').forEach(cardEl => (cardEl.onclick = async () => {
-    if (picked) return;
-    picked = true;
-    window.launchConfetti();
-    const chosen = pool[parseInt(cardEl.dataset.pickCard, 10)];
-    box.querySelectorAll('[data-pick-card]').forEach((el, idx) => {
-      const item = pool[idx];
-      el.style.borderColor = item.color;
-      el.style.opacity = idx === parseInt(cardEl.dataset.pickCard, 10) ? '1' : '0.45';
-      el.innerHTML = `<span class="rarity-tag" style="color:${item.color}">${item.tier}</span><h3 style="margin:6px 0 2px;">+${item.cred} Z</h3><div class="mono-dim">+${item.xp} XP</div>`;
-    });
-
-    const totalCred = chosen.cred + streakBonus;
-    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', {
-      credits: p.credits + totalCred,
-      xp: (p.xp || 0) + chosen.xp,
-      last_daily: Date.now(),
-      daily_streak: nextStreak,
-      saved_streak: Math.max(p.saved_streak || 0, nextStreak),
-      dailies_claimed: (p.dailies_claimed || 0) + 1
-    }, window.authToken);
-    await window.refreshMyProfile();
-    window.notify(`${chosen.tier}! +${totalCred} Z-Credits${streakBonus ? ` (+${streakBonus} Z Milestone!)` : ''}`);
-  }));
+  if (!p || Date.now() - (p.last_daily || 0) < 86400000) return;
+  window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits + 200, xp: (p.xp || 0) + 150, last_daily: Date.now(), daily_streak: (p.daily_streak || 0) + 1 }, window.authToken).then(() => window.refreshMyProfile());
+  window.notify('Daily Mystery Reward claimed! +200 Z-Credits & +150 XP');
 };
 
-function checkLevelUpCelebration() {
-  const p = window.userProfile;
-  if (!p) return;
-  const curLvl = Math.floor((p.xp || 0) / 1000) + 1;
-  const key = `zynk_lvl_${p.id}`;
-  const prevLvl = parseInt(localStorage.getItem(key) || String(curLvl), 10);
-  localStorage.setItem(key, String(curLvl));
-  if (curLvl > prevLvl) {
-    window.launchConfetti();
-    const modal = document.getElementById('user-modal');
-    const box = document.getElementById('user-modal-content');
-    if (modal && box) {
-      box.style.maxWidth = '420px';
-      box.innerHTML = `
-        <div style="padding:28px;text-align:center;">
-          <span class="rarity-tag" style="color:#f59e0b">NEURAL RANK ASCENSION</span>
-          <h2 style="font-size:1.8rem;margin:8px 0;color:#10b981;">LEVEL UP!</h2>
-          <p class="sub-text" style="margin-bottom:16px;">Congratulations <strong>@${p.username}</strong> — you reached <strong>Level ${curLvl}</strong>!</p>
-          <button type="button" class="btn-neon" style="width:100%" onclick="document.getElementById('user-modal').classList.add('hidden')">Awesome!</button>
-        </div>`;
-      modal.classList.remove('hidden');
-    }
-  }
-}
-
-document.addEventListener('click', (e) => {
-  if (e.target.id === 'dash-daily-btn') window.openDailyPickerModal();
-});
-
-setInterval(() => {
-  const p = window.userProfile;
-  if (!p) return;
-  const rem = 86400000 - (Date.now() - (p.last_daily || 0));
-  const label = rem <= 0 ? 'Pick Daily Mystery Card' : `Next Card in ${String(Math.floor(rem / 3600000)).padStart(2, '0')}:${String(Math.floor((rem % 3600000) / 60000)).padStart(2, '0')}:${String(Math.floor((rem % 60000) / 1000)).padStart(2, '0')}`;
-  ['daily-quest-btn', 'dash-daily-btn'].forEach(id => {
-    const b = document.getElementById(id);
-    if (b) { b.disabled = rem > 0; b.className = rem <= 0 ? 'btn-neon' : 'btn-outline'; b.textContent = label; }
-  });
-}, 1000);
-
-window.addEventListener('zynk-profile-updated', () => {
-  checkLevelUpCelebration();
-  renderMyProfileTab();
-  renderLeaderboardQuestsAndAnnouncements();
-  renderPartnersAndCredits();
-});
-window.addEventListener('DOMContentLoaded', () => {
-  if (window.activeLegalTabOverride) activeLegalTab = window.activeLegalTabOverride;
-  renderMyProfileTab();
-  renderLeaderboardQuestsAndAnnouncements();
-  renderPartnersAndCredits();
-  renderRulesAndLegal();
-});
+document.addEventListener('click', (e) => { if (e.target.id === 'dash-daily-btn') window.openDailyPickerModal(); });
+window.addEventListener('zynk-profile-updated', () => { renderMyProfileTab(); renderLeaderboardQuestsAndAnnouncements(); renderPartnersAndCredits(); });
+window.addEventListener('DOMContentLoaded', () => { renderMyProfileTab(); renderLeaderboardQuestsAndAnnouncements(); renderPartnersAndCredits(); renderRulesAndLegal(); });
