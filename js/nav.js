@@ -13,10 +13,10 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 const CLOAKS = {
   none: { title: 'ZynkOS — Neural OS & Arcade', icon: 'logo.png' },
-  clever: { title: 'Clever | Portal', icon: 'https://clever.com' },
-  classroom: { title: 'Home - Classroom', icon: 'https://gstatic.com' },
-  drive: { title: 'My Drive - Google Drive', icon: 'https://gstatic.com' },
-  docs: { title: 'Google Docs', icon: 'https://gstatic.com' }
+  clever: { title: 'Clever | Portal', icon: 'https://www.google.com/s2/favicons?domain=clever.com&sz=128' },
+  classroom: { title: 'Home - Classroom', icon: 'https://www.gstatic.com/classroom/logo_square_rounded.svg' },
+  drive: { title: 'My Drive - Google Drive', icon: 'https://ssl.gstatic.com/images/branding/productlogos/drive_2026/v2/ico/drive_2026_256dp.ico' },
+  docs: { title: 'Google Docs', icon: 'https://ssl.gstatic.com/images/branding/productlogos/docs_2026/v2/ico/docs_2026_256dp.ico' }
 };
 
 function applyCloak(key) {
@@ -32,7 +32,7 @@ window.applyLiveWallpaper = function(wp) {
   if (!layer) {
     layer = document.createElement('div');
     layer.id = 'zynk-live-wp';
-    layer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;transition:opacity 0.3s;';
+    layer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.5;transition:opacity 0.3s;';
     document.body.prepend(layer);
   }
   if (!document.getElementById('zynk-wp-keyframes')) {
@@ -40,22 +40,36 @@ window.applyLiveWallpaper = function(wp) {
     st.id = 'zynk-wp-keyframes';
     st.textContent = `
       @keyframes zynkGridMove { 0% { background-position: 0 0; } 100% { background-position: 48px 48px; } }
-      @keyframes zynkPulseBg { 0%, 100% { filter: hue-rotate(0deg) brightness(1); } 50% { filter: hue-rotate(35deg) brightness(1.25); } }
+      @keyframes zynkRainFall { 0% { background-position: 0 0, 24px 30px; } 100% { background-position: 0 96px, 24px 126px; } }
+      @keyframes zynkPulseBg { 0%, 100% { filter: hue-rotate(0deg) brightness(1); } 50% { filter: hue-rotate(40deg) brightness(1.3); } }
+      @keyframes zynkAuroraMove { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
     `;
     document.head.appendChild(st);
   }
   if (wp === 'grid') {
-    layer.style.background = 'linear-gradient(rgba(16,185,129,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(16,185,129,0.18) 1px, transparent 1px)';
+    layer.style.background = 'linear-gradient(rgba(16,185,129,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(16,185,129,0.2) 1px, transparent 1px)';
     layer.style.backgroundSize = '48px 48px';
     layer.style.animation = 'zynkGridMove 4s linear infinite';
   } else if (wp === 'nebula') {
-    layer.style.background = 'radial-gradient(circle at 20% 30%, rgba(6,182,212,0.35), transparent 55%), radial-gradient(circle at 80% 70%, rgba(168,85,247,0.35), transparent 55%)';
+    layer.style.background = 'radial-gradient(circle at 20% 30%, rgba(6,182,212,0.38), transparent 55%), radial-gradient(circle at 80% 70%, rgba(168,85,247,0.38), transparent 55%)';
     layer.style.backgroundSize = '100% 100%';
     layer.style.animation = 'zynkPulseBg 8s ease-in-out infinite';
   } else if (wp === 'solar') {
-    layer.style.background = 'radial-gradient(circle at 50% 20%, rgba(245,158,11,0.32), transparent 60%), radial-gradient(circle at 20% 80%, rgba(244,63,94,0.25), transparent 55%)';
+    layer.style.background = 'radial-gradient(circle at 50% 20%, rgba(245,158,11,0.35), transparent 60%), radial-gradient(circle at 20% 80%, rgba(244,63,94,0.28), transparent 55%)';
     layer.style.backgroundSize = '100% 100%';
     layer.style.animation = 'zynkPulseBg 7s ease-in-out infinite';
+  } else if (wp === 'stars') {
+    layer.style.background = 'radial-gradient(2px 2px at 20px 30px, #fff, transparent), radial-gradient(2px 2px at 70px 80px, #10b981, transparent), radial-gradient(1.5px 1.5px at 45px 60px, #38bdf8, transparent)';
+    layer.style.backgroundSize = '96px 96px';
+    layer.style.animation = 'zynkGridMove 5s linear infinite';
+  } else if (wp === 'rain') {
+    layer.style.background = 'linear-gradient(180deg, rgba(16,185,129,0.25) 0%, transparent 60%), linear-gradient(180deg, rgba(6,182,212,0.2) 0%, transparent 50%)';
+    layer.style.backgroundSize = '48px 96px';
+    layer.style.animation = 'zynkRainFall 2.2s linear infinite';
+  } else if (wp === 'aurora') {
+    layer.style.background = 'linear-gradient(125deg, rgba(16,185,129,0.26), rgba(6,182,212,0.26), rgba(168,85,247,0.26), rgba(245,158,11,0.2))';
+    layer.style.backgroundSize = '300% 300%';
+    layer.style.animation = 'zynkAuroraMove 10s ease infinite';
   } else {
     layer.style.background = 'none';
     layer.style.animation = 'none';
@@ -102,11 +116,11 @@ updateClock();
 
 const HASH_ROUTES = {
   dashboard: 'dash-view', chat: 'chat-view', vortex: 'vortex-view',
-  arcade: 'arcade-view', ranks: 'ranks-view', store: 'store-view',
-  profile: 'profile-view', quests: 'achieve-view', leaderboards: 'leader-view',
-  tools: 'tools-view', partners: 'partners-view', credits: 'credits-view',
-  rules: 'rules-view', privacy: 'rules-view', tos: 'rules-view',
-  reports: 'reports-view', beta: 'beta-view', founder: 'admin-view', settings: 'settings-view'
+  ranks: 'ranks-view', store: 'store-view', profile: 'profile-view',
+  quests: 'achieve-view', leaderboards: 'leader-view', tools: 'tools-view',
+  partners: 'partners-view', credits: 'credits-view', rules: 'rules-view',
+  privacy: 'rules-view', tos: 'rules-view', reports: 'reports-view',
+  beta: 'beta-view', founder: 'admin-view', settings: 'settings-view'
 };
 
 function syncRouteFromHash() {
@@ -240,13 +254,13 @@ function renderSettingsPanel() {
     card.innerHTML = `
       <h2 style="margin-bottom:14px;">Themes, Live Wallpapers & Clock</h2>
       <div class="setting-group"><label>Color Theme</label><select id="set-theme" class="tool-input"><option value="default">Emerald Neural (Default)</option><option value="theme-cyber">Cyber Cyan</option><option value="theme-crimson">Crimson Ops</option><option value="theme-gold">Solar Gold</option><option value="theme-violet">Violet Pulse</option></select></div>
-      <div class="setting-group"><label>Animated Live Wallpaper</label><select id="set-wp" class="tool-input"><option value="none">None (Solid Dark)</option><option value="grid">Cyber Matrix Grid (Moving)</option><option value="nebula">Neon Nebula Pulse (Animated)</option><option value="solar">Solar Aura Shift (Animated)</option></select></div>
+      <div class="setting-group"><label>Animated Live Wallpaper</label><select id="set-wp" class="tool-input"><option value="none">None (Solid Dark)</option><option value="grid">Cyber Matrix Grid (Moving)</option><option value="nebula">Neon Nebula Pulse (Animated)</option><option value="solar">Solar Aura Shift (Animated)</option><option value="stars">Starfield Warp (Animated)</option><option value="rain">Emerald Digital Rain (Animated)</option><option value="aurora">Aurora Prism Wave (Animated)</option></select></div>
       <div class="setting-group"><label>TimeZone</label><select id="set-tz" class="tool-input"><option value="auto">Auto-Detect (Local Time)</option><option value="America/New_York">Eastern Time (ET)</option><option value="America/Chicago">Central Time (CT)</option><option value="America/Denver">Mountain Time (MT)</option><option value="America/Los_Angeles">Pacific Time (PT)</option><option value="UTC">UTC</option></select></div>
       <div class="setting-group"><label>Clock Format</label><select id="set-format" class="tool-input"><option value="12">12-Hour (AM / PM)</option><option value="24">24-Hour (Military)</option></select></div>
       <div class="setting-group"><label>UI Interface Scale</label><select id="set-zoom" class="tool-input"><option value="1">100% (Standard)</option><option value="0.9">90% (Compact)</option><option value="1.1">110% (Large)</option></select></div>
       <button class="btn-neon" id="save-disp-btn">Save Display Preferences</button>`;
 
-    document.getElementById('set-theme').value = localStorage.getItem('zynk_theme') || p?.profile_theme || 'default';
+    document.getElementById('set-theme').value = p?.profile_theme || localStorage.getItem('zynk_theme') || 'default';
     document.getElementById('set-wp').value = localStorage.getItem('zynk_wp') || 'none';
     document.getElementById('set-tz').value = localStorage.getItem('zynk_tz') || 'auto';
     document.getElementById('set-format').value = localStorage.getItem('zynk_format') === '24' ? '24' : '12';
@@ -261,11 +275,14 @@ function renderSettingsPanel() {
       localStorage.setItem('zynk_tz', document.getElementById('set-tz').value);
       localStorage.setItem('zynk_format', document.getElementById('set-format').value);
       localStorage.setItem('zynk_zoom', zm);
-      document.body.className = th === 'default' ? '' : th;
+      window.applySavedTheme?.(th);
       document.body.style.zoom = zm;
       window.applyLiveWallpaper(wp);
       updateClock();
-      if (p) await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { profile_theme: th }, window.authToken);
+      if (p) {
+        p.profile_theme = th;
+        await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { profile_theme: th }, window.authToken);
+      }
       window.notify('Display & wallpaper preferences saved!');
     };
   }
@@ -393,11 +410,25 @@ function renderSettingsPanel() {
 let vtxClient = null;
 let vtxReplyId = null;
 
-async function initVortexGuildClient() {
+function ensureVortexSdkLoaded() {
+  return new Promise((resolve) => {
+    if (window.Vortex) return resolve(window.Vortex);
+    let sc = document.querySelector('script[src*="vortexos.net/sdk"]');
+    if (!sc) {
+      sc = document.createElement('script');
+      sc.src = 'https://vortexos.net';
+      document.head.appendChild(sc);
+    }
+    sc.addEventListener('load', () => resolve(window.Vortex));
+    sc.addEventListener('error', () => resolve(null));
+    setTimeout(() => resolve(window.Vortex || null), 3500);
+  });
+}
+
+window.initVortexGuildClient = async function() {
   const host = document.getElementById('vortex-view');
   if (!host) return;
   host.className = 'tab-view chat-layout';
-  host.style.cssText = '';
   host.innerHTML = `
     <div class="chat-main">
       <div class="view-topbar" style="flex-wrap:wrap;gap:8px;">
@@ -425,12 +456,6 @@ async function initVortexGuildClient() {
       <div id="vortex-members-list"></div>
     </aside>`;
 
-  if (!window.Vortex) {
-    document.getElementById('vtx-status').textContent = 'Vortex SDK loading...';
-    return;
-  }
-
-  vtxClient = window.Vortex.init({ clientId: 'vtx_bc3f3d47d3074ad0f5f1' });
   const statusEl = document.getElementById('vtx-status');
   const loginBtn = document.getElementById('vtx-login-btn');
   const logoutBtn = document.getElementById('vtx-logout-btn');
@@ -438,12 +463,20 @@ async function initVortexGuildClient() {
   const inp = document.getElementById('vtx-input');
   const sendBtn = document.getElementById('vtx-send-btn');
 
+  const sdk = await ensureVortexSdkLoaded();
+  if (!sdk) {
+    statusEl.textContent = 'Vortex SDK offline';
+    return;
+  }
+
+  vtxClient = sdk.init({ clientId: 'vtx_bc3f3d47d3074ad0f5f1' });
+
   const renderVtxMsg = (m) => {
     if (document.querySelector(`[data-vtx-id="${m.id}"]`)) return;
     const div = document.createElement('div');
     div.className = 'chat-msg';
     div.dataset.vtxId = m.id;
-    const col = Array.isArray(m.author?.color) ? m.author.color[0] : (m.author?.color || '#a855f7');
+    const col = Array.isArray(m.author?.color) ? m.author.color : (m.author?.color || '#a855f7');
     const av = m.author?.avatar ? vtxClient.asset(m.author.avatar) : 'logo.png';
     const time = m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
     const canDel = vtxClient.user && (vtxClient.user.id === m.author?.id || (vtxClient.permissions || []).includes('manageMessages'));
@@ -451,7 +484,7 @@ async function initVortexGuildClient() {
 
     div.innerHTML = `
       <div class="msg-actions">
-        <button type="button" class="msg-act-btn" title="Reply" data-vrep="${m.id}" data-vuser="${m.author?.username || 'user'}">↩</button>
+        <button type="button" class="msg-act-btn" title="Reply" data-vrep="${m.id}">↩</button>
         ${canEdit ? `<button type="button" class="msg-act-btn" title="Edit" data-vedit="${m.id}">✎</button>` : ''}
         ${canDel ? `<button type="button" class="msg-act-btn" style="color:#f43f5e;" title="Delete" data-vdel="${m.id}">✕</button>` : ''}
         <button type="button" class="msg-act-btn" style="color:#f59e0b;" title="Report to Vortex" data-vrepmsg="${m.id}">⚑</button>
@@ -459,7 +492,7 @@ async function initVortexGuildClient() {
       <img class="msg-avatar" src="${av}" onerror="this.src='logo.png'" />
       <div style="flex:1;min-width:0;">
         ${m.replyTo ? `<div class="reply-quote">↩ Replying to @${m.replyTo.author?.username || 'member'}: ${String(m.replyTo.content || '').slice(0, 50).replace(/</g, '&lt;')}</div>` : ''}
-        <div><strong style="color:${col}">${m.author?.username || 'Member'}</strong> <span class="mono-dim">${time}</span></div>
+        <div><strong style="color:${col}">${m.author?.username || 'Member'}</strong> <span class="role-chip" style="color:#a855f7;padding:1px 7px;">VTEX</span> <span class="mono-dim">${time}</span></div>
         <div class="vtx-body" style="margin-top:3px;word-break:break-word;">${m.html || vtxClient.render(m.content || '')}${m.editedAt ? ' <span class="mono-dim">(edited)</span>' : ''}</div>
       </div>`;
 
@@ -503,16 +536,31 @@ async function initVortexGuildClient() {
       const { members } = await vtxClient.members('', 50);
       mList.innerHTML = (members || []).map(mb => {
         const u = mb.user || mb;
-        const col = Array.isArray(u.color) ? u.color[0] : (u.color || '#f8fafc');
+        const col = Array.isArray(u.color) ? u.color : (u.color || '#f8fafc');
         const av = u.avatar ? vtxClient.asset(u.avatar) : 'logo.png';
-        return `<div class="member-item"><div class="mem-av-wrap"><img src="${av}" onerror="this.src='logo.png'" /><span class="mem-dot" style="background:${u.online ? '#10b981' : '#64748b'}"></span></div><div style="min-width:0;"><div style="color:${col};font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.username}</div></div></div>`;
+        return `<div class="member-card"><div class="mem-av-wrap"><img src="${av}" onerror="this.src='logo.png'" /><span class="mem-dot" style="background:${u.online ? '#10b981' : '#64748b'}"></span></div><div style="min-width:0;flex:1;"><div style="color:${col};font-weight:700;font-size:0.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.username}</div><div class="mono-dim" style="font-size:0.68rem;">Vortex Member</div></div></div>`;
       }).join('');
     } catch (e) {}
   };
 
+  loginBtn.onclick = async () => {
+    if (!vtxClient) return;
+    try {
+      await vtxClient.login({ popup: true });
+      window.initVortexGuildClient();
+    } catch (err) {
+      vtxClient.login();
+    }
+  };
+
+  logoutBtn.onclick = () => {
+    vtxClient?.logout();
+    window.initVortexGuildClient();
+  };
+
   await vtxClient.ready;
   if (!vtxClient.site.allowed) {
-    statusEl.textContent = `Blocked: ${vtxClient.site.reason || 'Add site in Vortex Where it works'}`;
+    statusEl.textContent = `Site check: ${vtxClient.site.reason || 'Verify site tag'}`;
     return;
   }
 
@@ -524,22 +572,8 @@ async function initVortexGuildClient() {
     sendBtn.disabled = false;
     inp.placeholder = 'Message Vortex Guild...';
   } else {
-    statusEl.textContent = 'Not signed in';
+    statusEl.textContent = 'Ready to sign in';
   }
-
-  loginBtn.onclick = async () => {
-    try {
-      await vtxClient.login({ popup: true });
-      initVortexGuildClient();
-    } catch (err) {
-      statusEl.textContent = err.message;
-    }
-  };
-
-  logoutBtn.onclick = () => {
-    vtxClient.logout();
-    initVortexGuildClient();
-  };
 
   const chBar = document.getElementById('vtx-ch-bar');
   const channels = vtxClient.channels || [];
@@ -550,7 +584,7 @@ async function initVortexGuildClient() {
     loadChannelHistory(channels.find(x => x.id === b.dataset.vch));
   }));
 
-  const initialCh = channels.find(c => c.id === vtxClient.channel) || channels[0];
+  const initialCh = channels.find(c => c.id === vtxClient.channel) || channels;
   if (initialCh) {
     await vtxClient.join(initialCh.id).catch(() => {});
     await loadChannelHistory(initialCh);
@@ -585,7 +619,7 @@ async function initVortexGuildClient() {
       window.notify?.(err.message, true);
     }
   };
-}
+};
 
 window.addEventListener('DOMContentLoaded', () => {
   applyCloak(localStorage.getItem('zynk_cloak') || 'none');
@@ -594,7 +628,7 @@ window.addEventListener('DOMContentLoaded', () => {
   if (zm !== '1') document.body.style.zoom = zm;
   renderSettingsPanel();
   syncRouteFromHash();
-  initVortexGuildClient();
+  window.initVortexGuildClient();
 });
 window.addEventListener('zynk-profile-updated', () => {
   renderSettingsPanel();
