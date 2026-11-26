@@ -59,7 +59,6 @@ function startFoggyWindowRain() {
     vy: 1.4 + Math.random() * 2.4,
     wobble: Math.random() * Math.PI * 2
   }));
-
   function tick() {
     if (!cv.isConnected) return;
     ctx.clearRect(0, 0, w, h);
@@ -74,6 +73,7 @@ function startFoggyWindowRain() {
     });
     ctx.fillStyle = 'rgba(148, 163, 184, 0.06)';
     ctx.fillRect(0, 0, w, h);
+
     drops.forEach(d => {
       d.wobble += 0.04;
       d.x += Math.sin(d.wobble) * 0.25;
@@ -215,9 +215,7 @@ function syncRouteFromHash() {
   window.openTab?.(HASH_ROUTES[slug], true);
 }
 
-window.addEventListener('hashchange', syncRouteFromHash);
-
-const searchInp = document.getElementById('global-search-inp');
+window.addEvconst searchInp = document.getElementById('global-search-inp');
 const searchPop = document.getElementById('global-search-pop');
 
 searchInp?.addEventListener('input', async () => {
@@ -240,6 +238,7 @@ searchInp?.addEventListener('input', async () => {
   if (Array.isArray(msgs) && msgs.length) {
     html += `<div class="mono-dim" style="padding:4px 10px;font-weight:700;">MESSAGES</div>` + msgs.map(m => `<div class="ac-item" data-stab="chat-view"><span><strong>@${m.username}:</strong> ${String(m.content).slice(0, 38)}</span><span class="mono-dim">#${m.channel || 'global'}</span></div>`).join('');
   }
+
   if (!html) html = `<div style="padding:10px;" class="mono-dim">No results for "${q}"</div>`;
   searchPop.innerHTML = html;
   searchPop.classList.remove('hidden');
@@ -273,7 +272,7 @@ window.openInboxModal = async function() {
 
   const reqIds = Array.isArray(p?.friend_requests) ? p.friend_requests : [];
   const reqUsers = reqIds.length ? await window.sbRest(`users?id=in.(${reqIds.join(',')})&select=id,username`).catch(() => []) : [];
-
+entListener('hashchange', syncRouteFromHash);
   box.style.maxWidth = '500px';
   box.innerHTML = `
     <div style="padding:22px;">
@@ -303,6 +302,7 @@ window.openInboxModal = async function() {
 document.addEventListener('click', (e) => {
   if (e.target.closest('#open-inbox-btn')) window.openInboxModal();
 });
+
 let activeSetTab = 'DISPLAY';
 
 function renderSettingsPanel() {
@@ -332,7 +332,6 @@ function renderSettingsPanel() {
 
   shell.querySelectorAll('[data-stab]').forEach(b => (b.onclick = () => { activeSetTab = b.dataset.stab; renderSettingsPanel(); }));
   const card = document.getElementById('settings-body-card');
-
   if (activeSetTab === 'DISPLAY') {
     card.innerHTML = `
       <h2 style="margin-bottom:14px;">Themes, Live Wallpapers & Clock</h2>
@@ -526,7 +525,6 @@ function renderSettingsPanel() {
   }
 }
 let vtxClient = null;
-let vtxReplyId = null;
 
 function ensureVortexSdkLoaded() {
   return new Promise((resolve) => {
@@ -573,8 +571,6 @@ window.initVortexGuildClient = async function() {
         </div>
       </div>
       <div class="chat-feed" id="vortex-messages"></div>
-      <div id="vtx-typing-bar" class="typing-bar"></div>
-      <div id="vtx-reply-bar" class="reply-banner hidden"></div>
       <form class="chat-input-bar" id="vtx-form">
         <input type="text" id="vtx-input" maxlength="2000" placeholder="Sign in with Vortex to chat..." autocomplete="off" disabled />
         <button type="submit" class="btn-neon" id="vtx-send-btn" disabled>Send</button>
@@ -588,42 +584,13 @@ window.initVortexGuildClient = async function() {
   const statusEl = document.getElementById('vtx-status');
   const loginBtn = document.getElementById('vtx-login-btn');
   const logoutBtn = document.getElementById('vtx-logout-btn');
-  const msgFeed = document.getElementById('vortex-messages');
   const inp = document.getElementById('vtx-input');
   const sendBtn = document.getElementById('vtx-send-btn');
 
   const sdk = await ensureVortexSdkLoaded();
-  if (!sdk) {
-    statusEl.textContent = 'Vortex SDK offline';
-    return;
-  }
+  if (!sdk) { statusEl.textContent = 'Vortex SDK offline'; return; }
 
   vtxClient = sdk.init({ clientId: 'vtx_bc3f3d47d3074ad0f5f1' });
-
-  const renderVtxMsg = (m) => {
-    if (!m || !m.id || document.querySelector(`[data-vtx-id="${m.id}"]`)) return;
-    const div = document.createElement('div');
-    div.className = 'chat-msg';
-    div.dataset.vtxId = m.id;
-    const col = Array.isArray(m.author?.color) ? m.author.color : (m.author?.color || '#a855f7');
-    const av = m.author?.avatar || 'logo.png';
-    const time = m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-    const srcLabel = (m.source && m.source !== 'vortex') ? m.source.toUpperCase() : 'VTEX';
-
-    div.innerHTML = `
-      <img class="msg-avatar" src="${av}" onerror="this.src='logo.png'" />
-      <div style="flex:1;min-width:0;">
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-          <strong style="color:${col}">${m.author?.username || 'Member'}</strong>
-          <span class="role-chip" style="color:#38bdf8;border-color:rgba(56,189,248,0.35);padding:1px 7px;">${srcLabel}</span>
-          <span class="mono-dim">${time}</span>
-        </div>
-        <div class="vtx-body" style="margin-top:3px;word-break:break-word;">${m.html || vtxClient.render(m.content || '')}</div>
-      </div>`;
-    msgFeed.appendChild(div);
-    msgFeed.scrollTop = msgFeed.scrollHeight;
-  };
-
   loginBtn.onclick = async () => {
     try { await vtxClient.login({ popup: true }); window.initVortexGuildClient(); } catch (e) { vtxClient.login(); }
   };
