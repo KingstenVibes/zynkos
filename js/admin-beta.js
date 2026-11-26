@@ -21,22 +21,54 @@ function compressImageFile(file, maxDim = 320) {
   });
 }
 
+window.claimStaffStipend = async function() {
+  const p = window.userProfile;
+  if (!p) return;
+  if (Date.now() - (p.last_staff_stipend || 0) < 86400000) return window.notify?.('Staff stipend is on 24h cooldown!', true);
+  const nextStreak = (p.staff_streak || 0) + 1;
+  const total = Math.round(250 * (1 + nextStreak * 0.05));
+  await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', {
+    credits: p.credits + total,
+    xp: (p.xp || 0) + 150,
+    last_staff_stipend: Date.now(),
+    staff_streak: nextStreak
+  }, window.authToken);
+  window.launchConfetti?.();
+  await window.refreshMyProfile();
+  window.notify?.(`Staff Stipend Claimed! +${total} Z-Credits (Day ${nextStreak} • +${nextStreak * 5}% Staff Bonus!)`);
+};
+
+function buildStaffStipendCardHtml(p) {
+  const rem = 86400000 - (Date.now() - (p.last_staff_stipend || 0));
+  const nextStreak = (p.staff_streak || 0) + 1;
+  const bonusPct = nextStreak * 5;
+  const previewAmt = Math.round(250 * (1 + bonusPct / 100));
+  return `
+    <div class="glass-card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;border-color:rgba(6,182,212,0.4);">
+      <div>
+        <span class="rarity-tag" style="color:#06b6d4;">DAILY STAFF STIPEND • DAY ${nextStreak} (+${bonusPct}% BONUS)</span>
+        <h3 style="margin:2px 0;">Staff Daily Bonus: +${previewAmt} Z-Credits & +150 XP</h3>
+        <p class="sub-text">Grows by +5% every consecutive day you claim your staff stipend!</p>
+      </div>
+      <button type="button" class="${rem <= 0 ? 'btn-neon' : 'btn-outline'}" ${rem <= 0 ? '' : 'disabled'} onclick="claimStaffStipend()">${rem <= 0 ? `Claim +${previewAmt} Z Stipend` : 'Claimed Today'}</button>
+    </div>`;
+}
+
+function renderStaffStipendOnHome() {
+  const slot = document.getElementById('dash-staff-stipend-slot');
+  const p = window.userProfile;
+  const isStaff = p && (['FOUNDER', 'HEAD DEV', 'DEVELOPER', 'ADMIN', 'MODERATOR'].includes((p.role || '').toUpperCase()) || (p.extra_roles || []).some(r => ['ADMIN', 'MODERATOR'].includes(r)));
+  if (!slot) return;
+  slot.innerHTML = isStaff ? buildStaffStipendCardHtml(p) : '';
+}
 async function renderStaffReports() {
   const box = document.getElementById('reports-container');
   const p = window.userProfile;
-  const isStaff = p && (['FOUNDER', 'ADMIN', 'MODERATOR'].includes(p.role) || (p.extra_roles || []).some(r => ['ADMIN', 'MODERATOR'].includes(r)));
+  const isStaff = p && (['FOUNDER', 'HEAD DEV', 'DEVELOPER', 'ADMIN', 'MODERATOR'].includes((p.role || '').toUpperCase()) || (p.extra_roles || []).some(r => ['ADMIN', 'MODERATOR'].includes(r)));
   if (!box || !isStaff || !window.sbRest) return;
 
   const reports = await window.sbRest('zynk_reports?order=id.desc&limit=50').catch(() => []);
-  const stipendBanner = `
-    <div class="glass-card" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;border-color:rgba(6,182,212,0.35);">
-      <div>
-        <span class="rarity-tag" style="color:#06b6d4;">STAFF PERK • COMING SOON</span>
-        <h3>Daily Staff Stipend</h3>
-        <p class="sub-text">Daily Z-Credits bonus for active Moderators, Admins & Staff will unlock here soon.</p>
-      </div>
-      <button type="button" class="btn-outline" disabled>Coming Soon</button>
-    </div>`;
+  const stipendHtml = `<div style="margin-bottom:16px;">${buildStaffStipendCardHtml(p)}</div>`;
 
   const listHtml = (reports || []).map(r => `
     <div class="glass-card" id="rep-${r.id}" style="margin-bottom:12px;">
@@ -46,14 +78,14 @@ async function renderStaffReports() {
       </div>
       <div style="padding:10px;border-radius:8px;background:#04070b;margin-bottom:10px;font-size:0.86rem;">"${String(r.message_text || '').replace(/</g, '&lt;')}"</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button type="button" class="btn-outline" data-act="ghost" data-id="${r.id}">Ghost (Dismiss)</button>
+        <button type="button" class="btn-outline" data-act="ghost" data-id="${r.id}" data-u="${r.target_user}">Ghost (Dismiss)</button>
         <button type="button" class="btn-outline" style="color:#f59e0b;border-color:#f59e0b;" data-act="mute" data-id="${r.id}" data-u="${r.target_user}" data-r="${r.reason}">Mute (Choose Time)</button>
         <button type="button" class="btn-outline" style="color:#f43f5e;border-color:#f43f5e;" data-act="ban" data-id="${r.id}" data-u="${r.target_user}" data-r="${r.reason}">Ban (Choose Time)</button>
         <button type="button" class="btn-neon" style="background:#f43f5e;color:#fff;" data-act="term" data-id="${r.id}" data-u="${r.target_user}" data-r="${r.reason}">Terminate Account</button>
       </div>
     </div>`).join('') || '<div class="glass-card"><p class="sub-text">No reports in the moderation queue. All clear!</p></div>';
 
-  box.innerHTML = stipendBanner + listHtml;
+  box.innerHTML = stipendHtml + listHtml;
 
   box.querySelectorAll('[data-act]').forEach(btn => (btn.onclick = async () => {
     const act = btn.dataset.act;
@@ -62,6 +94,7 @@ async function renderStaffReports() {
     const reason = btn.dataset.r || 'Rule violation';
     if (act === 'ghost') {
       await window.sbRest(`zynk_reports?id=eq.${id}`, 'DELETE', null, window.authToken);
+      await window.logAudit?.('REPORT_GHOST', `@${target}`, 'Dismissed report');
       document.getElementById(`rep-${id}`)?.remove();
       return window.notify?.('Report ghosted & dismissed.');
     }
@@ -72,6 +105,7 @@ async function renderStaffReports() {
       const ms = m ? parseInt(m.at(1), 10) * (m.at(2).toLowerCase() === 'd' ? 86400000 : m.at(2).toLowerCase() === 'h' ? 3600000 : 60000) : 600000;
       await window.sbRest(`users?username=ilike.${encodeURIComponent(target)}`, 'PATCH', { is_muted: true, mute_until: Date.now() + ms, mute_reason: reason }, window.authToken);
       await window.sbRest(`zynk_reports?id=eq.${id}`, 'DELETE', null, window.authToken);
+      await window.logAudit?.('REPORT_MUTE', `@${target}`, `${dur} — ${reason}`);
       document.getElementById(`rep-${id}`)?.remove();
       return window.notify?.(`Muted @${target} for ${dur}.`);
     }
@@ -82,6 +116,7 @@ async function renderStaffReports() {
       const ms = m ? parseInt(m.at(1), 10) * (m.at(2).toLowerCase() === 'd' ? 86400000 : m.at(2).toLowerCase() === 'h' ? 3600000 : 60000) : 86400000;
       await window.sbRest(`users?username=ilike.${encodeURIComponent(target)}`, 'PATCH', { ban_until: Date.now() + ms, ban_reason: reason, online: false }, window.authToken);
       await window.sbRest(`zynk_reports?id=eq.${id}`, 'DELETE', null, window.authToken);
+      await window.logAudit?.('REPORT_BAN', `@${target}`, `${dur} — ${reason}`);
       document.getElementById(`rep-${id}`)?.remove();
       return window.notify?.(`Banned @${target} for ${dur}.`);
     }
@@ -89,6 +124,7 @@ async function renderStaffReports() {
       if (!confirm(`Permanently terminate @${target}'s account?`)) return;
       await window.sbRest(`users?username=ilike.${encodeURIComponent(target)}`, 'PATCH', { ban_until: 9999999999999, ban_reason: `Terminated: ${reason}`, online: false }, window.authToken);
       await window.sbRest(`zynk_reports?id=eq.${id}`, 'DELETE', null, window.authToken);
+      await window.logAudit?.('TERMINATE_ACCOUNT', `@${target}`, reason);
       document.getElementById(`rep-${id}`)?.remove();
       return window.notify?.(`Terminated @${target}.`);
     }
@@ -163,7 +199,8 @@ async function renderAdminAndBeta() {
     { id: 'SHOP', label: 'Shop & Deals' },
     { id: 'PARTNERS', label: 'Partners & Credits' },
     { id: 'ROLES', label: 'Members & Roles' },
-    { id: 'SECRETS', label: 'Quests & Secrets' }
+    { id: 'SECRETS', label: 'Quests & Secrets' },
+    { id: 'AUDIT', label: 'Audit Log' }
   ];
 
   adminBox.innerHTML = `
@@ -197,6 +234,7 @@ async function renderAdminAndBeta() {
       const body = document.getElementById('ann-body').value.trim();
       if (!title || !body) return window.notify('Enter both title and message.', true);
       await window.sbRest('announcements', 'POST', { icon: '', title, body, author: p.username }, window.authToken);
+      await window.logAudit?.('ANNOUNCEMENT', title, body);
       window.notify('Announcement published!');
       renderAdminAndBeta();
     };
@@ -206,8 +244,6 @@ async function renderAdminAndBeta() {
       await window.sbRest(`announcements?id=eq.${id}`, 'DELETE', null, window.authToken);
     }));
   }
-
-
   if (activeFounderTab === 'SHOP') {
     const storeItems = await window.sbRest('store_items?order=id.asc').catch(() => []);
     sub.innerHTML = `
@@ -247,6 +283,7 @@ async function renderAdminAndBeta() {
       const rawVal = document.getElementById('adm-item-val').value.trim();
       if (!name) return window.notify('Enter item name.', true);
       await window.sbRest('store_items', 'POST', { name, image_url: img, item_type: document.getElementById('adm-item-type').value, rarity: document.getElementById('adm-item-rarity').value, item_value: rawVal || img || '#10b981', cost: parseInt(document.getElementById('adm-item-cost').value, 10) || 100, is_daily_deal: document.getElementById('adm-item-deal').checked }, window.authToken);
+      await window.logAudit?.('STORE_ADD', name, `Added ${document.getElementById('adm-item-type').value} to store`);
       uploadedImg = '';
       window.notify('Published to Store!');
       window.renderRanksAndStore?.();
@@ -263,6 +300,7 @@ async function renderAdminAndBeta() {
       const id = b.dataset.delItem;
       document.getElementById(`st-row-${id}`)?.remove();
       await window.sbRest(`store_items?id=eq.${id}`, 'DELETE', null, window.authToken);
+      await window.logAudit?.('STORE_DELETE', `Item #${id}`, 'Removed item from store');
       window.renderRanksAndStore?.();
       window.notify('Deleted item from Store!');
     }));
@@ -332,7 +370,7 @@ async function renderAdminAndBeta() {
       await window.sbRest(`zynk_credits?id=eq.${id}`, 'DELETE', null, window.authToken);
     }));
   }
-    if (activeFounderTab === 'ROLES') {
+  if (activeFounderTab === 'ROLES') {
     const allMembers = await window.sbRest('users?order=username.asc&limit=200').catch(() => []);
     sub.innerHTML = `
       <div class="bento-grid" style="padding:0;">
@@ -356,7 +394,7 @@ async function renderAdminAndBeta() {
         <h3 style="display:flex;align-items:center;gap:8px;">${ADM_SVG.shield} Editing: <span style="color:#10b981">@${u.username}</span></h3>
         <p class="mono-dim" style="margin-bottom:10px;">Balance: ${u.credits} Z-Credits • Role: [${u.role}] • UID: ${u.id}</p>
         <label class="sub-text">Primary Role:</label>
-        <select id="ed-role" class="tool-input"><option value="MEMBER">MEMBER</option><option value="SUPPORTER">SUPPORTER</option><option value="VIP">VIP</option><option value="UPLOADER">UPLOADER</option><option value="DESIGNER">DESIGNER</option><option value="BETA">BETA TESTER</option><option value="MODERATOR">MODERATOR</option><option value="ADMIN">ADMIN</option><option value="FOUNDER">FOUNDER</option></select>
+        <select id="ed-role" class="tool-input"><option value="MEMBER">MEMBER</option><option value="SUPPORTER">SUPPORTER</option><option value="VIP">VIP</option><option value="UPLOADER">UPLOADER</option><option value="DESIGNER">DESIGNER</option><option value="BETA">BETA TESTER</option><option value="MODERATOR">MODERATOR</option><option value="ADMIN">ADMIN</option><option value="DEVELOPER">DEVELOPER</option><option value="HEAD DEV">HEAD DEV</option><option value="FOUNDER">FOUNDER</option></select>
         <label class="sub-text">Extra Badge Roles (Ctrl+Click for multiple):</label>
         <select id="ed-extras" multiple class="tool-input" style="height:90px;"><option value="SUPPORTER">SUPPORTER</option><option value="VIP">VIP</option><option value="UPLOADER">UPLOADER</option><option value="DESIGNER">DESIGNER</option><option value="OG">OG MEMBER</option><option value="BETA">BETA</option></select>
         <div style="display:flex;gap:8px;align-items:center;">
@@ -378,6 +416,7 @@ async function renderAdminAndBeta() {
         const add = parseInt(document.getElementById('ed-cred-amt').value, 10) || 0;
         const next = (u.credits || 0) + add;
         await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { credits: next }, window.authToken);
+        await window.logAudit?.('ADD_CREDITS', `@${u.username}`, `+${add} Z-Credits (New: ${next})`);
         u.credits = next;
         window.notify(`Added +${add} Z-Credits to @${u.username} (Now: ${next})`);
         if (u.id === p.id) await window.refreshMyProfile();
@@ -387,6 +426,7 @@ async function renderAdminAndBeta() {
       document.getElementById('ed-set-cred').onclick = async () => {
         const exact = Math.max(0, parseInt(document.getElementById('ed-cred-amt').value, 10) || 0);
         await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { credits: exact }, window.authToken);
+        await window.logAudit?.('SET_CREDITS', `@${u.username}`, `Set to ${exact} Z-Credits`);
         u.credits = exact;
         window.notify(`Set @${u.username} balance to ${exact} Z-Credits`);
         if (u.id === p.id) await window.refreshMyProfile();
@@ -395,6 +435,7 @@ async function renderAdminAndBeta() {
 
       document.getElementById('ed-clear-inf').onclick = async () => {
         await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { infractions: [], is_muted: false, mute_until: 0, ban_until: 0 }, window.authToken);
+        await window.logAudit?.('CLEAR_INFRACTIONS', `@${u.username}`, 'Restored standing');
         window.notify(`Cleared infractions & restored standing for @${u.username}!`);
       };
 
@@ -403,6 +444,7 @@ async function renderAdminAndBeta() {
         const extras = Array.from(document.getElementById('ed-extras').selectedOptions).map(o => o.value);
         const is_beta = role === 'BETA' || role === 'FOUNDER' || extras.includes('BETA');
         await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { role, extra_roles: extras, is_beta }, window.authToken);
+        await window.logAudit?.('EDIT_ROLES', `@${u.username}`, `Role: ${role} | Extras: ${extras.join(', ') || 'None'}`);
         Object.assign(u, { role, extra_roles: extras, is_beta });
         window.notify(`Saved roles for @${u.username}!`);
         if (u.id === p.id) await window.refreshMyProfile();
@@ -460,7 +502,18 @@ async function renderAdminAndBeta() {
       renderAdminAndBeta();
     }));
   }
+
+  if (activeFounderTab === 'AUDIT') {
+    const logs = await window.sbRest('zynk_audit_logs?order=id.desc&limit=80').catch(() => []);
+    sub.innerHTML = `
+      <div class="glass-card">
+        <div class="card-head"><span>System & Staff Audit Log</span><span class="mono-dim">${(logs || []).length} RECORDED EVENTS</span></div>
+        <div style="max-height:380px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
+          ${(logs || []).map(l => `<div style="padding:8px 12px;border-radius:8px;background:#04070b;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;"><span><strong style="color:#10b981">@${l.actor}</strong> <span class="pill" style="padding:1px 7px;font-size:0.7rem;">${l.action}</span> <strong>${l.target}</strong> — ${l.details}</span><span class="mono-dim">${l.created_at ? new Date(l.created_at).toLocaleString() : ''}</span></div>`).join('') || '<p class="sub-text">No audit log events recorded yet.</p>'}
+        </div>
+      </div>`;
+  }
 }
 
-window.addEventListener('zynk-profile-updated', () => { renderAdminAndBeta(); renderStaffReports(); });
-window.addEventListener('DOMContentLoaded', () => { renderAdminAndBeta(); renderStaffReports(); });
+window.addEventListener('zynk-profile-updated', () => { renderAdminAndBeta(); renderStaffReports(); renderStaffStipendOnHome(); });
+window.addEventListener('DOMContentLoaded', () => { renderAdminAndBeta(); renderStaffReports(); renderStaffStipendOnHome(); });
