@@ -465,7 +465,7 @@ window.reportChatMsg = async function(msgId, targetUser, msgText) {
   const reason = prompt(`Report @${targetUser} — Enter reason:`);
   if (!reason || !reason.trim()) return;
   await window.sbRest('zynk_reports', 'POST', { reporter: me.username, target_user: targetUser, message_id: msgId, message_text: msgText, channel: activeChannel, reason: reason.trim() }, window.authToken);
-  window.notify?.('Report submitted bez be true!');
+  window.notify?.('Report submitted!');
 };
 window.editChatMsg = function(msgId, oldText) {
   const row = document.querySelector(`[data-mid="${msgId}"]`);
@@ -529,6 +529,55 @@ function buildMsgEl(m) {
   div.querySelector('.msg-author').onclick = openProf;
   return div;
 }
+let lastSeenGlobalNotifId = 0;
+let lastSeenAnnId = 0;
+let lastSeenReqCount = -1;
+
+window.sendZynkSystemNotif = function(title, body, category, onClick) {
+  const prefs = JSON.parse(localStorage.getItem('zynk_notif_prefs') || '{"enabled":true,"mentions":true,"dms":true,"friends":true,"announcements":true}');
+  if (!prefs.enabled) return;
+  if (category && prefs[category] === false) return;
+  window.notify?.(`${title}: ${body}`, false, onClick);
+  if ('Notification' in window && Notification.permission === 'granted') {
+    const n = new Notification(title, { body, icon: 'logo.png', badge: 'logo.png' });
+    n.onclick = () => { window.focus(); onClick?.(); n.close(); };
+  }
+};
+
+async function pollBackgroundNotifications() {
+  const me = window.userProfile;
+  if (!window.sbRest || !me) return;
+  const recent = await window.sbRest(`messages?select=id,username,content,channel&id=gt.${lastSeenGlobalNotifId}&order=id.asc&limit=15`).catch(() => []);
+  if (Array.isArray(recent) && recent.length) {
+    const firstRun = lastSeenGlobalNotifId === 0;
+    recent.forEach(m => {
+      if (m.id > lastSeenGlobalNotifId) lastSeenGlobalNotifId = m.id;
+      if (firstRun || m.username === me.username || m.username === 'ZynkBot') return;
+      const ch = m.channel || 'global';
+      if (!canAccessChannel(me, ch)) return;
+      if (ch.startsWith('dm_')) {
+        window.sendZynkSystemNotif(`ZynkOS • Private DM from @${m.username}`, m.content || 'Sent an attachment', 'dms', () => { window.openTab?.('chat-view'); window.switchChatChannel(ch, `@${m.username}`); });
+      } else if (new RegExp(`@${me.username}\\b`, 'i').test(m.content || '')) {
+        window.sendZynkSystemNotif(`ZynkOS • #${ch}`, `@${m.username}: ${m.content}`, 'mentions', () => { window.openTab?.('chat-view'); window.switchChatChannel(ch, ch === 'global' ? '#zynk-global' : `#${ch}`); });
+      }
+    });
+  }
+  const anns = await window.sbRest('announcements?select=id,title,body,author&order=id.desc&limit=1').catch(() => []);
+  const latestAnn = Array.isArray(anns) ? anns.at(0) : null;
+  if (latestAnn) {
+    if (lastSeenAnnId > 0 && latestAnn.id > lastSeenAnnId && latestAnn.author !== me.username) {
+      window.sendZynkSystemNotif(`ZynkOS • ${latestAnn.title}`, latestAnn.body, 'announcements', () => window.openTab?.('dash-view'));
+    }
+    lastSeenAnnId = latestAnn.id;
+  }
+  const reqs = Array.isArray(me.friend_requests) ? me.friend_requests : [];
+  if (lastSeenReqCount >= 0 && reqs.length > lastSeenReqCount) {
+    window.sendZynkSystemNotif('ZynkOS • New Friend Request', 'Someone sent you a friend request! Click to view.', 'friends', () => window.openInboxModal?.());
+  }
+  lastSeenReqCount = reqs.length;
+}
+setInterval(pollBackgroundNotifications, 4000);
+
 function appendSingleMsg(m) {
   if (!msgBox) return;
   msgBox.appendChild(buildMsgEl(m));
@@ -542,19 +591,16 @@ function renderMessages(msgs) {
   msgs.forEach(m => msgBox.appendChild(buildMsgEl(m)));
   if (wasAtBottom || !initialChatLoaded) msgBox.scrollTop = msgBox.scrollHeight;
 }
-
 function ensureChatScrollControls() {
   const mainCol = document.querySelector('#chat-view .chat-main');
   if (!mainCol || document.getElementById('chat-unread-bar')) return;
   mainCol.style.position = 'relative';
-
   const uBar = document.createElement('div');
   uBar.id = 'chat-unread-bar';
   uBar.className = 'hidden';
   uBar.style.cssText = 'background:rgba(244,63,94,0.16);border:1px solid #f43f5e;color:#fda4af;border-radius:10px;padding:6px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;';
   uBar.innerHTML = `<span>You have unread messages in this channel</span><button type="button" id="chat-mark-read-btn" class="btn-neon" style="padding:3px 10px;font-size:0.74rem;">Mark as Read</button>`;
   msgBox?.before(uBar);
-
   const jumpBtn = document.createElement('button');
   jumpBtn.type = 'button';
   jumpBtn.id = 'chat-jump-bottom';
@@ -563,11 +609,7 @@ function ensureChatScrollControls() {
   jumpBtn.textContent = '↓ Jump to Present';
   jumpBtn.onclick = () => { if (msgBox) msgBox.scrollTop = msgBox.scrollHeight; jumpBtn.classList.add('hidden'); };
   mainCol.appendChild(jumpBtn);
-
-  msgBox?.addEventListener('scroll', () => {
-    const dist = msgBox.scrollHeight - msgBox.scrollTop - msgBox.clientHeight;
-    jumpBtn.classList.toggle('hidden', dist < 140);
-  });
+  msgBox?.addEventListener('scroll', () => { jumpBtn.classList.toggle('hidden', (msgBox.scrollHeight - msgBox.scrollTop - msgBox.clientHeight) < 140); });
 }
 
 async function pollChatAndMembers() {
@@ -587,25 +629,15 @@ async function pollChatAndMembers() {
       if (uBar) {
         uBar.classList.toggle('hidden', !(savedRead > 0 && latestId > savedRead));
         const mrBtn = document.getElementById('chat-mark-read-btn');
-        if (mrBtn) mrBtn.onclick = () => {
-          lastReadMsgIdByCh[activeChannel] = latestId;
-          localStorage.setItem('zynk_read_ids', JSON.stringify(lastReadMsgIdByCh));
-          uBar.classList.add('hidden');
-          if (msgBox) msgBox.scrollTop = msgBox.scrollHeight;
-        };
+        if (mrBtn) mrBtn.onclick = () => { lastReadMsgIdByCh[activeChannel] = latestId; localStorage.setItem('zynk_read_ids', JSON.stringify(lastReadMsgIdByCh)); uBar.classList.add('hidden'); if (msgBox) msgBox.scrollTop = msgBox.scrollHeight; };
       }
       const hash = activeChannel + ':' + JSON.stringify(msgs.map(m => [m.id, m.content, m.edited, m.reactions]));
       if (hash !== lastChatHash) {
         const firstLoad = !lastChatHash;
         lastChatHash = hash;
         renderMessages(msgs);
-        if (firstLoad && savedRead > 0) {
-          const targetEl = document.querySelector(`[data-mid="${savedRead}"]`);
-          if (targetEl && msgBox) msgBox.scrollTop = Math.max(0, targetEl.offsetTop - 40);
-        } else if (!savedRead && latestId) {
-          lastReadMsgIdByCh[activeChannel] = latestId;
-          localStorage.setItem('zynk_read_ids', JSON.stringify(lastReadMsgIdByCh));
-        }
+        if (firstLoad && savedRead > 0) { const targetEl = document.querySelector(`[data-mid="${savedRead}"]`); if (targetEl && msgBox) msgBox.scrollTop = Math.max(0, targetEl.offsetTop - 40); }
+        else if (!savedRead && latestId) { lastReadMsgIdByCh[activeChannel] = latestId; localStorage.setItem('zynk_read_ids', JSON.stringify(lastReadMsgIdByCh)); }
       }
     }
   } catch (err) {}
@@ -623,7 +655,6 @@ async function pollChatAndMembers() {
     }
   }
 }
-
 document.addEventListener('keydown', (e) => {
   if (e.target.id === 'chat-input' && e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
@@ -670,9 +701,7 @@ chatForm?.addEventListener('submit', async (e) => {
   if (activeChannel === 'global' && !raw.startsWith('/')) {
     const wait = Math.ceil((5000 - (Date.now() - lastGlobalSentAt)) / 1000);
     if (wait > 0) return window.notify?.(`Slow mode in #zynk-global: wait ${wait}s before sending again.`, true);
-    if (raw && raw.toLowerCase() === lastGlobalMsgText.toLowerCase()) {
-      return window.notify?.('You cannot send the exact same message twice in a row in #zynk-global.', true);
-    }
+    if (raw && raw.toLowerCase() === lastGlobalMsgText.toLowerCase()) return window.notify?.('You cannot send the exact same message twice in a row in #zynk-global.', true);
     lastGlobalSentAt = Date.now();
     lastGlobalMsgText = raw;
   }
