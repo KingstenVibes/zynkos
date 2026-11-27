@@ -5,7 +5,6 @@ const PROF_SVG = {
   msg: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
   shield: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
   gift: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>`,
-  bag: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>`,
   scroll: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`
 };
 
@@ -112,10 +111,12 @@ async function renderMyProfileTab() {
   if (!box) return;
   if (!p) { box.innerHTML = `<div class="glass-card"><h2>Sign in to customize your profile</h2></div>`; return; }
 
-  const allItems = await window.sbRest('store_items?order=id.asc').catch(() => []);
-  const ownedList = (allItems || []).filter(it => (p.owned_items || []).includes(it.id));
+  let draftAvatar = p.avatar || 'logo.png';
+  let draftBanner = p.banner || 'linear-gradient(135deg,#064e3b,#0f172a)';
+  const origBio = p.bio || '';
+
   const frameGlow = p.avatar_frame && p.avatar_frame !== 'none' ? `box-shadow:0 0 0 3px ${p.avatar_frame},0 0 18px ${p.avatar_frame};` : '';
-  const bannerBg = p.banner && (p.banner.startsWith('http') || String(p.banner).startsWith('data:')) ? `url('${p.banner}') center/cover` : (p.banner || 'linear-gradient(135deg,#064e3b,#0f172a)');
+  const bannerBg = draftBanner.startsWith('http') || draftBanner.startsWith('data:') ? `url('${draftBanner}') center/cover` : draftBanner;
 
   const isPrivileged = ['FOUNDER', 'HEAD DEV', 'DEVELOPER', 'ADMIN', 'MODERATOR'].includes((p.role || '').toUpperCase());
   const canUploadPfp = isPrivileged || (p.owned_items || []).includes('pwr_pfp');
@@ -134,40 +135,76 @@ async function renderMyProfileTab() {
   const myReqs = (allUsers || []).filter(u => reqIds.includes(u.id));
 
   box.innerHTML = `
-    <div style="max-width:860px;margin:auto;display:flex;flex-direction:column;gap:20px;">
+    <div style="max-width:860px;margin:auto;display:flex;flex-direction:column;gap:20px;padding-bottom:70px;">
       <div class="glass-card" style="padding:0;overflow:hidden;">
-        <div class="banner-hero" style="background:${bannerBg}">
-          <img class="banner-avatar" style="border-color:${p.equipped_color};${frameGlow}" src="${safeAvatar(p.avatar)}" />
+        <div class="banner-hero" id="prof-banner-preview" style="background:${bannerBg}">
+          <img class="banner-avatar" id="prof-avatar-preview" style="border-color:${p.equipped_color};${frameGlow}" src="${safeAvatar(draftAvatar)}" />
         </div>
         <div class="profile-body">
           <h2 style="color:${p.equipped_color}">${p.username}</h2>
           <div class="badges-row" style="margin:6px 0 14px;">${window.renderRoleChips ? window.renderRoleChips(p) : ''}</div>
-          <div class="setting-group"><label>About Me / Bio (Press Enter for new lines)</label><textarea id="edit-bio" class="tool-input" rows="4" style="resize:vertical;line-height:1.5;">${p.bio || ''}</textarea></div>
+          <div class="setting-group"><label>About Me / Bio (Press Enter for new lines)</label><textarea id="edit-bio" class="tool-input" rows="4" style="resize:vertical;line-height:1.5;">${origBio}</textarea></div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-            <button id="save-my-profile" class="btn-neon">Save Bio</button>
-            <button id="reset-my-gear" class="btn-outline">Reset Avatar & Banner</button>
             <input type="file" id="custom-pfp-inp" accept="image/*" style="position:fixed;left:-9999px;opacity:0;" />
             <input type="file" id="custom-ban-inp" accept="image/*" style="position:fixed;left:-9999px;opacity:0;" />
-            <button id="upload-pfp-btn" class="btn-outline">${canUploadPfp ? 'Upload Custom PFP' : 'Upload Custom PFP (Store Pass)'}</button>
-            <button id="upload-ban-btn" class="btn-outline">${canUploadBanner ? 'Upload Custom Banner' : 'Upload Custom Banner (Store Pass)'}</button>
+            <button type="button" id="upload-pfp-btn" class="btn-outline">${canUploadPfp ? 'Upload Custom PFP' : 'Upload Custom PFP (Store Pass)'}</button>
+            <button type="button" id="upload-ban-btn" class="btn-outline">${canUploadBanner ? 'Upload Custom Banner' : 'Upload Custom Banner (Store Pass)'}</button>
+            <button type="button" id="reset-my-gear" class="btn-outline">Reset Avatar & Banner</button>
           </div>
         </div>
       </div>
       <div class="glass-card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><h3 style="display:flex;align-items:center;gap:8px;">${PROF_SVG.userCheck} Friends (${myFriends.length}) & Requests (${myReqs.length})</h3></div>${myReqs.length ? `<div style="margin-bottom:12px;"><div class="mono-dim" style="margin-bottom:6px;">INCOMING REQUESTS</div>${myReqs.map(r => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:#04070b;border-radius:8px;margin-bottom:6px;"><span><strong>@${r.username}</strong></span><button class="btn-neon" style="padding:4px 10px;font-size:0.78rem;" onclick="acceptFriendRequest('${r.id}')">Accept</button></div>`).join('')}</div>` : ''}<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;">${myFriends.map(f => `<div style="padding:10px;border-radius:10px;background:#04070b;display:flex;justify-content:space-between;align-items:center;"><div style="display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="openUserModal('${f.id}')"><img src="${safeAvatar(f.avatar)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" /><div><strong style="color:${f.equipped_color || '#f8fafc'}">${f.username}</strong><div class="mono-dim">${f.online ? 'Online' : 'Offline'}</div></div></div><button class="btn-ghost" style="color:#f43f5e;" title="Unfriend" onclick="removeFriend('${f.id}')">✕</button></div>`).join('') || '<p class="sub-text">No friends added yet—click any member in Zynk Chat to send a friend request!</p>'}</div></div>
       <div class="glass-card" style="border-color:${standingCol}55;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><h3 style="display:flex;align-items:center;gap:8px;">${PROF_SVG.shield} Account Standing: <span style="color:${standingCol}">${standingLabel}</span></h3><span class="pill" style="border-color:${standingCol};color:${standingCol};">${infList.length} Record(s)</span></div><div style="display:flex;flex-direction:column;gap:6px;">${infList.map(x => `<div style="padding:8px 12px;border-radius:8px;background:#04070b;display:flex;justify-content:space-between;"><span><strong style="color:#f59e0b">${x.type}:</strong> ${x.reason}</span><span class="mono-dim">by @${x.by} • ${x.at}</span></div>`).join('') || '<div class="mono-dim">Your account is in good standing. No active or expired infractions.</div>'}</div></div>
-      <div class="glass-card"><h3 style="display:flex;align-items:center;gap:8px;">${PROF_SVG.bag} My Visual Inventory (${ownedList.length} Items Owned)</h3><div class="cards-grid" id="inv-visual-grid" style="margin-top:12px;"></div></div>
+    </div>
+    <div id="prof-save-bar" class="hidden" style="position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:9000;background:rgba(4,7,11,0.96);border:1px solid var(--neon-emerald);border-radius:12px;padding:10px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 10px 30px rgba(0,0,0,0.75);">
+      <span style="font-size:0.86rem;font-weight:700;">Careful — you have unsaved profile changes!</span>
+      <button type="button" id="prof-reset-draft" class="btn-ghost" style="padding:5px 10px;">Reset</button>
+      <button type="button" id="prof-save-draft" class="btn-neon" style="padding:6px 14px;">Save Changes</button>
     </div>`;
-  document.getElementById('save-my-profile').onclick = async () => {
-    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { bio: document.getElementById('edit-bio').value }, window.authToken);
-    await window.logAudit?.('PROFILE_BIO', `@${p.username}`, 'Updated bio');
-    await window.refreshMyProfile();
-    window.notify('Profile bio saved!');
+  const saveBar = document.getElementById('prof-save-bar');
+  const bioInp = document.getElementById('edit-bio');
+  const avPrev = document.getElementById('prof-avatar-preview');
+  const banPrev = document.getElementById('prof-banner-preview');
+
+  const checkDirty = () => {
+    const dirty = bioInp.value !== origBio || draftAvatar !== (p.avatar || 'logo.png') || draftBanner !== (p.banner || 'linear-gradient(135deg,#064e3b,#0f172a)');
+    saveBar.classList.toggle('hidden', !dirty);
+  };
+
+  bioInp.oninput = checkDirty;
+
+  document.getElementById('prof-reset-draft').onclick = () => {
+    bioInp.value = origBio;
+    draftAvatar = p.avatar || 'logo.png';
+    draftBanner = p.banner || 'linear-gradient(135deg,#064e3b,#0f172a)';
+    avPrev.src = safeAvatar(draftAvatar);
+    banPrev.style.background = draftBanner.startsWith('http') || draftBanner.startsWith('data:') ? `url('${draftBanner}') center/cover` : draftBanner;
+    checkDirty();
+  };
+
+  document.getElementById('prof-save-draft').onclick = async () => {
+    const btn = document.getElementById('prof-save-draft');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    try {
+      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { bio: bioInp.value, avatar: draftAvatar, banner: draftBanner }, window.authToken);
+      await window.logAudit?.('PROFILE_UPDATE', `@${p.username}`, 'Updated profile bio/avatar/banner');
+      await window.refreshMyProfile();
+      window.notify('Profile changes saved!');
+    } catch (err) {
+      window.notify('Save failed: ' + err.message, true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Save Changes';
+    }
   };
 
   document.getElementById('reset-my-gear').onclick = async () => {
-    await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { avatar: 'logo.png', banner: 'linear-gradient(135deg,#064e3b,#0f172a)', avatar_frame: 'none' }, window.authToken);
-    await window.refreshMyProfile();
-    window.notify('Reset avatar, banner & frame to defaults.');
+    draftAvatar = 'logo.png';
+    draftBanner = 'linear-gradient(135deg,#064e3b,#0f172a)';
+    avPrev.src = 'logo.png';
+    banPrev.style.background = draftBanner;
+    checkDirty();
   };
 
   document.getElementById('upload-pfp-btn').onclick = () => {
@@ -203,54 +240,20 @@ async function renderMyProfileTab() {
     const f = e.target.files?.at(0);
     e.target.value = '';
     if (!f) return;
-    try {
-      window.notify('Uploading Custom PFP...');
-      const dataUrl = await compressProfileImg(f, 150, 150);
-      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { avatar: dataUrl }, window.authToken);
-      await window.logAudit?.('PROFILE_PFP', `@${p.username}`, 'Updated custom PFP');
-      await window.refreshMyProfile();
-      window.notify('Custom Profile Picture saved!');
-    } catch (err) { window.notify('PFP upload failed: ' + err.message, true); }
+    draftAvatar = await compressProfileImg(f, 150, 150);
+    avPrev.src = draftAvatar;
+    checkDirty();
   };
 
   document.getElementById('custom-ban-inp').onchange = async (e) => {
     const f = e.target.files?.at(0);
     e.target.value = '';
     if (!f) return;
-    try {
-      window.notify('Uploading Custom Banner...');
-      const dataUrl = await compressProfileImg(f, 560, 180);
-      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { banner: dataUrl }, window.authToken);
-      await window.logAudit?.('PROFILE_BANNER', `@${p.username}`, 'Updated custom banner');
-      await window.refreshMyProfile();
-      window.notify('Custom Profile Banner saved!');
-    } catch (err) { window.notify('Banner upload failed: ' + err.message, true); }
+    draftBanner = await compressProfileImg(f, 560, 180);
+    banPrev.style.background = `url('${draftBanner}') center/cover`;
+    checkDirty();
   };
-  const invGrid = document.getElementById('inv-visual-grid');
-  ownedList.forEach(it => {
-    const t = it.item_type || 'avatar';
-    const val = it.item_value || it.image_url;
-    const isEq = (t === 'avatar' && p.avatar === val) || (t === 'frame' && p.avatar_frame === val) || (t === 'banner' && p.banner === val) || (t === 'theme' && p.profile_theme === val) || (t === 'color' && p.equipped_color === val);
-    let preview = `<img src="${safeAvatar(it.image_url)}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;margin-bottom:8px;" />`;
-    if (t === 'frame') preview = `<div style="width:64px;height:64px;border-radius:50%;margin:0 auto 8px;border:3px solid ${val};box-shadow:0 0 14px ${val};"></div>`;
-    if (t === 'banner') preview = `<div style="height:44px;border-radius:8px;margin-bottom:8px;background:${val.startsWith('http') || val.startsWith('data:') ? `url('${val}') center/cover` : val};"></div>`;
-    if (t === 'theme' || t === 'color') preview = `<div style="height:44px;border-radius:8px;margin-bottom:8px;background:${t === 'color' ? val : '#04070b'};border:1px solid var(--neon-emerald);display:flex;align-items:center;justify-content:center;font-weight:700;">${it.name}</div>`;
-
-    const card = document.createElement('div');
-    card.className = 'glass-card';
-    card.style.padding = '12px';
-    card.innerHTML = `${preview}<div class="mono-dim">${t.toUpperCase()}</div><strong>${it.name}</strong><button class="${isEq ? 'btn-neon' : 'btn-outline'}" style="width:100%;margin-top:8px;">${isEq ? 'Equipped' : 'Equip'}</button>`;
-    card.querySelector('button').onclick = async () => {
-      const patch = t === 'avatar' ? { avatar: val } : t === 'frame' ? { avatar_frame: val } : t === 'banner' ? { banner: val } : t === 'theme' ? { profile_theme: val } : { equipped_color: val };
-      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', patch, window.authToken);
-      if (t === 'theme') window.applySavedTheme?.(val);
-      await window.refreshMyProfile();
-      window.notify(`Equipped ${it.name}!`);
-    };
-    invGrid.appendChild(card);
-  });
 }
-
 function renderDailyMysteryCards() {
   const host = document.getElementById('daily-cards-row');
   if (!host) return;
@@ -286,6 +289,7 @@ function renderDailyMysteryCards() {
     };
   });
 }
+
 async function renderPartnersTab() {
   const grid = document.getElementById('partners-grid');
   if (!grid || !window.sbRest) return;
@@ -306,7 +310,6 @@ async function renderPartnersTab() {
       ${pt.url ? `<a href="${pt.url}" target="_blank" rel="noopener" class="btn-neon" style="text-align:center;text-decoration:none;">Visit ${pt.name} ↗</a>` : ''}
     </div>`).join('') || `<div class="glass-card" style="grid-column:1/-1;"><p class="sub-text">Official partners will appear here soon!</p></div>`;
 }
-
 async function renderCreditsTab() {
   const grid = document.getElementById('credits-grid');
   if (!grid || !window.sbRest) return;
@@ -351,65 +354,27 @@ async function renderCreditsTab() {
 
   grid.innerHTML = cards.join('');
 }
+
 let activeLegalTab = 'RULES';
 
 function renderRulesAndLegalTab() {
   const host = document.getElementById('rules-legal-container');
   if (!host) return;
-  if (window.activeLegalTabOverride) {
-    activeLegalTab = window.activeLegalTabOverride;
-    window.activeLegalTabOverride = null;
-  }
-
+  if (window.activeLegalTabOverride) { activeLegalTab = window.activeLegalTabOverride; window.activeLegalTabOverride = null; }
   host.innerHTML = `
     <div style="max-width:860px;margin:auto;">
-      <div class="view-topbar">
-        <div>
-          <h1 style="display:flex;align-items:center;gap:10px;">${PROF_SVG.scroll} Rules, Privacy Policy & Terms</h1>
-          <p class="sub-text">Community guidelines, 13+ age requirement & platform policies</p>
-        </div>
-      </div>
-      <div class="store-tabs" style="margin-bottom:16px;">
-        <button class="${activeLegalTab === 'RULES' ? 'btn-neon' : 'btn-outline'}" data-ltab="RULES">Community Rules</button>
-        <button class="${activeLegalTab === 'TOS' ? 'btn-neon' : 'btn-outline'}" data-ltab="TOS">Terms of Service</button>
-        <button class="${activeLegalTab === 'PRIVACY' ? 'btn-neon' : 'btn-outline'}" data-ltab="PRIVACY">Privacy Policy</button>
-      </div>
+      <div class="view-topbar"><div><h1 style="display:flex;align-items:center;gap:10px;">${PROF_SVG.scroll} Rules, Privacy Policy & Terms</h1><p class="sub-text">Community guidelines, 13+ age requirement & platform policies</p></div></div>
+      <div class="store-tabs" style="margin-bottom:16px;"><button class="${activeLegalTab === 'RULES' ? 'btn-neon' : 'btn-outline'}" data-ltab="RULES">Community Rules</button><button class="${activeLegalTab === 'TOS' ? 'btn-neon' : 'btn-outline'}" data-ltab="TOS">Terms of Service</button><button class="${activeLegalTab === 'PRIVACY' ? 'btn-neon' : 'btn-outline'}" data-ltab="PRIVACY">Privacy Policy</button></div>
       <div class="glass-card" id="legal-doc-body" style="line-height:1.7;"></div>
     </div>`;
-
   host.querySelectorAll('[data-ltab]').forEach(b => (b.onclick = () => { activeLegalTab = b.dataset.ltab; renderRulesAndLegalTab(); }));
   const body = document.getElementById('legal-doc-body');
-
   if (activeLegalTab === 'RULES') {
-    body.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <h2>ZynkOS Community Guidelines</h2>
-        <span class="pill" style="border-color:#10b981;color:#10b981;">13+ REQUIRED • ENFORCED BY STAFF</span>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:12px;">
-        <div style="padding:12px 14px;border-radius:10px;background:#04070b;"><strong style="color:#10b981;">RULE 01 — Minimum Age Requirement (13+)</strong><p class="sub-text">You must be at least 13 years old to create an account, participate in Zynk Chat, or use ZynkOS services. Underage accounts will be suspended immediately.</p></div>
-        <div style="padding:12px 14px;border-radius:10px;background:#04070b;"><strong style="color:#10b981;">RULE 02 — Be Respectful — Zero Harassment or Hate Speech</strong><p class="sub-text">Treat every member with respect. Harassment, bullying, slurs, discrimination, doxxing, or threats of any kind are strictly prohibited.</p></div>
-        <div style="padding:12px 14px;border-radius:10px;background:#04070b;"><strong style="color:#10b981;">RULE 03 — Keep It Safe For Work (No NSFW or Gore)</strong><p class="sub-text">Do not post, upload, or link sexually explicit content, graphic violence, or disturbing media in Zynk Chat, avatars, banners, or custom stickers.</p></div>
-        <div style="padding:12px 14px;border-radius:10px;background:#04070b;"><strong style="color:#10b981;">RULE 04 — No Spam, Flooding, or Unsolicited Self-Promo</strong><p class="sub-text">Avoid message spamming, copypasta flooding, ping abuse (mass @mentions), or advertising external servers/links without Founder or Staff approval.</p></div>
-        <div style="padding:12px 14px;border-radius:10px;background:#04070b;"><strong style="color:#10b981;">RULE 05 — No Exploiting, Alt-Farming, or Economy Abuse</strong><p class="sub-text">Do not use scripts, bugs, or alternate accounts to farm Z-Credits, XP, Daily Mystery Cards, or leaderboard ranks.</p></div>
-        <div style="padding:12px 14px;border-radius:10px;background:#04070b;"><strong style="color:#10b981;">RULE 06 — Follow Staff Instructions & Ban Evasion Policy</strong><p class="sub-text">Listen to Moderators, Admins, Developers, and the Founder. Creating new accounts to bypass a mute or ban will result in a permanent ban.</p></div>
-      </div>`;
+    body.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;"><h2>ZynkOS Community Guidelines</h2><span class="pill" style="border-color:#10b981;color:#10b981;">13+ REQUIRED • ENFORCED BY STAFF</span></div><div style="display:flex;flex-direction:column;gap:12px;"><div style="padding:12px 14px;border-radius:10px;background:#04070b;"><strong style="color:#10b981;">RULE 01 — Minimum Age Requirement (13+)</strong><p class="sub-text">You must be at least 13 years old to create an account or use ZynkOS.</p></div><div style="padding:12px 14px;border-radius:10px;background:#04070b;"><strong style="color:#10b981;">RULE 02 — Zero Harassment or Hate Speech</strong><p class="sub-text">Treat every member with respect.</p></div><div style="padding:12px 14px;border-radius:10px;background:#04070b;"><strong style="color:#10b981;">RULE 03 — Keep It Safe For Work</strong><p class="sub-text">No NSFW, gore, or disturbing media.</p></div><div style="padding:12px 14px;border-radius:10px;background:#04070b;"><strong style="color:#10b981;">RULE 04 — No Spam or Unsolicited Self-Promo</strong><p class="sub-text">Avoid message flooding or unauthorized links.</p></div></div>`;
   } else if (activeLegalTab === 'TOS') {
-    body.innerHTML = `
-      <h2 style="margin-bottom:10px;">Terms of Service</h2>
-      <p class="sub-text" style="margin-bottom:12px;">Last Updated: November 2026 • By accessing ZynkOS (<strong>zynkos.linkpc.net</strong>), you agree to these Terms.</p>
-      <p style="margin-bottom:10px;"><strong>1. Eligibility (13+ Only):</strong> ZynkOS is intended strictly for users aged 13 and older. By registering an account, you confirm that you meet this minimum age requirement.</p>
-      <p style="margin-bottom:10px;"><strong>2. Virtual Currency & Items:</strong> Z-Credits, XP, Ranks, Mystery Cards, and Store items are virtual platform rewards with zero real-world monetary value and cannot be exchanged for real currency.</p>
-      <p style="margin-bottom:10px;"><strong>3. User Content & Moderation:</strong> You are responsible for all messages, custom avatars, banners, and stickers you upload. Staff reserve the right to remove content, mute, or suspend accounts that violate Community Rules.</p>
-      <p><strong>4. Service Availability:</strong> ZynkOS is provided "as is" and features may be updated, balanced, or reset at the discretion of the Founder.</p>`;
+    body.innerHTML = `<h2 style="margin-bottom:10px;">Terms of Service</h2><p class="sub-text">ZynkOS is for users 13+. Z-Credits and Store items are virtual rewards with no real-world monetary value.</p>`;
   } else {
-    body.innerHTML = `
-      <h2 style="margin-bottom:10px;">Privacy Policy</h2>
-      <p class="sub-text" style="margin-bottom:12px;">Last Updated: November 2026 • Your privacy matters on ZynkOS.</p>
-      <p style="margin-bottom:10px;"><strong>1. Information We Collect:</strong> We store your email address (used solely for authentication), chosen username, encrypted password hash, profile customizations, chat messages, and virtual Z-Credit/XP progress.</p>
-      <p style="margin-bottom:10px;"><strong>2. How We Use Data:</strong> Your data is used exclusively to operate ZynkOS features, sync your profile across sessions, and enforce community safety.</p>
-      <p style="margin-bottom:10px;"><strong>3. Third-Party Services:</strong> Authentication and database storage are powered by Supabase. Optional Vortex Guild chat connects via VortexOS when you explicitly sign in with Vortex.</p>
-      <p><strong>4. Account Deletion:</strong> You may permanently delete your account and associated profile data at any time inside <strong>Settings → Account & Danger Zone</strong>.</p>`;
+    body.innerHTML = `<h2 style="margin-bottom:10px;">Privacy Policy</h2><p class="sub-text">We store only your authentication credentials, username, and ZynkOS profile progress. You may delete your account anytime in Settings.</p>`;
   }
 }
 
