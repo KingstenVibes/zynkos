@@ -53,11 +53,8 @@ function startFoggyWindowRain() {
     { x: 0.85, y: 0.75, r: 100, c: 'rgba(168,85,247,0.13)' }
   ];
   const drops = Array.from({ length: 55 }, () => ({
-    x: Math.random() * w,
-    y: Math.random() * h,
-    r: 1.5 + Math.random() * 2.2,
-    vy: 1.4 + Math.random() * 2.4,
-    wobble: Math.random() * Math.PI * 2
+    x: Math.random() * w, y: Math.random() * h,
+    r: 1.5 + Math.random() * 2.2, vy: 1.4 + Math.random() * 2.4, wobble: Math.random() * Math.PI * 2
   }));
   function tick() {
     if (!cv.isConnected) return;
@@ -215,7 +212,8 @@ function syncRouteFromHash() {
   window.openTab?.(HASH_ROUTES[slug], true);
 }
 
-window.addEvconst searchInp = document.getElementById('global-search-inp');
+window.addEventListener('hashchange', syncRouteFromHash);
+const searchInp = document.getElementById('global-search-inp');
 const searchPop = document.getElementById('global-search-pop');
 
 searchInp?.addEventListener('input', async () => {
@@ -272,7 +270,6 @@ window.openInboxModal = async function() {
 
   const reqIds = Array.isArray(p?.friend_requests) ? p.friend_requests : [];
   const reqUsers = reqIds.length ? await window.sbRest(`users?id=in.(${reqIds.join(',')})&select=id,username`).catch(() => []) : [];
-entListener('hashchange', syncRouteFromHash);
   box.style.maxWidth = '500px';
   box.innerHTML = `
     <div style="padding:22px;">
@@ -368,6 +365,7 @@ function renderSettingsPanel() {
       window.notify('Display & wallpaper preferences saved!');
     };
   }
+
   if (activeSetTab === 'ACCOUNT') {
     const monthMs = 2592000000;
     const remMs = monthMs - (Date.now() - (Number(p?.last_username_change) || 0));
@@ -393,7 +391,6 @@ function renderSettingsPanel() {
         <p class="sub-text" style="margin-bottom:12px;">Permanently delete your ZynkOS profile, Z-Credits, XP, and inventory. This cannot be undone.</p>
         <button class="btn-outline" id="delete-acc-btn" style="color:#f43f5e;border-color:#f43f5e;">Delete My Account</button>
       </div>`;
-
     document.getElementById('update-pass-btn').onclick = async () => {
       const np = document.getElementById('new-pass-inp').value;
       if (!window.authToken || np.length < 6) return window.notify('Sign in and enter a 6+ character password.', true);
@@ -411,23 +408,15 @@ function renderSettingsPanel() {
       if (!p) return window.notify('Sign in first!', true);
       if (onCd) return window.notify(`You can change your username again in ${daysLeft} day(s).`, true);
       const nextName = document.getElementById('new-uname-inp').value.trim();
-      if (!/^[a-zA-Z0-9_]{3,20}$/.test(nextName)) {
-        return window.notify('Username must be 3–20 characters (letters, numbers, or _).', true);
-      }
-      if (nextName.toLowerCase() === p.username.toLowerCase()) {
-        return window.notify('That is already your current username.', true);
-      }
+      if (!/^[a-zA-Z0-9_]{3,20}$/.test(nextName)) return window.notify('Username must be 3–20 characters (letters, numbers, or _).', true);
+      if (nextName.toLowerCase() === p.username.toLowerCase()) return window.notify('That is already your current username.', true);
       const existing = await window.sbRest(`users?username=ilike.${encodeURIComponent(nextName)}&select=id`).catch(() => []);
-      if (Array.isArray(existing) && existing.length > 0) {
-        return window.notify('That username is already taken!', true);
-      }
+      if (Array.isArray(existing) && existing.length > 0) return window.notify('That username is already taken!', true);
       try {
         await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { username: nextName, last_username_change: Date.now() }, window.authToken);
         await window.refreshMyProfile();
         window.notify(`Username changed to @${nextName}!`);
-      } catch (err) {
-        window.notify(err.message, true);
-      }
+      } catch (err) { window.notify(err.message, true); }
     };
 
     document.getElementById('delete-acc-btn').onclick = async () => {
@@ -440,39 +429,22 @@ function renderSettingsPanel() {
       setTimeout(() => window.location.reload(), 1000);
     };
   }
-  if (activeSetTab === 'NOTIF') {
-    card.innerHTML = `
-      <h2 style="margin-bottom:14px;">Notifications & Install ZynkOS App</h2>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
-        <button class="btn-neon" id="enable-notif-btn">Enable Browser Notifications</button>
-        <button class="btn-outline" id="install-pwa-btn">Install ZynkOS App</button>
-      </div>
-      <label class="remember-row"><input type="checkbox" id="notif-mentions" checked /><span>Notify me when someone @mentions me in Zynk Chat</span></label>`;
 
+  if (activeSetTab === 'NOTIF') {
+    card.innerHTML = `<h2 style="margin-bottom:14px;">Notifications & Install ZynkOS App</h2><div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;"><button class="btn-neon" id="enable-notif-btn">Enable Browser Notifications</button><button class="btn-outline" id="install-pwa-btn">Install ZynkOS App</button></div><label class="remember-row"><input type="checkbox" id="notif-mentions" checked /><span>Notify me when someone @mentions me in Zynk Chat</span></label>`;
     document.getElementById('enable-notif-btn').onclick = async () => {
       if (!('Notification' in window)) return window.notify('Browser notifications not supported here.', true);
       const perm = await Notification.requestPermission();
       window.notify(perm === 'granted' ? 'Desktop notifications enabled!' : 'Notification permission denied.', perm !== 'granted');
     };
-
     document.getElementById('install-pwa-btn').onclick = async () => {
-      if (deferredInstallPrompt) {
-        deferredInstallPrompt.prompt();
-        await deferredInstallPrompt.userChoice;
-        deferredInstallPrompt = null;
-      } else {
-        window.notify('Click the Install icon in your browser address bar or Browser Menu -> Install ZynkOS!');
-      }
+      if (deferredInstallPrompt) { deferredInstallPrompt.prompt(); await deferredInstallPrompt.userChoice; deferredInstallPrompt = null; }
+      else window.notify('Click the Install icon in your browser address bar or Browser Menu -> Install ZynkOS!');
     };
   }
 
   if (activeSetTab === 'PRIVACY') {
-    card.innerHTML = `
-      <h2 style="margin-bottom:14px;">Privacy & Safety</h2>
-      <label class="remember-row"><input type="checkbox" id="priv-show-lb" ${p?.hide_leaderboard ? '' : 'checked'} /><span>Show me on the Global Leaderboard</span></label>
-      <label class="remember-row"><input type="checkbox" id="priv-show-on" ${p?.online === false ? '' : 'checked'} /><span>Show my Online status & live activity in Zynk Chat</span></label>
-      <button class="btn-neon" id="save-priv-btn" style="margin-top:8px;">Save Privacy Settings</button>`;
-
+    card.innerHTML = `<h2 style="margin-bottom:14px;">Privacy & Safety</h2><label class="remember-row"><input type="checkbox" id="priv-show-lb" ${p?.hide_leaderboard ? '' : 'checked'} /><span>Show me on the Global Leaderboard</span></label><label class="remember-row"><input type="checkbox" id="priv-show-on" ${p?.online === false ? '' : 'checked'} /><span>Show my Online status & live activity in Zynk Chat</span></label><button class="btn-neon" id="save-priv-btn" style="margin-top:8px;">Save Privacy Settings</button>`;
     document.getElementById('save-priv-btn').onclick = async () => {
       if (!p) return window.notify('Sign in first!', true);
       await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { hide_leaderboard: !document.getElementById('priv-show-lb').checked, online: document.getElementById('priv-show-on').checked }, window.authToken);
@@ -480,18 +452,8 @@ function renderSettingsPanel() {
       window.notify('Privacy settings saved!');
     };
   }
-
   if (activeSetTab === 'CLOAK') {
-    card.innerHTML = `
-      <h2 style="margin-bottom:14px;">Tab Disguise & Instant Panic Key</h2>
-      <div class="setting-group"><label>Tab Disguise</label><select id="set-cloak" class="tool-input"><option value="none">None (ZynkOS Default)</option><option value="clever">Clever Portal</option><option value="classroom">Google Classroom</option><option value="drive">Google Drive</option><option value="docs">Google Docs</option></select></div>
-      <div class="setting-group"><label>Panic Redirect URL</label><input id="set-panic" class="tool-input" value="${localStorage.getItem('zynk_panic_url') || 'https://google.com'}" /></div>
-      <label class="remember-row"><input type="checkbox" id="set-esc" ${localStorage.getItem('zynk_esc_panic') === '1' ? 'checked' : ''} /><span>Press ESC key anytime to trigger instant Panic Redirect</span></label>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">
-        <button class="btn-neon" id="save-cloak-btn">Save Disguise Settings</button>
-        <button class="btn-outline" id="open-inv-btn">Launch Invisible Tab Opener</button>
-      </div>`;
-
+    card.innerHTML = `<h2 style="margin-bottom:14px;">Tab Disguise & Instant Panic Key</h2><div class="setting-group"><label>Tab Disguise</label><select id="set-cloak" class="tool-input"><option value="none">None (ZynkOS Default)</option><option value="clever">Clever Portal</option><option value="classroom">Google Classroom</option><option value="drive">Google Drive</option><option value="docs">Google Docs</option></select></div><div class="setting-group"><label>Panic Redirect URL</label><input id="set-panic" class="tool-input" value="${localStorage.getItem('zynk_panic_url') || 'https://google.com'}" /></div><label class="remember-row"><input type="checkbox" id="set-esc" ${localStorage.getItem('zynk_esc_panic') === '1' ? 'checked' : ''} /><span>Press ESC key anytime to trigger instant Panic Redirect</span></label><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;"><button class="btn-neon" id="save-cloak-btn">Save Disguise Settings</button><button class="btn-outline" id="open-inv-btn">Launch Invisible Tab Opener</button></div>`;
     document.getElementById('set-cloak').value = localStorage.getItem('zynk_cloak') || 'none';
     document.getElementById('save-cloak-btn').onclick = () => {
       const ck = document.getElementById('set-cloak').value;
@@ -501,7 +463,6 @@ function renderSettingsPanel() {
       applyCloak(ck);
       window.notify('Tab disguise & panic settings saved!');
     };
-
     document.getElementById('open-inv-btn').onclick = () => {
       const blankUrl = ['about', 'blank'].join(':');
       const w = window.open(blankUrl, '_blank');
@@ -513,18 +474,12 @@ function renderSettingsPanel() {
 
   if (activeSetTab === 'SESSIONS') {
     const remembered = Boolean(localStorage.getItem('zynk_session'));
-    card.innerHTML = `
-      <h2 style="margin-bottom:14px;">Active Sessions</h2>
-      <div style="padding:14px;border-radius:12px;background:#04070b;border:1px solid var(--neon-emerald);display:flex;justify-content:space-between;align-items:center;">
-        <div>
-          <strong>Current Browser Session <span class="pill" style="margin-left:6px;color:#10b981;">This Device</span></strong>
-          <div class="mono-dim" style="margin-top:4px;">Signed in as @${p?.username || 'Guest'} • Persistence: ${remembered ? 'Auto-Renewing (Remember Me)' : 'Session Only'}</div>
-        </div>
-        <button class="btn-outline" onclick="document.getElementById('top-auth-btn').click()">Sign Out</button>
-      </div>`;
+    card.innerHTML = `<h2 style="margin-bottom:14px;">Active Sessions</h2><div style="padding:14px;border-radius:12px;background:#04070b;border:1px solid var(--neon-emerald);display:flex;justify-content:space-between;align-items:center;"><div><strong>Current Browser Session <span class="pill" style="margin-left:6px;color:#10b981;">This Device</span></strong><div class="mono-dim" style="margin-top:4px;">Signed in as @${p?.username || 'Guest'} • Persistence: ${remembered ? 'Auto-Renewing (Remember Me)' : 'Session Only'}</div></div><button class="btn-outline" onclick="document.getElementById('top-auth-btn').click()">Sign Out</button></div>`;
   }
 }
+
 let vtxClient = null;
+let vtxLastSent = 0;
 
 function ensureVortexSdkLoaded() {
   return new Promise((resolve) => {
@@ -540,7 +495,6 @@ function ensureVortexSdkLoaded() {
     setTimeout(() => resolve(window.Vortex || null), 4000);
   });
 }
-
 window.initVortexGuildClient = async function() {
   const host = document.getElementById('vortex-view');
   if (!host) return;
@@ -555,14 +509,14 @@ window.initVortexGuildClient = async function() {
       <div class="dock-sep-line"></div>
       <div class="mono-dim" style="padding:0 6px;font-weight:700;">VORTEX GLOBAL</div>
       <div id="vtx-global-list" style="display:flex;flex-direction:column;gap:3px;"></div>
-      <div class="mono-dim" style="padding:8px 6px 0;font-weight:700;">GUILD CHANNELS</div>
+      <div class="mono-dim" style="padding:8px 6px 0;font-weight:700;">ZYNKOS GUILD</div>
       <div id="vtx-guild-list" style="display:flex;flex-direction:column;gap:3px;"></div>
     </aside>
     <div class="chat-main">
       <div class="view-topbar" style="flex-wrap:wrap;gap:8px;">
         <div>
           <h2 id="vtx-ch-title"># Vortex Global</h2>
-          <div class="mono-dim" id="vtx-ch-topic">Cross-guild Vortex channel • Powered by <a href="https://vortexos.net" target="_blank" rel="noopener" style="color:var(--neon-emerald);font-weight:700;text-decoration:none;">VortexOS.net ↗</a></div>
+          <div class="mono-dim" id="vtx-ch-topic">Linked to Vortex Guild & Vortex Global (5s Slow Mode) • <a href="https://vortexos.net" target="_blank" rel="noopener" style="color:var(--neon-emerald);font-weight:700;text-decoration:none;">VortexOS.net ↗</a></div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <span class="mono-dim" id="vtx-status">Connecting...</span>
@@ -577,39 +531,75 @@ window.initVortexGuildClient = async function() {
       </form>
     </div>
     <aside class="members-panel">
-      <div class="members-head" id="vtx-guild-name">VORTEX MEMBERS</div>
-      <div id="vortex-members-list"></div>
+      <div class="members-head">VORTEX NETWORK</div>
+      <div style="padding:8px;font-size:0.8rem;color:var(--text-dim);line-height:1.5;">Messages in <strong>#Vortex Global</strong> sync live across all Vortex partner sites.<br><br>Guild channels sync directly with your <strong>ZynkOS</strong> Vortex guild.</div>
     </aside>`;
 
   const statusEl = document.getElementById('vtx-status');
   const loginBtn = document.getElementById('vtx-login-btn');
   const logoutBtn = document.getElementById('vtx-logout-btn');
+  const msgFeed = document.getElementById('vortex-messages');
   const inp = document.getElementById('vtx-input');
   const sendBtn = document.getElementById('vtx-send-btn');
 
   const sdk = await ensureVortexSdkLoaded();
   if (!sdk) { statusEl.textContent = 'Vortex SDK offline'; return; }
-
   vtxClient = sdk.init({ clientId: 'vtx_bc3f3d47d3074ad0f5f1' });
-  loginBtn.onclick = async () => {
-    try { await vtxClient.login({ popup: true }); window.initVortexGuildClient(); } catch (e) { vtxClient.login(); }
-  };
-  logoutBtn.onclick = () => { vtxClient?.logout(); window.initVortexGuildClient(); };
 
+  const renderVtxMsg = (m) => {
+    if (!m || !m.id || document.querySelector(`[data-vtx-id="${m.id}"]`)) return;
+    const div = document.createElement('div');
+    div.className = 'chat-msg';
+    div.dataset.vtxId = m.id;
+    const col = Array.isArray(m.author?.color) ? m.author.color.at(0) : (m.author?.color || '#a855f7');
+    const tag = m.guild?.tag ? `<span class="role-chip" style="color:#10b981;border-color:rgba(16,185,129,0.35);padding:1px 7px;">${m.guild.tag}</span>` : '';
+    div.innerHTML = `<img class="msg-avatar" src="${m.author?.avatar || 'logo.png'}" onerror="this.src='logo.png'" /><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><strong style="color:${col}">${m.author?.username || 'Member'}</strong>${tag}</div><div class="vtx-body" style="margin-top:3px;word-break:break-word;">${m.html || vtxClient.render(m.content || '')}</div></div>`;
+    msgFeed.appendChild(div);
+    msgFeed.scrollTop = msgFeed.scrollHeight;
+  };
+
+  loginBtn.onclick = () => vtxClient.login({ popup: true }).then(() => window.initVortexGuildClient()).catch(() => vtxClient.login());
+  logoutBtn.onclick = () => { vtxClient?.logout(); window.initVortexGuildClient(); };
   await vtxClient.ready;
-  if (!vtxClient.site?.allowed) {
-    statusEl.textContent = vtxClient.site?.reason || 'Site pending approval';
-    return;
-  }
+  if (!vtxClient.site?.allowed) { statusEl.textContent = vtxClient.site?.reason || 'Pending Vortex approval'; return; }
+
+  const switchVtxChan = async (ch) => {
+    if (!ch) return;
+    await vtxClient.join(ch.id);
+    document.getElementById('vtx-ch-title').textContent = `# ${ch.name}`;
+    host.querySelectorAll('[data-vch]').forEach(b => b.classList.toggle('active', b.dataset.vch === ch.id));
+    msgFeed.innerHTML = '';
+    const { messages } = await vtxClient.history(ch.id, { limit: 50 }).catch(() => ({ messages: [] }));
+    (messages || []).forEach(renderVtxMsg);
+    if (vtxClient.user) inp.placeholder = `Message #${ch.name} (5s slow mode)...`;
+  };
+
   if (vtxClient.user) {
     statusEl.textContent = `@${vtxClient.user.username}`;
     loginBtn.classList.add('hidden');
     logoutBtn.classList.remove('hidden');
     inp.disabled = false;
     sendBtn.disabled = false;
-  } else {
-    statusEl.textContent = 'Sign in required';
-  }
+    const chs = vtxClient.channels || [];
+    const gChs = chs.filter(c => /global/i.test(c.name || '') || c.id === 'global');
+    const sChs = chs.filter(c => !gChs.includes(c));
+    document.getElementById('vtx-global-list').innerHTML = gChs.map(c => `<button type="button" class="ch-item-btn" data-vch="${c.id}"># ${c.name}</button>`).join('');
+    document.getElementById('vtx-guild-list').innerHTML = sChs.map(c => `<button type="button" class="ch-item-btn" data-vch="${c.id}"># ${c.name}</button>`).join('');
+    host.querySelectorAll('[data-vch]').forEach(b => (b.onclick = () => switchVtxChan(chs.find(x => x.id === b.dataset.vch))));
+    const first = gChs.at(0) || sChs.at(0);
+    if (first) await switchVtxChan(first);
+    vtxClient.on('message', (m) => { if (m.channelId === vtxClient.channel) renderVtxMsg(m); });
+    document.getElementById('vtx-form').onsubmit = async (e) => {
+      e.preventDefault();
+      const t = inp.value.trim();
+      if (!t) return;
+      const wait = Math.ceil((5000 - (Date.now() - vtxLastSent)) / 1000);
+      if (wait > 0) return window.notify?.(`Vortex slow mode: wait ${wait}s before sending again.`, true);
+      vtxLastSent = Date.now();
+      inp.value = '';
+      try { await vtxClient.send(t); } catch (err) { window.notify?.(err.message || 'Send failed', true); }
+    };
+  } else { statusEl.textContent = 'Sign in required'; }
 };
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -621,7 +611,4 @@ window.addEventListener('DOMContentLoaded', () => {
   syncRouteFromHash();
   window.initVortexGuildClient();
 });
-window.addEventListener('zynk-profile-updated', () => {
-  renderSettingsPanel();
-  syncRouteFromHash();
-});
+window.addEventListener('zynk-profile-updated', () => { renderSettingsPanel(); syncRouteFromHash(); });
