@@ -8,7 +8,6 @@ let initialChatLoaded = false;
 let activeReply = null;
 let pendingAttachment = null;
 let lastChatHash = '';
-let lastNotifiedMsgId = 0;
 let lastTypingPing = 0;
 let lastSentByChannel = {};
 let channelSlowMode = { global: 0, updates: 0, beta: 0 };
@@ -385,6 +384,7 @@ window.openReactPicker = function(btn, msgId) {
   pop.innerHTML = ALL_EMOJIS.map(em => `<button type="button" class="react-choice" onclick="toggleReaction(${msgId}, '${em}')">${em}</button>`).join('');
   bar.appendChild(pop);
 };
+
 window.toggleChatDrawer = function() {
   if (!drawerBox) return;
   drawerBox.classList.toggle('hidden');
@@ -408,7 +408,6 @@ window.toggleChatDrawer = function() {
     window.toggleChatDrawer();
   };
 };
-
 window.sendStickerImg = async function(idx) {
   const p = window.userProfile;
   const src = p?.stickers?.[idx];
@@ -441,6 +440,7 @@ document.getElementById('chat-file-inp')?.addEventListener('change', async (e) =
   prev.innerHTML = `<div style="display:flex;align-items:center;gap:10px;">${thumb}<div><strong>${f.name}</strong><div class="mono-dim">${pendingAttachment.sizeLabel} • Ready to send</div></div></div><button type="button" class="btn-ghost" onclick="clearPendingAttachment()">✕</button>`;
   document.getElementById('chat-input')?.focus();
 });
+
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.msg-actions')) {
     document.querySelectorAll('.react-popover').forEach(p => p.remove());
@@ -529,7 +529,6 @@ function buildMsgEl(m) {
   const av = rawAv && !String(rawAv).includes('dicebear') ? rawAv : 'logo.png';
   const timeStr = m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
   const safeText = formatDiscordMarkdown(m.content || '');
-
   const isOwner = me && m.user_id && String(m.user_id) === String(me.id);
   const canDel = canDeleteMsg(me, m);
   const reacts = m.reactions && typeof m.reactions === 'object' ? m.reactions : {};
@@ -537,27 +536,10 @@ function buildMsgEl(m) {
     const mine = me && arr.includes(me.username);
     return `<button type="button" class="react-pill ${mine ? 'mine' : ''}" title="Reacted by ${arr.map(u => '@' + u).join(', ')}" onclick="toggleReaction(${m.id}, '${em}')">${em} ${arr.length}</button>`;
   }).join('');
-
   const badgeIcons = matchedUser && window.renderRoleBadgeIcons ? window.renderRoleBadgeIcons(matchedUser) : '';
   const isVideo = String(m.image_url || '').startsWith('data:video');
   const mediaHtml = m.image_url ? (isVideo ? `<video src="${m.image_url}" controls class="chat-img-attach" style="max-width:340px;"></video>` : `<img src="${m.image_url}" class="chat-img-attach" style="${m.content === '[Sticker]' ? 'width:110px;height:110px;border:none;' : ''}" />`) : '';
-
-  div.innerHTML = `
-    <div class="msg-actions">
-      <button type="button" class="msg-act-btn" title="Add Reaction" onclick="openReactPicker(this, ${m.id})">${CHAT_SVG.react}</button>
-      <button type="button" class="msg-act-btn" title="Reply" onclick="setChatReply('${m.username}', \`${String(m.content || '').replace(/`/g, '')}\`)">${CHAT_SVG.reply}</button>
-      ${isOwner ? `<button type="button" class="msg-act-btn" title="Edit Message" onclick="editChatMsg(${m.id}, \`${String(m.content || '').replace(/`/g, '')}\`)">${CHAT_SVG.edit}</button>` : ''}
-      ${!isOwner && m.username !== 'ZynkBot' ? `<button type="button" class="msg-act-btn" style="color:#f59e0b;" title="Report Message" onclick="reportChatMsg(${m.id}, '${m.username}', \`${String(m.content || '').replace(/`/g, '')}\`)">${CHAT_SVG.flag}</button>` : ''}
-      ${canDel ? `<button type="button" class="msg-act-btn" style="color:#f43f5e;" title="Delete Message" onclick="deleteChatMsg(${m.id})">${CHAT_SVG.trash}</button>` : ''}
-    </div>
-    <img class="msg-avatar" src="${av}" />
-    <div style="flex:1;min-width:0;">
-      ${m.reply_to ? `<div class="reply-quote">${CHAT_SVG.reply} <span>${String(m.reply_to).replace(/</g, '&lt;')}</span></div>` : ''}
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><strong style="color:${m.color || '#10b981'};cursor:pointer;" class="msg-author">${m.username}</strong>${badgeIcons}<span class="mono-dim">[${m.role || 'MEMBER'}]${m.is_beta ? ' [BETA]' : ''} • ${timeStr}</span></div>
-      ${m.content && m.content !== '[Sticker]' ? `<div class="msg-text-body" style="margin-top:3px;word-break:break-word;">${safeText}${m.edited ? ' <span class="mono-dim">(edited)</span>' : ''}</div>` : ''}
-      ${mediaHtml}
-      ${reactHtml ? `<div class="react-row">${reactHtml}</div>` : ''}
-    </div>`;
+  div.innerHTML = `<div class="msg-actions"><button type="button" class="msg-act-btn" title="Add Reaction" onclick="openReactPicker(this, ${m.id})">${CHAT_SVG.react}</button><button type="button" class="msg-act-btn" title="Reply" onclick="setChatReply('${m.username}', \`${String(m.content || '').replace(/`/g, '')}\`)">${CHAT_SVG.reply}</button>${isOwner ? `<button type="button" class="msg-act-btn" title="Edit Message" onclick="editChatMsg(${m.id}, \`${String(m.content || '').replace(/`/g, '')}\`)">${CHAT_SVG.edit}</button>` : ''}${!isOwner && m.username !== 'ZynkBot' ? `<button type="button" class="msg-act-btn" style="color:#f59e0b;" title="Report Message" onclick="reportChatMsg(${m.id}, '${m.username}', \`${String(m.content || '').replace(/`/g, '')}\`)">${CHAT_SVG.flag}</button>` : ''}${canDel ? `<button type="button" class="msg-act-btn" style="color:#f43f5e;" title="Delete Message" onclick="deleteChatMsg(${m.id})">${CHAT_SVG.trash}</button>` : ''}</div><img class="msg-avatar" src="${av}" /><div style="flex:1;min-width:0;">${m.reply_to ? `<div class="reply-quote">${CHAT_SVG.reply} <span>${String(m.reply_to).replace(/</g, '&lt;')}</span></div>` : ''}<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><strong style="color:${m.color || '#10b981'};cursor:pointer;" class="msg-author">${m.username}</strong>${badgeIcons}<span class="mono-dim">[${m.role || 'MEMBER'}]${m.is_beta ? ' [BETA]' : ''} • ${timeStr}</span></div>${m.content && m.content !== '[Sticker]' ? `<div class="msg-text-body" style="margin-top:3px;word-break:break-word;">${safeText}${m.edited ? ' <span class="mono-dim">(edited)</span>' : ''}</div>` : ''}${mediaHtml}${reactHtml ? `<div class="react-row">${reactHtml}</div>` : ''}</div>`;
   const openProf = () => { if (m.user_id && window.openUserModal) window.openUserModal(m.user_id); };
   div.querySelector('.msg-avatar').onclick = openProf;
   div.querySelector('.msg-author').onclick = openProf;
@@ -657,27 +639,6 @@ chatForm?.addEventListener('submit', async (e) => {
   window.clearPendingAttachment();
   const replyText = activeReply || '';
   window.clearChatReply();
-
-  if (raw.startsWith('/')) {
-    const parts = raw.split(' ');
-    const cmd = parts.at(0).toLowerCase();
-    const targetName = parts.at(1)?.replace(/^@/, '');
-    if (cmd === '/help') return appendSingleMsg({ id: Date.now(), username: 'ZynkBot', role: 'SYSTEM', color: '#06b6d4', content: 'Member Commands: `/help`, `/credits`, `/pay @user <amount>`' });
-    if (cmd === '/credits') return appendSingleMsg({ id: Date.now(), username: 'ZynkBot', role: 'SYSTEM', color: '#06b6d4', content: `@${p.username}: **${p.credits} Z-Credits** (Level ${Math.floor((p.xp || 0) / 1000) + 1})` });
-    if (cmd === '/pay' && targetName) {
-      const amt = parseInt(parts.at(2), 10);
-      if (!(amt > 0) || p.credits < amt) return window.notify('Invalid or insufficient Z-Credits.', true);
-      const found = await window.sbRest(`users?username=ilike.${encodeURIComponent(targetName)}`);
-      const u = Array.isArray(found) ? found.at(0) : null;
-      if (!u) return window.notify(`User @${targetName} not found.`, true);
-      await window.sbRest(`users?id=eq.${p.id}`, 'PATCH', { credits: p.credits - amt }, window.authToken);
-      await window.sbRest(`users?id=eq.${u.id}`, 'PATCH', { credits: u.credits + amt }, window.authToken);
-      await window.logAudit?.('PAY_CREDITS', `@${u.username}`, `Sent ${amt} Z-Credits`);
-      await window.refreshMyProfile();
-      return appendSingleMsg({ id: Date.now(), username: 'ZynkBot', role: 'SYSTEM', color: '#06b6d4', content: `@${p.username} sent **${amt} Z-Credits** to @${u.username}!` });
-    }
-  }
-
   const mult = (p.boost_until && p.boost_until > Date.now()) ? 2 : 1;
   appendSingleMsg({ id: Date.now(), user_id: p.id, username: p.username, avatar: p.avatar, role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: raw, image_url: att?.dataUrl || '', reply_to: replyText, created_at: new Date().toISOString() });
   await window.sbRest('messages', 'POST', { user_id: p.id, username: p.username, avatar: 'logo.png', role: p.role, is_beta: !!p.is_beta, color: p.equipped_color, content: raw, image_url: att?.dataUrl || '', reply_to: replyText, channel: activeChannel }, window.authToken);
@@ -688,4 +649,3 @@ chatForm?.addEventListener('submit', async (e) => {
 window.addEventListener('zynk-profile-updated', buildChannelBar);
 setInterval(pollChatAndMembers, 2000);
 pollChatAndMembers();
-]
