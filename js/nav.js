@@ -308,7 +308,7 @@ function renderSettingsPanel() {
   const p = window.userProfile;
 
   const tabs = [
-    { id: 'DISPLAY', label: 'Themes & Wallpapers' },
+    { id: 'DISPLAY', label: 'Themes & A.Wallpapers' },
     { id: 'ACCOUNT', label: 'Account & Danger Zone' },
     { id: 'NOTIF', label: 'Notifications & App' },
     { id: 'PRIVACY', label: 'Privacy & Safety' },
@@ -394,11 +394,7 @@ function renderSettingsPanel() {
     document.getElementById('update-pass-btn').onclick = async () => {
       const np = document.getElementById('new-pass-inp').value;
       if (!window.authToken || np.length < 6) return window.notify('Sign in and enter a 6+ character password.', true);
-      const res = await fetch(`${SB_URL}/auth/v1/user`, {
-        method: 'PUT',
-        headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + window.authToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: np })
-      });
+      const res = await fetch(`${SB_URL}/auth/v1/user`, { method: 'PUT', headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + window.authToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ password: np }) });
       if (!res.ok) return window.notify('Could not update password.', true);
       document.getElementById('new-pass-inp').value = '';
       window.notify('Password updated!');
@@ -431,18 +427,30 @@ function renderSettingsPanel() {
   }
 
   if (activeSetTab === 'NOTIF') {
-    card.innerHTML = `<h2 style="margin-bottom:14px;">Notifications & Install ZynkOS App</h2><div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;"><button class="btn-neon" id="enable-notif-btn">Enable Browser Notifications</button><button class="btn-outline" id="install-pwa-btn">Install ZynkOS App</button></div><label class="remember-row"><input type="checkbox" id="notif-mentions" checked /><span>Notify me when someone @mentions me in Zynk Chat</span></label>`;
-    document.getElementById('enable-notif-btn').onclick = async () => {
-      if (!('Notification' in window)) return window.notify('Browser notifications not supported here.', true);
-      const perm = await Notification.requestPermission();
-      window.notify(perm === 'granted' ? 'Desktop notifications enabled!' : 'Notification permission denied.', perm !== 'granted');
+    const prefs = JSON.parse(localStorage.getItem('zynk_notif_prefs') || '{"enabled":true,"mentions":true,"dms":true,"friends":true,"announcements":true}');
+    const savePrefs = () => localStorage.setItem('zynk_notif_prefs', JSON.stringify(prefs));
+    card.innerHTML = `<h2 style="margin-bottom:14px;">Desktop & App Notifications</h2><div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;"><button class="${prefs.enabled ? 'btn-outline' : 'btn-neon'}" id="toggle-notif-btn">${prefs.enabled ? 'Turn Notifications Off' : 'Enable Desktop Notifications'}</button><button class="btn-outline" id="test-notif-btn">Send Test Notification</button><button class="btn-outline" id="install-pwa-btn">Install ZynkOS App</button></div><div class="mono-dim" style="margin-bottom:8px;font-weight:700;">CHOOSE WHAT TRIGGERS NOTIFICATIONS</div><label class="remember-row"><input type="checkbox" id="np-mentions" ${prefs.mentions ? 'checked' : ''} /><span>@Mentions in Zynk Chat channels</span></label><label class="remember-row"><input type="checkbox" id="np-dms" ${prefs.dms ? 'checked' : ''} /><span>Direct Messages (Private Chats)</span></label><label class="remember-row"><input type="checkbox" id="np-friends" ${prefs.friends ? 'checked' : ''} /><span>Incoming Friend Requests</span></label><label class="remember-row"><input type="checkbox" id="np-ann" ${prefs.announcements ? 'checked' : ''} /><span>Founder & Staff System Announcements</span></label>`;
+
+    document.getElementById('toggle-notif-btn').onclick = async () => {
+      prefs.enabled = !prefs.enabled;
+      if (prefs.enabled && 'Notification' in window && Notification.permission !== 'granted') await Notification.requestPermission().catch(() => {});
+      savePrefs();
+      window.notify(prefs.enabled ? 'Desktop & App notifications enabled!' : 'All desktop notifications turned off.');
+      renderSettingsPanel();
     };
+    document.getElementById('test-notif-btn').onclick = async () => {
+      if ('Notification' in window && Notification.permission !== 'granted') await Notification.requestPermission().catch(() => {});
+      window.sendZynkSystemNotif?.('ZynkOS • System Test', 'Desktop & App notifications are active!', 'announcements', () => window.openTab?.('dash-view'));
+    };
+    ['mentions', 'dms', 'friends', 'announcements'].forEach((k, idx) => {
+      const ids = ['np-mentions', 'np-dms', 'np-friends', 'np-ann'];
+      document.getElementById(ids[idx]).onchange = (e) => { prefs[k] = e.target.checked; savePrefs(); };
+    });
     document.getElementById('install-pwa-btn').onclick = async () => {
       if (deferredInstallPrompt) { deferredInstallPrompt.prompt(); await deferredInstallPrompt.userChoice; deferredInstallPrompt = null; }
       else window.notify('Click the Install icon in your browser address bar or Browser Menu -> Install ZynkOS!');
     };
   }
-
   if (activeSetTab === 'PRIVACY') {
     card.innerHTML = `<h2 style="margin-bottom:14px;">Privacy & Safety</h2><label class="remember-row"><input type="checkbox" id="priv-show-lb" ${p?.hide_leaderboard ? '' : 'checked'} /><span>Show me on the Global Leaderboard</span></label><label class="remember-row"><input type="checkbox" id="priv-show-on" ${p?.online === false ? '' : 'checked'} /><span>Show my Online status & live activity in Zynk Chat</span></label><button class="btn-neon" id="save-priv-btn" style="margin-top:8px;">Save Privacy Settings</button>`;
     document.getElementById('save-priv-btn').onclick = async () => {
@@ -452,6 +460,7 @@ function renderSettingsPanel() {
       window.notify('Privacy settings saved!');
     };
   }
+
   if (activeSetTab === 'CLOAK') {
     card.innerHTML = `<h2 style="margin-bottom:14px;">Tab Disguise & Instant Panic Key</h2><div class="setting-group"><label>Tab Disguise</label><select id="set-cloak" class="tool-input"><option value="none">None (ZynkOS Default)</option><option value="clever">Clever Portal</option><option value="classroom">Google Classroom</option><option value="drive">Google Drive</option><option value="docs">Google Docs</option></select></div><div class="setting-group"><label>Panic Redirect URL</label><input id="set-panic" class="tool-input" value="${localStorage.getItem('zynk_panic_url') || 'https://google.com'}" /></div><label class="remember-row"><input type="checkbox" id="set-esc" ${localStorage.getItem('zynk_esc_panic') === '1' ? 'checked' : ''} /><span>Press ESC key anytime to trigger instant Panic Redirect</span></label><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;"><button class="btn-neon" id="save-cloak-btn">Save Disguise Settings</button><button class="btn-outline" id="open-inv-btn">Launch Invisible Tab Opener</button></div>`;
     document.getElementById('set-cloak').value = localStorage.getItem('zynk_cloak') || 'none';
@@ -485,11 +494,7 @@ function ensureVortexSdkLoaded() {
   return new Promise((resolve) => {
     if (window.Vortex) return resolve(window.Vortex);
     let sc = document.querySelector('script[src*="vortex.js"]');
-    if (!sc) {
-      sc = document.createElement('script');
-      sc.src = 'https://vortexos.net';
-      document.head.appendChild(sc);
-    }
+    if (!sc) { sc = document.createElement('script'); sc.src = 'https://vortexos.net'; document.head.appendChild(sc); }
     sc.addEventListener('load', () => resolve(window.Vortex));
     sc.addEventListener('error', () => resolve(null));
     setTimeout(() => resolve(window.Vortex || null), 4000);
