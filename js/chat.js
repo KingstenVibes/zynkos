@@ -529,17 +529,26 @@ function buildMsgEl(m) {
   div.querySelector('.msg-author').onclick = openProf;
   return div;
 }
-let lastSeenGlobalNotifId = 0;
-let lastSeenAnnId = 0;
-let lastSeenReqCount = -1;
+const notifiedOnceSet = new Set(JSON.parse(localStorage.getItem('zynk_notified_once') || '[]'));
 
-window.sendZynkSystemNotif = function(title, body, category, onClick) {
+function markNotifiedOnce(key) {
+  if (!key) return true;
+  if (notifiedOnceSet.has(key)) return false;
+  notifiedOnceSet.add(key);
+  const trimmed = [...notifiedOnceSet].slice(-250);
+  localStorage.setItem('zynk_notified_once', JSON.stringify(trimmed));
+  return true;
+}
+
+window.sendZynkSystemNotif = function(title, body, category, onClick, onceKey) {
   const prefs = JSON.parse(localStorage.getItem('zynk_notif_prefs') || '{"enabled":true,"mentions":true,"dms":true,"friends":true,"announcements":true}');
   if (!prefs.enabled) return;
   if (category && prefs[category] === false) return;
+  if (onceKey && !markNotifiedOnce(onceKey)) return;
+
   window.notify?.(`${title}: ${body}`, false, onClick);
   if ('Notification' in window && Notification.permission === 'granted') {
-    const n = new Notification(title, { body, icon: 'logo.png', badge: 'logo.png' });
+    const n = new Notification(title, { body, icon: 'logo.png', badge: 'logo.png', tag: onceKey || undefined });
     n.onclick = () => { window.focus(); onClick?.(); n.close(); };
   }
 };
@@ -547,37 +556,38 @@ window.sendZynkSystemNotif = function(title, body, category, onClick) {
 async function pollBackgroundNotifications() {
   const me = window.userProfile;
   if (!window.sbRest || !me) return;
-  const recent = await window.sbRest(`messages?select=id,username,content,channel&id=gt.${lastSeenGlobalNotifId}&order=id.asc&limit=15`).catch(() => []);
+  const onChatTab = !document.getElementById('chat-view')?.classList.contains('hidden');
+  const onDashTab = !document.getElementById('dash-view')?.classList.contains('hidden');
+
+  const recent = await window.sbRest('messages?select=id,username,content,channel&order=id.desc&limit=15').catch(() => []);
   if (Array.isArray(recent) && recent.length) {
-    const firstRun = lastSeenGlobalNotifId === 0;
-    recent.forEach(m => {
-      if (m.id > lastSeenGlobalNotifId) lastSeenGlobalNotifId = m.id;
-      if (firstRun || m.username === me.username || m.username === 'ZynkBot') return;
+    recent.reverse().forEach(m => {
+      const key = `msg_${me.id}_${m.id}`;
+      if (m.username === me.username || m.username === 'ZynkBot') return;
       const ch = m.channel || 'global';
       if (!canAccessChannel(me, ch)) return;
+      if (onChatTab && activeChannel === ch) { markNotifiedOnce(key); return; }
+
       if (ch.startsWith('dm_')) {
-        window.sendZynkSystemNotif(`ZynkOS • Private DM from @${m.username}`, m.content || 'Sent an attachment', 'dms', () => { window.openTab?.('chat-view'); window.switchChatChannel(ch, `@${m.username}`); });
+        window.sendZynkSystemNotif(`ZynkOS • DM from @${m.username}`, m.content || 'Sent an attachment', 'dms', () => { window.openTab?.('chat-view'); window.switchChatChannel(ch, `@${m.username}`); }, key);
       } else if (new RegExp(`@${me.username}\\b`, 'i').test(m.content || '')) {
-        window.sendZynkSystemNotif(`ZynkOS • #${ch}`, `@${m.username}: ${m.content}`, 'mentions', () => { window.openTab?.('chat-view'); window.switchChatChannel(ch, ch === 'global' ? '#zynk-global' : `#${ch}`); });
+        window.sendZynkSystemNotif(`ZynkOS • #${ch}`, `@${m.username}: ${m.content}`, 'mentions', () => { window.openTab?.('chat-view'); window.switchChatChannel(ch, ch === 'global' ? '#zynk-global' : `#${ch}`); }, key);
       }
     });
   }
+
   const anns = await window.sbRest('announcements?select=id,title,body,author&order=id.desc&limit=1').catch(() => []);
   const latestAnn = Array.isArray(anns) ? anns.at(0) : null;
-  if (latestAnn) {
-    if (lastSeenAnnId > 0 && latestAnn.id > lastSeenAnnId && latestAnn.author !== me.username) {
-      window.sendZynkSystemNotif(`ZynkOS • ${latestAnn.title}`, latestAnn.body, 'announcements', () => window.openTab?.('dash-view'));
-    }
-    lastSeenAnnId = latestAnn.id;
+  if (latestAnn && latestAnn.author !== me.username && !onDashTab) {
+    window.sendZynkSystemNotif(`ZynkOS • ${latestAnn.title}`, latestAnn.body, 'announcements', () => window.openTab?.('dash-view'), `ann_${me.id}_${latestAnn.id}`);
   }
+
   const reqs = Array.isArray(me.friend_requests) ? me.friend_requests : [];
-  if (lastSeenReqCount >= 0 && reqs.length > lastSeenReqCount) {
-    window.sendZynkSystemNotif('ZynkOS • New Friend Request', 'Someone sent you a friend request! Click to view.', 'friends', () => window.openInboxModal?.());
-  }
-  lastSeenReqCount = reqs.length;
+  reqs.forEach(fromId => {
+    window.sendZynkSystemNotif('ZynkOS • Friend Request', 'You have a new friend request! Click to view.', 'friends', () => window.openInboxModal?.(), `req_${me.id}_${fromId}`);
+  });
 }
 setInterval(pollBackgroundNotifications, 4000);
-
 function appendSingleMsg(m) {
   if (!msgBox) return;
   msgBox.appendChild(buildMsgEl(m));
@@ -591,6 +601,7 @@ function renderMessages(msgs) {
   msgs.forEach(m => msgBox.appendChild(buildMsgEl(m)));
   if (wasAtBottom || !initialChatLoaded) msgBox.scrollTop = msgBox.scrollHeight;
 }
+
 function ensureChatScrollControls() {
   const mainCol = document.querySelector('#chat-view .chat-main');
   if (!mainCol || document.getElementById('chat-unread-bar')) return;
@@ -655,6 +666,7 @@ async function pollChatAndMembers() {
     }
   }
 }
+
 document.addEventListener('keydown', (e) => {
   if (e.target.id === 'chat-input' && e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
